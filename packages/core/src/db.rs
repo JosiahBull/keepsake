@@ -1,3 +1,4 @@
+use anyhow::Context;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
 use std::{str::FromStr, time::Duration};
 
@@ -18,13 +19,25 @@ pub async fn connect(url: &str) -> anyhow::Result<sqlx::SqlitePool> {
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
     {
-        std::fs::create_dir_all(parent)?;
+        std::fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "create SQLite directory {}; it must be writable by the running user",
+                parent.display()
+            )
+        })?;
     }
+    let filename = options.get_filename().to_path_buf();
     let pool = SqlitePoolOptions::new()
         .max_connections(4)
         .acquire_timeout(Duration::from_secs(5))
         .connect_with(options)
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "open or create SQLite database {}; its directory must be writable by the running user, including for WAL files",
+                filename.display()
+            )
+        })?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     Ok(pool)
 }

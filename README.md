@@ -3,13 +3,27 @@
 A personal library for storing facts and practising recall, explanation, and application.
 The TypeScript website builds to static files served by a Rust/Axum backend with SQLite.
 
+## Screenshots
+
+Example household vocabulary in the library:
+
+![Keepsake library with searchable te reo Māori facts and an expanded answer](docs/screenshots/library.png)
+
+Scheduled recall with feedback and the next review intervals:
+
+![A typed recall attempt, revealed answer, and Again, Hard, Good and Easy interval choices](docs/screenshots/scheduled-recall.png)
+
+Matching questions and answers from the same topic:
+
+![A matching round with four food and drink words from one te reo Māori topic bank](docs/screenshots/matching.png)
+
 ## Install
 
 Download the CLI for your platform from [Releases](https://github.com/JosiahBull/keepsake/releases/latest).
 Verify its archive against the release's `SHA256SUMS`, extract it, and put `keepsake`
 on your `PATH`. Linux, macOS, and Windows binaries are available.
 
-The container image is `ghcr.io/josiahbull/keepsake:0.2.0` for Linux amd64 and arm64.
+The container image is `ghcr.io/josiahbull/keepsake:0.3.0` for Linux amd64 and arm64.
 From a checkout, start it with persistent SQLite storage using:
 
 ```sh
@@ -20,7 +34,7 @@ docker compose up -d
 Open http://localhost:8080. The CLI can also be built independently from source:
 
 ```sh
-cargo install --git https://github.com/JosiahBull/keepsake --tag v0.2.0 keepsake-cli --locked
+cargo install --git https://github.com/JosiahBull/keepsake --tag v0.3.0 keepsake-cli --locked
 ```
 
 ## Capture a fact
@@ -259,6 +273,11 @@ Node is only needed to build the frontend.
 Run the server from the repository root with its defaults. `.env` files are not loaded
 automatically. Embedded, append-only migrations run on startup. SQLite uses WAL, foreign
 keys, and a four-connection pool. Keep the database on local persistent storage.
+
+Missing database files and parent directories are created on startup. The database
+directory must be writable, including for SQLite's WAL files. The container runs as
+UID/GID `10001:10001`; bind-mounted storage must grant that user write access.
+The default Compose named volume is initialized with the image's directory ownership.
 
 An explicitly configured `WEB_DIR` must contain a readable `index.html`; startup fails
 before opening SQLite when it is missing. With `WEB_DIR` unset, the development API can
