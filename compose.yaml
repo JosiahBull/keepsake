@@ -7,6 +7,13 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - keepsake-data:/data
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    stop_grace_period: 30s
     restart: unless-stopped
 volumes:
   keepsake-data:

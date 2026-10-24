@@ -22,6 +22,11 @@ trap cleanup EXIT
 # published port is unused by `run`; this one-off gets an ephemeral loopback port.
 "${compose[@]}" run --detach --no-deps --pull never \
   --publish 127.0.0.1::8080 --name "$container" keepsake >/dev/null
+docker inspect --format '{{json .HostConfig}}' "$container" | jq -e '
+  .ReadonlyRootfs and (.CapDrop | index("ALL"))
+  and (.SecurityOpt | any(. == "no-new-privileges:true" or . == "no-new-privileges"))
+  and (.Tmpfs["/tmp"] | contains("size=64m") and contains("noexec") and contains("nosuid") and contains("nodev"))
+' >/dev/null
 endpoint=$(docker port "$container" 8080/tcp)
 [[ "$endpoint" == 127.0.0.1:* ]] || { echo 'Expected a loopback container port.' >&2; exit 1; }
 base="http://$endpoint"
@@ -31,6 +36,16 @@ for ((attempt=0; attempt<30; attempt++)); do
   sleep 1
 done
 jq -e '.status == "ok"' "$scratch/health.json" >/dev/null
+docker exec "$container" keepsake-server --health-check
+docker exec --user 0 "$container" sh -c '
+  if touch /app/.smoke-root-write 2>/dev/null; then
+    echo "Container root filesystem is writable." >&2
+    exit 1
+  fi
+  temporary=$(mktemp /tmp/keepsake-smoke.XXXXXX)
+  test -w "$temporary"
+  rm "$temporary"
+'
 
 curl_args=(--fail --silent --show-error --connect-timeout 2 --max-time 5)
 curl "${curl_args[@]}" "$base/" > "$scratch/index.html"
@@ -64,4 +79,4 @@ curl "${curl_args[@]}" "$base/api/facts/$fact_id" | jq -e --argjson id "$fact_id
   .id == $id and .answer == "Write-ahead logging" and .source == "container-smoke"
   and .tags == ["ci"] and any(.practices[]; .kind == "flashcard" and .answer == "Write-ahead logging")
 ' >/dev/null
-printf 'Container health, built SPA and shared SQLite passed: %s\n' "$KEEPSAKE_IMAGE"
+printf 'Container confinement, health, built SPA and shared SQLite passed: %s\n' "$KEEPSAKE_IMAGE"
