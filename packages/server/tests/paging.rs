@@ -82,3 +82,35 @@ async fn exposes_page_cursors_global_samples_and_validated_bounds() {
     );
     pool.close().await;
 }
+
+#[tokio::test]
+async fn searches_te_reo_with_either_case_of_url_encoded_macrons() {
+    let directory = tempfile::tempdir().unwrap();
+    let pool = db::connect(&format!(
+        "sqlite:{}",
+        directory.path().join("macrons.db").display()
+    ))
+    .await
+    .unwrap();
+    facts::create(
+        &pool,
+        NewFact {
+            prompt: "Offer help".into(),
+            answer: "Ka Āwhina ahau i a koe.".into(),
+            context: String::new(),
+            source: String::new(),
+            tags: vec![],
+            practices: vec![],
+        },
+    )
+    .await
+    .unwrap();
+    let app = router(pool.clone(), directory.path());
+    for search in ["%C4%81whina", "%C4%80WHINA"] {
+        let (status, page) = get(app.clone(), &format!("/api/facts?search={search}")).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(page["total"], 1);
+        assert_eq!(page["items"][0]["answer"], "Ka Āwhina ahau i a koe.");
+    }
+    pool.close().await;
+}

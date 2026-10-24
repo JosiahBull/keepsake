@@ -159,8 +159,9 @@ the [saved research](docs/research/learning-and-retention-2026-10-24.md). The re
 retrieval, feedback, and spacing; the particular mix of formats is a product proposal.
 
 Library reads use bounded pages. `keepsake list --search 'sqlite' --limit 25` searches
-questions, answers, context, and tags. Search treats `%` and `_` literally and uses
-SQLite's case-insensitive ASCII matching. JSON output is `{items, next_cursor, total}`;
+questions, answers, context, and tags. Search treats `%` and `_` literally and matches
+ASCII and Māori macron vowels regardless of case. Other non-ASCII letters
+are case-sensitive. JSON output is `{items, next_cursor, total}`;
 continue with `--before NEXT_CURSOR` and the same search until the cursor is null.
 `list` accepts 1–100 facts per page; `show ID` includes that fact's practice variants.
 

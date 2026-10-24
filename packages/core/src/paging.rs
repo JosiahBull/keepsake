@@ -32,19 +32,6 @@ impl TryFrom<FactRow> for FactSummary {
     }
 }
 
-fn fact_limit() -> i64 {
-    25
-}
-fn review_limit() -> i64 {
-    50
-}
-fn session_limit() -> i64 {
-    20
-}
-fn sample_limit() -> i64 {
-    4
-}
-
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(default, deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
@@ -56,15 +43,17 @@ pub struct FactQuery {
     /// Literal substring search across question, answer, context, and tags.
     pub search: String,
 }
+
 impl Default for FactQuery {
     fn default() -> Self {
         Self {
-            limit: fact_limit(),
+            limit: 25,
             before_id: None,
             search: String::new(),
         }
     }
 }
+
 impl FactQuery {
     pub fn validate(&self) -> anyhow::Result<()> {
         validate_limit(self.limit, 100)?;
@@ -79,6 +68,7 @@ impl FactQuery {
         Ok(())
     }
 }
+
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(default, deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
@@ -88,14 +78,16 @@ pub struct ReviewQuery {
     /// Return reviews newer than this ID.
     pub after_id: Option<i64>,
 }
+
 impl Default for ReviewQuery {
     fn default() -> Self {
         Self {
-            limit: review_limit(),
+            limit: 50,
             after_id: None,
         }
     }
 }
+
 impl ReviewQuery {
     pub fn validate(&self) -> anyhow::Result<()> {
         validate_limit(self.limit, 100)?;
@@ -106,6 +98,7 @@ impl ReviewQuery {
         Ok(())
     }
 }
+
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(default, deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
@@ -113,13 +106,13 @@ pub struct PracticeQuery {
     /// Number of random prompts, from 1 to 50 (default 20).
     pub limit: i64,
 }
+
 impl Default for PracticeQuery {
     fn default() -> Self {
-        Self {
-            limit: session_limit(),
-        }
+        Self { limit: 20 }
     }
 }
+
 #[derive(Debug, Deserialize, IntoParams)]
 #[serde(default, deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
@@ -127,23 +120,25 @@ pub struct SampleQuery {
     /// Number of distinct matching pairs, from 1 to 4 (default 4).
     pub limit: i64,
 }
+
 impl Default for SampleQuery {
     fn default() -> Self {
-        Self {
-            limit: sample_limit(),
-        }
+        Self { limit: 4 }
     }
 }
+
 impl PracticeQuery {
     pub fn validate(&self) -> anyhow::Result<()> {
         validate_limit(self.limit, 50)
     }
 }
+
 impl SampleQuery {
     pub fn validate(&self) -> anyhow::Result<()> {
         validate_limit(self.limit, 4)
     }
 }
+
 fn validate_limit(limit: i64, maximum: i64) -> anyhow::Result<()> {
     ensure!(
         (1..=maximum).contains(&limit),
@@ -158,32 +153,43 @@ pub struct FactPage {
     pub next_cursor: Option<i64>,
     pub total: i64,
 }
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct ReviewPage {
     pub items: Vec<Review>,
     pub next_cursor: Option<i64>,
     pub total: i64,
 }
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct PracticeQuestion {
     pub fact: FactSummary,
     pub practice: Practice,
 }
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct PracticeSession {
     pub items: Vec<PracticeQuestion>,
     pub total: i64,
 }
+
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
 pub struct FactSample {
     pub items: Vec<FactSummary>,
 }
 
 fn search_pattern(search: &str) -> String {
+    // Match the SQL fold exactly; other Unicode letters remain case-sensitive.
     // Treat wildcard characters as text, including the escape character itself.
     format!(
         "%{}%",
         search
+            .to_ascii_lowercase()
+            .replace('Ā', "ā")
+            .replace('Ē', "ē")
+            .replace('Ī', "ī")
+            .replace('Ō', "ō")
+            .replace('Ū', "ū")
             .replace('#', "##")
             .replace('%', "#%")
             .replace('_', "#_")
@@ -195,13 +201,16 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     let pattern = search_pattern(&query.search);
     let fetch_limit = query.limit + 1;
     let mut connection = pool.acquire().await?;
+    // JSON's table-valued function applies the same fold to each searchable field
+    // without joining unrelated field boundaries into a possible substring match.
     let total = sqlx::query_scalar!(
         "SELECT count(*) AS \"count!: i64\" FROM facts
-         WHERE prompt LIKE ? ESCAPE '#' OR answer LIKE ? ESCAPE '#'
-            OR context LIKE ? ESCAPE '#' OR tags LIKE ? ESCAPE '#'",
-        pattern,
-        pattern,
-        pattern,
+         WHERE EXISTS (
+           SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field
+           WHERE lower(replace(replace(replace(replace(replace(
+             field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))
+             LIKE ? ESCAPE '#'
+         )",
         pattern
     )
     .fetch_one(&mut *connection)
@@ -209,15 +218,15 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     let mut rows = sqlx::query_as!(
         FactRow,
         "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts
-         WHERE (? IS NULL OR id < ?) AND
-           (prompt LIKE ? ESCAPE '#' OR answer LIKE ? ESCAPE '#'
-            OR context LIKE ? ESCAPE '#' OR tags LIKE ? ESCAPE '#')
+         WHERE (? IS NULL OR id < ?) AND EXISTS (
+           SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field
+           WHERE lower(replace(replace(replace(replace(replace(
+             field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))
+             LIKE ? ESCAPE '#'
+         )
          ORDER BY id DESC LIMIT ?",
         query.before_id,
         query.before_id,
-        pattern,
-        pattern,
-        pattern,
         pattern,
         fetch_limit
     )

@@ -254,3 +254,123 @@ async fn rejects_out_of_range_bounds_without_running_unbounded_queries() {
     );
     pool.close().await;
 }
+
+#[tokio::test]
+async fn search_folds_maori_macrons_in_every_field_without_losing_page_boundaries() {
+    let (_directory, pool) = pool().await;
+    for (index, field) in ["prompt", "answer", "context", "tags"]
+        .into_iter()
+        .enumerate()
+    {
+        for vowels in ["āēīōū", "ĀĒĪŌŪ"] {
+            let mut input = fact(index);
+            let value = format!("{field} {vowels}");
+            match field {
+                "prompt" => input.prompt = value,
+                "answer" => input.answer = value,
+                "context" => input.context = value,
+                "tags" => input.tags = vec![value],
+                _ => unreachable!(),
+            }
+            facts::create(&pool, input).await.unwrap();
+        }
+        let page = paging::facts(
+            &pool,
+            &FactQuery {
+                search: format!("{field} ĀĒĪŌŪ"),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.total, 2, "{field}");
+        assert_eq!(page.items.len(), 2, "{field}");
+    }
+    for vowels in ["ā", "Ā", "ē", "Ē", "ī", "Ī", "ō", "Ō", "ū", "Ū"] {
+        assert_eq!(
+            paging::facts(
+                &pool,
+                &FactQuery {
+                    search: vowels.into(),
+                    ..Default::default()
+                }
+            )
+            .await
+            .unwrap()
+            .total,
+            8,
+            "{vowels}"
+        );
+    }
+    let mut ids = HashSet::new();
+    let mut cursor = None;
+    for search in ["ĀĒĪŌŪ", "āēīōū", "ĀĒĪŌŪ"] {
+        let page = paging::facts(
+            &pool,
+            &FactQuery {
+                search: search.into(),
+                limit: 3,
+                before_id: cursor,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.total, 8);
+        assert!(page.items.len() <= 3);
+        for item in page.items {
+            assert!(ids.insert(item.id));
+        }
+        cursor = page.next_cursor;
+    }
+    assert!(cursor.is_none());
+    assert_eq!(ids.len(), 8);
+
+    let mut greek = fact(99);
+    greek.prompt = "Σ".into();
+    facts::create(&pool, greek).await.unwrap();
+    for (search, expected) in [("Σ", 1), ("σ", 0)] {
+        let page = paging::facts(
+            &pool,
+            &FactQuery {
+                search: search.into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.total, expected, "{search}");
+    }
+
+    let mut literal = fact(100);
+    literal.prompt = "Whānau 100%_#\\ Ā".into();
+    facts::create(&pool, literal).await.unwrap();
+    let page = paging::facts(
+        &pool,
+        &FactQuery {
+            search: "WHĀNAU 100%_#\\ ā".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.total, 1);
+    assert_eq!(page.items[0].prompt, "Whānau 100%_#\\ Ā");
+    let mut separate = fact(101);
+    separate.prompt = "adjoining".into();
+    separate.answer = "separate".into();
+    facts::create(&pool, separate).await.unwrap();
+    assert_eq!(
+        paging::facts(
+            &pool,
+            &FactQuery {
+                search: "adjoining separate".into(),
+                ..Default::default()
+            }
+        )
+        .await
+        .unwrap()
+        .total,
+        0
+    );
+    pool.close().await;
+}

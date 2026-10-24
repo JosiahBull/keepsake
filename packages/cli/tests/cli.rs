@@ -511,3 +511,24 @@ fn lists_bounded_pages_with_visible_cursors_and_server_equivalent_search() {
     assert_eq!(filtered["total"], 1);
     assert!(!cli(&database, &["list", "--limit", "101"]).status.success());
 }
+
+#[test]
+fn finds_te_reo_answers_using_either_macron_case() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("maori.db");
+    json(&cli(
+        &database,
+        &[
+            "add",
+            "--prompt",
+            "Offer help",
+            "--answer",
+            "Ka Āwhina ahau i a koe.",
+        ],
+    ));
+    for search in ["āwhina", "ĀWHINA"] {
+        let page = json(&cli(&database, &["list", "--search", search]));
+        assert_eq!(page["total"], 1);
+        assert_eq!(page["items"][0]["answer"], "Ka Āwhina ahau i a koe.");
+    }
+}
