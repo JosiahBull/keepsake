@@ -1,6 +1,7 @@
 pub use keepsake_core::{db, facts};
 pub mod config;
 mod facts_api;
+pub mod lifecycle;
 
 use axum::{
     Json, Router,
