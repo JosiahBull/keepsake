@@ -11,6 +11,4 @@ serde_json.workspace = true
 sqlx.workspace = true
 utoipa.workspace = true
 tempfile = "3"
-
-[dev-dependencies]
 tokio.workspace = true

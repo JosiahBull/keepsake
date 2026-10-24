@@ -293,13 +293,17 @@ pub async fn create_many(pool: &SqlitePool, facts: Vec<NewFact>) -> anyhow::Resu
     for fact in &facts {
         validate_new_fact(fact)?;
     }
-    let mut transaction = pool.begin().await?;
-    let mut saved = Vec::with_capacity(facts.len());
-    for fact in facts {
-        saved.push(insert_fact(&mut transaction, fact).await?);
-    }
-    transaction.commit().await?;
-    Ok(saved)
+    crate::db::write_transaction(pool, move |connection| {
+        let facts = facts.clone();
+        Box::pin(async move {
+            let mut saved = Vec::with_capacity(facts.len());
+            for fact in facts {
+                saved.push(insert_fact(connection, fact).await?);
+            }
+            Ok(saved)
+        })
+    })
+    .await
 }
 
 async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> anyhow::Result<Fact> {
@@ -343,19 +347,20 @@ pub async fn add_practices(
 ) -> anyhow::Result<Fact> {
     ensure!(!practices.is_empty(), "provide at least one practice");
     validate_practices(&practices)?;
-    let mut transaction = pool.begin().await?;
-    ensure!(
-        load_id(&mut transaction, id).await?.is_some(),
-        "fact {id} does not exist"
-    );
-    for practice in &practices {
-        insert_practice(&mut transaction, id, practice).await?;
-    }
-    let result = load_id(&mut transaction, id)
-        .await?
-        .context("fact missing")?;
-    transaction.commit().await?;
-    Ok(result)
+    crate::db::write_transaction(pool, move |connection| {
+        let practices = practices.clone();
+        Box::pin(async move {
+            ensure!(
+                load_id(connection, id).await?.is_some(),
+                "fact {id} does not exist"
+            );
+            for practice in &practices {
+                insert_practice(connection, id, practice).await?;
+            }
+            load_id(connection, id).await?.context("fact missing")
+        })
+    })
+    .await
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
@@ -402,7 +407,7 @@ impl ReviewOutcome {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewReview {
     pub fact_id: i64,
@@ -453,32 +458,38 @@ pub fn validate_review(review: &NewReview, fact: &Fact) -> anyhow::Result<()> {
 }
 
 pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Result<Review> {
-    let fact = get(pool, review.fact_id)
-        .await?
-        .context("fact does not exist")?;
-    validate_review(&review, &fact)?;
-    let (id, reviewed_at): (i64, String) = sqlx::query_as(
-        "INSERT INTO reviews (fact_id, practice_id, method, outcome, response_ms)
+    crate::db::write_transaction(pool, move |connection| {
+        let review = review.clone();
+        Box::pin(async move {
+            let fact = load_id(connection, review.fact_id)
+                .await?
+                .context("fact does not exist")?;
+            validate_review(&review, &fact)?;
+            let (id, reviewed_at): (i64, String) = sqlx::query_as(
+                "INSERT INTO reviews (fact_id, practice_id, method, outcome, response_ms)
          VALUES (?, ?, ?, ?, ?)
          RETURNING id, reviewed_at",
-    )
-    .bind(review.fact_id)
-    .bind(review.practice_id)
-    .bind(review.method.as_str())
-    .bind(review.outcome.as_str())
-    .bind(review.response_ms)
-    .fetch_one(pool)
-    .await?;
+            )
+            .bind(review.fact_id)
+            .bind(review.practice_id)
+            .bind(review.method.as_str())
+            .bind(review.outcome.as_str())
+            .bind(review.response_ms)
+            .fetch_one(&mut *connection)
+            .await?;
 
-    Ok(Review {
-        id,
-        fact_id: review.fact_id,
-        practice_id: review.practice_id,
-        method: review.method,
-        outcome: review.outcome,
-        response_ms: review.response_ms,
-        reviewed_at,
+            Ok(Review {
+                id,
+                fact_id: review.fact_id,
+                practice_id: review.practice_id,
+                method: review.method,
+                outcome: review.outcome,
+                response_ms: review.response_ms,
+                reviewed_at,
+            })
+        })
     })
+    .await
 }
 
 #[derive(FromRow)]

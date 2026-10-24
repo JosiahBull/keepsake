@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::{Path, State},
-    http::StatusCode,
+    http::{StatusCode, header::RETRY_AFTER},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -27,6 +27,12 @@ impl ApiError {
     }
 
     fn internal(error: anyhow::Error) -> Self {
+        if crate::db::is_overloaded(&error) {
+            return Self(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Library is busy. Try again shortly.".into(),
+            );
+        }
         tracing::error!(%error, "fact storage operation failed");
         Self(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -37,17 +43,25 @@ impl ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
-        (self.0, Json(ErrorBody { error: self.1 })).into_response()
+        let status = self.0;
+        let mut response = (status, Json(ErrorBody { error: self.1 })).into_response();
+        if status == StatusCode::SERVICE_UNAVAILABLE {
+            response
+                .headers_mut()
+                .insert(RETRY_AFTER, "1".parse().expect("valid retry delay"));
+        }
+        response
     }
 }
 
-#[utoipa::path(get, path = "/api/facts", responses((status = 200, body = [Fact])))]
+#[utoipa::path(get, path = "/api/facts", responses((status = 200, body = [Fact]), (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)))]
 pub async fn list(State(pool): State<SqlitePool>) -> Result<Json<Vec<Fact>>, ApiError> {
     Ok(Json(facts::list(&pool).await.map_err(ApiError::internal)?))
 }
 
 #[utoipa::path(post, path = "/api/facts", request_body = NewFact, responses(
-    (status = 201, body = Fact), (status = 400, body = ErrorBody)
+    (status = 201, body = Fact), (status = 400, body = ErrorBody),
+    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
 ))]
 pub async fn create(
     State(pool): State<SqlitePool>,
@@ -62,7 +76,8 @@ pub async fn create(
 }
 
 #[utoipa::path(get, path = "/api/facts/{id}", params(("id" = i64, Path)), responses(
-    (status = 200, body = Fact), (status = 404, body = ErrorBody)
+    (status = 200, body = Fact), (status = 404, body = ErrorBody),
+    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
 ))]
 pub async fn get(
     State(pool): State<SqlitePool>,
@@ -77,7 +92,8 @@ pub async fn get(
 }
 
 #[utoipa::path(post, path = "/api/facts/{id}/practices", params(("id" = i64, Path)), request_body = [NewPractice], responses(
-    (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)
+    (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
 ))]
 pub async fn add_practices(
     State(pool): State<SqlitePool>,
@@ -105,7 +121,8 @@ pub async fn add_practices(
 }
 
 #[utoipa::path(post, path = "/api/reviews", request_body = NewReview, responses(
-    (status = 201, body = Review), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody)
+    (status = 201, body = Review), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
 ))]
 pub async fn review(
     State(pool): State<SqlitePool>,
@@ -127,7 +144,8 @@ pub async fn review(
 }
 
 #[utoipa::path(get, path = "/api/facts/{id}/reviews", params(("id" = i64, Path)), responses(
-    (status = 200, body = [Review]), (status = 404, body = ErrorBody)
+    (status = 200, body = [Review]), (status = 404, body = ErrorBody),
+    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
 ))]
 pub async fn reviews(
     State(pool): State<SqlitePool>,

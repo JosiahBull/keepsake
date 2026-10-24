@@ -108,3 +108,36 @@ async fn api_round_trip_and_validation_statuses() {
     assert_eq!(facts::reviews(&pool, saved.id).await.unwrap().len(), 1);
     pool.close().await;
 }
+
+#[tokio::test]
+async fn write_contention_returns_retryable_service_unavailable() {
+    let directory = tempfile::tempdir().unwrap();
+    let pool = db::connect(&format!(
+        "sqlite:{}",
+        directory.path().join("busy.db").display()
+    ))
+    .await
+    .unwrap();
+    let writer = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
+    let response = router(pool.clone(), directory.path())
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/facts")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&fact()).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(response.headers()["retry-after"], "1");
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body).unwrap()["error"],
+        "Library is busy. Try again shortly."
+    );
+    writer.rollback().await.unwrap();
+    assert!(facts::list(&pool).await.unwrap().is_empty());
+    pool.close().await;
+}
