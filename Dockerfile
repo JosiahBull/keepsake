@@ -46,4 +46,6 @@ ENV DATABASE_URL=sqlite:/data/keepsake.db BIND_ADDR=0.0.0.0:8080 WEB_DIR=/app/we
 USER keepsake
 VOLUME ["/data"]
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD ["/usr/local/bin/keepsake-server", "--health-check"]
 ENTRYPOINT ["keepsake-server"]
