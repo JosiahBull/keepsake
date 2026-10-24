@@ -13,8 +13,8 @@ plus standalone CLI archives. A release is complete when both are available.
 5. Create an annotated tag matching the version, then push it:
 
    ```sh
-   git tag -a v0.2.0 -m 'Keepsake 0.2.0'
-   git push origin v0.2.0
+   git tag -a v0.3.0 -m 'Keepsake 0.3.0'
+   git push origin v0.3.0
    ```
 
 Use the next version for later releases. Do not move an already published tag.
@@ -39,7 +39,7 @@ Watch the Release workflow through completion. Check the GitHub release contains
 CLI archives and SHA256 checksums, and verify the container manifest includes
 `linux/amd64` and `linux/arm64`.
 
-The image is `ghcr.io/josiahbull/keepsake:0.2.0`, also tagged `0.2` and `latest`.
+The image is `ghcr.io/josiahbull/keepsake:0.3.0`, also tagged `0.3` and `latest`.
 On the first release, set the package's visibility to Public in GitHub's package
 settings, then verify the image is accessible without credentials. Public repository
 visibility alone does not make its container package public.
