@@ -26,6 +26,48 @@ fn json(output: &Output) -> Value {
 }
 
 #[test]
+fn backup_and_restore_preserve_library_without_overwriting() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("source.db");
+    let backup = temp.path().join("backup.db");
+    let restored = temp.path().join("restored.db");
+    json(&cli(
+        &db,
+        &["add", "--prompt", "Remember?", "--answer", "Yes"],
+    ));
+    let report = json(&cli(&db, &["backup", backup.to_str().unwrap()]));
+    assert_eq!(report["facts"], 1);
+    assert!(
+        !cli(&db, &["backup", backup.to_str().unwrap()])
+            .status
+            .success()
+    );
+    json(&cli(
+        &db,
+        &[
+            "restore",
+            backup.to_str().unwrap(),
+            "--to",
+            restored.to_str().unwrap(),
+        ],
+    ));
+    assert_eq!(json(&cli(&restored, &["show", "1"]))["answer"], "Yes");
+    assert!(
+        !cli(
+            &db,
+            &[
+                "restore",
+                backup.to_str().unwrap(),
+                "--to",
+                db.to_str().unwrap()
+            ]
+        )
+        .status
+        .success()
+    );
+}
+
+#[test]
 fn capture_from_any_directory_and_read_back() {
     let temp = tempfile::tempdir().unwrap();
     let db = temp.path().join("facts.db");
