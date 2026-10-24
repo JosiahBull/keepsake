@@ -9,7 +9,7 @@ Download the CLI for your platform from [Releases](https://github.com/JosiahBull
 Verify its archive against the release's `SHA256SUMS`, extract it, and put `keepsake`
 on your `PATH`. Linux, macOS, and Windows binaries are available.
 
-The container image is `ghcr.io/josiahbull/keepsake:0.1.0` for Linux amd64 and arm64.
+The container image is `ghcr.io/josiahbull/keepsake:0.2.0` for Linux amd64 and arm64.
 From a checkout, start it with persistent SQLite storage using:
 
 ```sh
@@ -20,7 +20,7 @@ docker compose up -d
 Open http://localhost:8080. The CLI can also be built independently from source:
 
 ```sh
-cargo install --git https://github.com/JosiahBull/keepsake --tag v0.1.0 keepsake-cli --locked
+cargo install --git https://github.com/JosiahBull/keepsake --tag v0.2.0 keepsake-cli --locked
 ```
 
 ## Capture a fact
@@ -276,16 +276,22 @@ copying its data directory: WAL files can contain committed data outside the mai
 
 `pnpm gen:client` generates OpenAPI from Rust and then the TypeScript contract. Commit the
 schema and generated types together. The API exposes facts, practice variants, reviews,
-health, and OpenAPI. Unknown API routes return 404 rather than the SPA. SQL queries use
-runtime validation; Sure's offline SQLx query metadata workflow has not been added.
+health, and OpenAPI. Unknown API routes return 404 rather than the SPA. Static SQL queries
+are checked against the committed offline SQLx metadata. `pnpm sqlx:check` verifies it
+against a temporary database built from migrations.
 
 ```sh
+pnpm --filter @keepsake/web exec playwright install chromium webkit
 pnpm check
 pnpm test
 ```
 
+Install browsers once. `pnpm test` runs Rust tests and the browser suite.
 Tests use temporary databases and fake agent executables to cover persistence, validation,
 API boundaries, exact draft import, subprocess failures, deadlines, and output limits.
+Browser tests drive the built website through the real Rust server in desktop/mobile
+Chromium and mobile WebKit, covering fact capture, practice, matching and recovery.
+See [Browser tests](docs/testing.md) for commands, visual baselines and failure reports.
 The supplied research is preserved with its original citations; saving it did not
 independently verify its claims.
 
