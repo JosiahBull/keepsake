@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Shared process helpers are used by several integration-test binaries.
+
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
@@ -9,6 +11,7 @@ use std::{
 pub struct Server {
     child: Child,
     output: Arc<Mutex<String>>,
+    readers: Vec<std::thread::JoinHandle<()>>,
     pub address: SocketAddr,
     pub directory: tempfile::TempDir,
 }
@@ -39,22 +42,24 @@ impl Server {
             .stderr(Stdio::piped());
         let mut child = command.spawn().unwrap();
         let output = Arc::new(Mutex::new(String::new()));
+        let mut readers = Vec::new();
         for reader in [
             Box::new(child.stdout.take().unwrap()) as Box<dyn Read + Send>,
             Box::new(child.stderr.take().unwrap()) as Box<dyn Read + Send>,
         ] {
             let output = output.clone();
-            std::thread::spawn(move || {
+            readers.push(std::thread::spawn(move || {
                 for line in BufReader::new(reader).lines().map_while(Result::ok) {
                     let mut output = output.lock().unwrap();
                     output.push_str(&line);
                     output.push('\n');
                 }
-            });
+            }));
         }
         Self {
             child,
             output,
+            readers,
             address,
             directory,
         }
@@ -100,6 +105,9 @@ impl Server {
         let deadline = Instant::now() + limit;
         while Instant::now() < deadline {
             if let Some(status) = self.child.try_wait().unwrap() {
+                for reader in self.readers.drain(..) {
+                    reader.join().unwrap();
+                }
                 return status;
             }
             std::thread::sleep(Duration::from_millis(10));
