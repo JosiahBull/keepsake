@@ -13,5 +13,7 @@
 docs
 skills
 packages/client/openapi.json
+packages/web/tests
+packages/web/playwright.config.ts
 .env
 .env.*
