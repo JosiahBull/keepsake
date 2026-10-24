@@ -77,34 +77,41 @@ jobs:
       - run: pnpm --filter @keepsake/web check
       - run: pnpm --filter @keepsake/web build
 
-  image:
-    name: Container build
-    runs-on: ubuntu-24.04
+  image-platform:
+    name: Container (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
       - uses: docker/build-push-action@v7
         with:
           context: .
-          platforms: linux/amd64
+          platforms: linux/${{ matrix.arch }}
           load: true
-          tags: keepsake:ci
+          tags: keepsake:ci-${{ matrix.arch }}
           push: false
-          cache-from: type=gha,scope=image-amd64
-          cache-to: type=gha,scope=image-amd64,mode=max
+          cache-from: type=gha,scope=image-${{ matrix.arch }}
+          cache-to: type=gha,scope=image-${{ matrix.arch }},mode=max
       - name: Smoke test container and shared SQLite storage
-        shell: bash
-        run: |
-          docker run -d --name keepsake-smoke --publish 127.0.0.1:8080:8080 keepsake:ci
-          trap 'docker logs keepsake-smoke; docker rm -fv keepsake-smoke' EXIT
-          for ((attempt=0; attempt<30; attempt++)); do
-            if curl --fail --silent http://127.0.0.1:8080/api/health > health.json; then break; fi
-            sleep 1
-          done
-          jq -e '.status == "ok"' health.json
-          curl --fail --silent http://127.0.0.1:8080/ > index.html
-          grep -q 'Keepsake' index.html
-          docker exec keepsake-smoke keepsake --json add \
-            --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' > fact.json
-          fact_id=$(jq -r '.id' fact.json)
-          curl --fail --silent "http://127.0.0.1:8080/api/facts/$fact_id" | jq -e '.answer == "Write-ahead logging"'
+        env:
+          IMAGE: keepsake:ci-${{ matrix.arch }}
+        run: bash scripts/container-smoke.sh "$IMAGE"
+
+  image:
+    name: Container build
+    needs: image-platform
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require both native container tests
+        env:
+          RESULT: ${{ needs.image-platform.result }}
+        run: test "$RESULT" = success
