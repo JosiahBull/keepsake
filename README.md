@@ -281,12 +281,12 @@ are checked against the committed offline SQLx metadata. `pnpm sqlx:check` verif
 against a temporary database built from migrations.
 
 ```sh
+pnpm --filter @keepsake/web exec playwright install chromium webkit
 pnpm check
 pnpm test
 ```
 
-`pnpm test` runs Rust tests and the browser suite. Install browsers once with
-`pnpm --filter @keepsake/web exec playwright install chromium webkit`.
+Install browsers once. `pnpm test` runs Rust tests and the browser suite.
 Tests use temporary databases and fake agent executables to cover persistence, validation,
 API boundaries, exact draft import, subprocess failures, deadlines, and output limits.
 Browser tests drive the built website through the real Rust server in desktop/mobile
