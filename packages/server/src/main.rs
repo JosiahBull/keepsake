@@ -1,4 +1,4 @@
-use keepsake_server::{config::Config, db, lifecycle, router};
+use keepsake_server::{config::Config, db, http, lifecycle, router_with_limits};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
@@ -28,9 +28,8 @@ async fn serve(config: Config, shutdown: CancellationToken) -> anyhow::Result<()
         }
         let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
         tracing::info!(address = %listener.local_addr()?, "keepsake is listening");
-        axum::serve(listener, router(pool.clone(), &config.web_dir))
-            .with_graceful_shutdown(shutdown.cancelled_owned())
-            .await?;
+        let app = router_with_limits(pool.clone(), &config.web_dir, config.limits);
+        http::serve(listener, app, config.http, shutdown).await?;
         Ok(())
     }
     .await;

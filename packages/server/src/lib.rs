@@ -1,12 +1,15 @@
 pub use keepsake_core::{db, facts};
 pub mod config;
 mod facts_api;
+pub mod http;
 pub mod lifecycle;
+pub mod limits;
 
 use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
+    middleware::from_fn_with_state,
     routing::{get, post},
 };
 use serde::Serialize;
@@ -69,6 +72,10 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
 pub struct ApiDoc;
 
 pub fn router(pool: SqlitePool, web_dir: &Path) -> Router {
+    router_with_limits(pool, web_dir, limits::Limits::default())
+}
+
+pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limits) -> Router {
     let api = Router::new()
         .route("/health", get(health))
         .route("/facts", get(facts_api::list).post(facts_api::create))
@@ -85,7 +92,11 @@ pub fn router(pool: SqlitePool, web_dir: &Path) -> Router {
             ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
         )
         .with_state(pool)
-        .layer(DefaultBodyLimit::max(512 * 1024))
+        .layer(DefaultBodyLimit::max(limits.max_body_bytes))
         .layer(CompressionLayer::new())
+        .layer(from_fn_with_state(
+            limits::Admission::new(limits),
+            limits::admit,
+        ))
         .layer(TraceLayer::new_for_http())
 }
