@@ -1,0 +1,24 @@
+{
+  "name": "keepsake",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "node scripts/dev-api.mjs",
+    "dev:web": "pnpm --filter @keepsake/web dev",
+    "gen:client": "cargo run -p keepsake-server --bin gen-openapi && pnpm --filter @keepsake/client generate",
+    "build": "pnpm gen:client && cargo build --release -p keepsake-server -p keepsake-cli --bins && pnpm --filter @keepsake/web build",
+    "build:cli": "cargo build --release -p keepsake-cli --bin keepsake",
+    "check": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && pnpm --filter @keepsake/web check",
+    "test": "cargo test --workspace",
+    "keepsake": "./scripts/keepsake",
+    "skills:install": "node scripts/install-skills.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

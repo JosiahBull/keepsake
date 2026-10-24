@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+keepsake_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+: "${DATABASE_URL:=sqlite:$keepsake_root/data/keepsake.db}"
+export DATABASE_URL
+exec cargo run --quiet --manifest-path "$keepsake_root/Cargo.toml" -p keepsake-cli --bin keepsake -- "$@"

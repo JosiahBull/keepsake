@@ -1,0 +1,12 @@
+name: keepsake
+services:
+  keepsake:
+    image: ghcr.io/josiahbull/keepsake:0.1.0
+    build: .
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keepsake-data:/data
+    restart: unless-stopped
+volumes:
+  keepsake-data:

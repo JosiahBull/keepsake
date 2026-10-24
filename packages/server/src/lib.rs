@@ -1,0 +1,90 @@
+pub use keepsake_core::{db, facts};
+pub mod config;
+mod facts_api;
+
+use axum::{
+    Json, Router,
+    extract::{DefaultBodyLimit, State},
+    http::StatusCode,
+    routing::{get, post},
+};
+use serde::Serialize;
+use sqlx::SqlitePool;
+use std::path::Path;
+use tower_http::{
+    compression::CompressionLayer,
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
+use utoipa::{OpenApi, ToSchema};
+
+#[derive(Serialize, ToSchema)]
+pub struct Health {
+    pub status: String,
+}
+
+#[utoipa::path(get, path = "/api/health", responses(
+    (status = 200, description = "Server and database are available", body = Health),
+    (status = 503, description = "Database unavailable")
+))]
+async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCode> {
+    sqlx::query_scalar::<_, i64>("SELECT 1")
+        .fetch_one(&pool)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, "database health check failed");
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
+    Ok(Json(Health {
+        status: "ok".into(),
+    }))
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        health,
+        facts_api::list,
+        facts_api::create,
+        facts_api::get,
+        facts_api::add_practices,
+        facts_api::review,
+        facts_api::reviews
+    ),
+    components(schemas(
+        Health,
+        facts::Fact,
+        facts::NewFact,
+        facts::Practice,
+        facts::NewPractice,
+        facts::PracticeKind,
+        facts::NewReview,
+        facts::Review,
+        facts::ReviewMethod,
+        facts::ReviewOutcome,
+        facts_api::ErrorBody
+    ))
+)]
+pub struct ApiDoc;
+
+pub fn router(pool: SqlitePool, web_dir: &Path) -> Router {
+    let api = Router::new()
+        .route("/health", get(health))
+        .route("/facts", get(facts_api::list).post(facts_api::create))
+        .route("/facts/{id}", get(facts_api::get))
+        .route("/facts/{id}/practices", post(facts_api::add_practices))
+        .route("/facts/{id}/reviews", get(facts_api::reviews))
+        .route("/reviews", post(facts_api::review))
+        .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
+        .fallback(|| async { StatusCode::NOT_FOUND });
+    Router::new()
+        .nest("/api", api)
+        .route("/api", get(|| async { StatusCode::NOT_FOUND }))
+        .fallback_service(
+            ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
+        )
+        .with_state(pool)
+        .layer(DefaultBodyLimit::max(512 * 1024))
+        .layer(CompressionLayer::new())
+        .layer(TraceLayer::new_for_http())
+}

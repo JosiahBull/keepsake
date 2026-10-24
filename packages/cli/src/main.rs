@@ -1,0 +1,367 @@
+use anyhow::{Context, bail};
+use clap::{Args, Parser, Subcommand};
+use keepsake_cli::{
+    agent::{self, Agent},
+    source,
+};
+use keepsake_core::{
+    db,
+    facts::{self, Fact, NewFact},
+};
+use std::{io::Read, path::PathBuf};
+
+#[derive(Parser)]
+#[command(
+    name = "keepsake",
+    version,
+    about = "Capture facts and draft varied retrieval practice",
+    after_help = "Examples:\n  keepsake add --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' --tag sqlite\n  keepsake add --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' --agent claude --dry-run\n  keepsake add --url https://example.com/article --prompt 'Remember the main ideas' --dry-run\n  keepsake generate 1 --agent codex --dry-run\n  keepsake add --file reviewed-fact.json\n  keepsake --json list\n\nAgent calls send the supplied fact/context to your chosen provider using your local CLI login.\nReview generated drafts: use --dry-run before importing with add --file. No agent is called for manual facts by default; --url uses Claude Haiku unless --agent is supplied."
+)]
+struct Cli {
+    /// SQLite URL. Defaults to DATABASE_URL or data/keepsake.db in the current directory.
+    #[arg(long, global = true)]
+    database: Option<String>,
+    /// Emit JSON (dry-run always emits JSON).
+    #[arg(long, global = true)]
+    json: bool,
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Save manual facts or extract them from a URL.
+    Add(Add),
+    /// List saved facts.
+    List,
+    /// Show a saved fact and its practice variants.
+    Show { id: i64 },
+    /// Draft additional practice for an existing fact.
+    Generate {
+        id: i64,
+        #[command(flatten)]
+        agent: AgentOptions,
+        /// Save reviewed JSON from generate --dry-run (original fact must match).
+        #[arg(long, conflicts_with = "agent")]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Describe supported practice methods and study activities.
+    Methods,
+}
+
+#[derive(Args)]
+struct Add {
+    /// Retrieval question, or learning instructions when used with --url.
+    #[arg(long, required_unless_present = "file", conflicts_with = "file")]
+    prompt: Option<String>,
+    /// Authoritative answer, preserved exactly when AI drafts variants.
+    #[arg(long, required_unless_present_any = ["file", "url"], conflicts_with_all = ["file", "url"])]
+    answer: Option<String>,
+    #[arg(long, default_value = "", conflicts_with_all = ["file", "url"])]
+    context: String,
+    #[arg(long, default_value = "", conflicts_with_all = ["file", "url"])]
+    source: String,
+    #[arg(long = "tag", conflicts_with = "file")]
+    tags: Vec<String>,
+    /// Fetch a page and extract facts following --prompt. Defaults to Claude Haiku.
+    #[arg(long, requires = "prompt", conflicts_with = "file")]
+    url: Option<String>,
+    /// Maximum facts extracted from a URL (default 5, maximum 20).
+    #[arg(long, requires = "url", value_parser = clap::value_parser!(u32).range(1..=20))]
+    limit: Option<u32>,
+    /// Import one NewFact or an array; '-' reads standard input (max 1 MiB).
+    #[arg(long)]
+    file: Option<PathBuf>,
+    #[command(flatten)]
+    agent: AgentOptions,
+    /// Print proposed facts as JSON without saving.
+    #[arg(long)]
+    dry_run: bool,
+}
+
+#[derive(Args)]
+struct AgentOptions {
+    /// Optional external CLI: Claude Haiku or Codex Luna by default.
+    #[arg(long, value_enum)]
+    agent: Option<Agent>,
+    /// Override the provider model (requires --agent).
+    #[arg(long, requires = "agent")]
+    model: Option<String>,
+    /// External CLI executable path (requires --agent).
+    #[arg(long, requires = "agent")]
+    agent_command: Option<PathBuf>,
+    /// Agent deadline, in seconds (1–600).
+    #[arg(long, default_value_t = 120, value_parser = clap::value_parser!(u64).range(1..=600))]
+    timeout_seconds: u64,
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(error) = run(Cli::parse()).await {
+        eprintln!("Error: {error:#}");
+        std::process::exit(1);
+    }
+}
+
+async fn run(cli: Cli) -> anyhow::Result<()> {
+    if let Commands::Methods = &cli.command {
+        let methods = serde_json::json!([
+            {"kind":"flashcard","activity":"Recall before revealing the answer"},
+            {"kind":"multiple_choice","activity":"Choose one answer, then read corrective feedback"},
+            {"kind":"cloze","activity":"Supply a missing phrase from a meaningful cue"},
+            {"kind":"explain","activity":"Explain a concept against essential points"},
+            {"kind":"apply","activity":"Use knowledge in a scenario"},
+            {"kind":"matching","activity":"Mini game matching cues to answers across your library"}
+        ]);
+        if cli.json {
+            print_json(&methods)?;
+        } else {
+            for method in methods.as_array().expect("methods array") {
+                println!(
+                    "{} — {}",
+                    method["kind"].as_str().unwrap(),
+                    method["activity"].as_str().unwrap()
+                );
+            }
+            println!(
+                "\nResearch: docs/research/learning-and-retention-2026-10-24.md\nVariety is a design proposal; retrieval, corrective feedback and spacing provide the learning foundation."
+            );
+        }
+        return Ok(());
+    }
+    // Complete fetching, generation and validation before touching the database.
+    if let Commands::Add(add) = cli.command {
+        let is_url = add.url.is_some();
+        let (mut proposed, batch) = if let Some(url) = add.url {
+            let instruction = add.prompt.as_deref().unwrap_or_default();
+            if instruction.trim().is_empty() || instruction.len() > 8000 {
+                bail!("URL prompt must contain 1 to 8000 bytes");
+            }
+            let document = source::fetch(&url).await?;
+            let request = agent::Extraction {
+                document: &document,
+                instruction,
+                limit: add.limit.unwrap_or(5) as usize,
+                tags: &add.tags,
+            };
+            (
+                agent::extract_facts(
+                    &request,
+                    add.agent.agent.unwrap_or(Agent::Claude),
+                    add.agent.model.as_deref(),
+                    add.agent.agent_command.as_deref(),
+                    add.agent.timeout_seconds,
+                )
+                .await?,
+                true,
+            )
+        } else if let Some(path) = add.file {
+            read_input(path)?
+        } else {
+            (
+                vec![NewFact {
+                    prompt: add.prompt.unwrap_or_default(),
+                    answer: add.answer.unwrap_or_default(),
+                    context: add.context,
+                    source: add.source,
+                    tags: add.tags,
+                    practices: vec![],
+                }],
+                false,
+            )
+        };
+        if proposed.is_empty() || proposed.len() > 20 {
+            bail!("provide between 1 and 20 facts");
+        }
+        for fact in &mut proposed {
+            facts::validate_new_fact(fact)?;
+            if !is_url && let Some(provider) = add.agent.agent {
+                fact.practices.extend(
+                    agent::generate(
+                        fact,
+                        provider,
+                        add.agent.model.as_deref(),
+                        add.agent.agent_command.as_deref(),
+                        add.agent.timeout_seconds,
+                    )
+                    .await?,
+                );
+            }
+            facts::validate_new_fact(fact)?;
+        }
+        if add.dry_run {
+            return if batch {
+                print_json(&proposed)
+            } else {
+                print_json(&proposed[0])
+            };
+        }
+        let pool = db::connect(&database(cli.database)).await?;
+        let mut saved = facts::create_many(&pool, proposed).await?;
+        pool.close().await;
+        if batch && cli.json {
+            return print_json(&saved);
+        }
+        if batch {
+            let count = saved.len();
+            for fact in saved {
+                output_fact(fact, false)?;
+            }
+            println!("\nSaved {count} facts.");
+            return Ok(());
+        }
+        return output_fact(saved.pop().context("saved fact missing")?, cli.json);
+    }
+    let pool = db::connect(&database(cli.database)).await?;
+    match cli.command {
+        Commands::List => {
+            let saved = facts::list(&pool).await?;
+            if cli.json {
+                print_json(&saved)?;
+            } else if saved.is_empty() {
+                println!("No facts yet. Use keepsake add --prompt '...' --answer '...'.");
+            } else {
+                for fact in saved {
+                    println!("{}\t{}", fact.id, fact.prompt);
+                }
+            }
+        }
+        Commands::Show { id } => output_fact(
+            facts::get(&pool, id).await?.context("fact not found")?,
+            cli.json,
+        )?,
+        Commands::Generate {
+            id,
+            agent: options,
+            file,
+            dry_run,
+        } => {
+            let fact = facts::get(&pool, id).await?.context("fact not found")?;
+            let mut draft = NewFact {
+                prompt: fact.prompt,
+                answer: fact.answer,
+                context: fact.context,
+                source: fact.source,
+                tags: fact.tags,
+                practices: Vec::new(),
+            };
+            if let Some(path) = file {
+                let reviewed = read_fact(path)?;
+                facts::validate_new_fact(&reviewed)?;
+                if reviewed.prompt != draft.prompt
+                    || reviewed.answer != draft.answer
+                    || reviewed.context != draft.context
+                    || reviewed.source != draft.source
+                    || reviewed.tags != draft.tags
+                {
+                    bail!(
+                        "reviewed draft does not match the existing fact; use the JSON from generate {id} --dry-run"
+                    );
+                }
+                draft.practices = reviewed.practices;
+            } else {
+                let provider = options
+                    .agent
+                    .context("generate requires --agent claude|codex or --file reviewed.json")?;
+                draft.practices = agent::generate(
+                    &draft,
+                    provider,
+                    options.model.as_deref(),
+                    options.agent_command.as_deref(),
+                    options.timeout_seconds,
+                )
+                .await?;
+            }
+            if dry_run {
+                print_json(&draft)?;
+            } else {
+                output_fact(
+                    facts::add_practices(&pool, id, draft.practices).await?,
+                    cli.json,
+                )?;
+            }
+        }
+        Commands::Add(_) | Commands::Methods => unreachable!(),
+    }
+    Ok(())
+}
+
+fn database(explicit: Option<String>) -> String {
+    explicit
+        .or_else(|| std::env::var("DATABASE_URL").ok())
+        .unwrap_or_else(|| "sqlite:data/keepsake.db".into())
+}
+
+fn read_fact(path: PathBuf) -> anyhow::Result<NewFact> {
+    let (mut facts, batch) = read_input(path)?;
+    if batch {
+        bail!("generate --file expects the single fact object from generate --dry-run");
+    }
+    facts.pop().context("fact JSON was empty")
+}
+
+fn read_input(path: PathBuf) -> anyhow::Result<(Vec<NewFact>, bool)> {
+    let reader: Box<dyn Read> = if path.as_os_str() == "-" {
+        Box::new(std::io::stdin())
+    } else {
+        Box::new(std::fs::File::open(path).context("open fact JSON")?)
+    };
+    let mut bytes = Vec::new();
+    reader.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
+    if bytes.len() > 1024 * 1024 {
+        bail!("fact JSON exceeds 1 MiB");
+    }
+    let value: serde_json::Value = serde_json::from_slice(&bytes).context("parse fact JSON")?;
+    if value.is_array() {
+        Ok((
+            serde_json::from_value(value).context("parse fact array")?,
+            true,
+        ))
+    } else {
+        Ok((
+            vec![serde_json::from_value(value).context("parse fact")?],
+            false,
+        ))
+    }
+}
+
+fn print_json(value: &impl serde::Serialize) -> anyhow::Result<()> {
+    println!("{}", serde_json::to_string_pretty(value)?);
+    Ok(())
+}
+
+fn output_fact(fact: Fact, json: bool) -> anyhow::Result<()> {
+    if json {
+        print_json(&fact)
+    } else {
+        println!("#{} {}\n{}", fact.id, fact.prompt, fact.answer);
+        if !fact.context.is_empty() {
+            println!("\nContext: {}", fact.context);
+        }
+        if !fact.source.is_empty() {
+            println!("Source: {}", fact.source);
+        }
+        if !fact.tags.is_empty() {
+            println!("Tags: {}", fact.tags.join(", "));
+        }
+        for practice in fact.practices {
+            println!(
+                "\n{}: {}\nAnswer: {}",
+                serde_json::to_value(practice.kind)?
+                    .as_str()
+                    .unwrap_or("practice"),
+                practice.prompt,
+                practice.answer
+            );
+            if !practice.choices.is_empty() {
+                println!("Choices: {}", practice.choices.join(" | "));
+            }
+            if !practice.explanation.is_empty() {
+                println!("Feedback: {}", practice.explanation);
+            }
+        }
+        Ok(())
+    }
+}

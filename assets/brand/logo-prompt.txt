@@ -1,0 +1,8 @@
+Use case: logo-brand
+Asset type: primary logo for a new website named keepsake; transparent PNG.
+Primary request: Design one tasteful, distinctive, minimal logo that suggests holding onto something meaningful without assuming any particular product category. A compact abstract folded ribbon or protective loop enclosing a small lozenge, with a subtle lowercase k-like gesture, beside the lowercase wordmark "keepsake".
+Style/medium: precise flat vector-like graphic design, confident simple silhouette, restrained and contemporary with quiet warmth.
+Composition/framing: one horizontal logo lockup, icon at left, wordmark at right, balanced spacing, generous transparent margins. Icon must remain recognizable as a favicon.
+Typography: custom-feeling soft serif lowercase lettering, elegant but sturdy, excellent legibility, no decorative flourishes.
+Text (verbatim): "keepsake"
+Constraints: truly transparent background; only one logo; opaque solid dark warm charcoal mark and lettering; no gradients, shadows, textures, mockups, presentation boards, caption text, trademark symbols, hearts, cameras, or generic sparkle icons. No product domain assumptions. Crisp polished edges.

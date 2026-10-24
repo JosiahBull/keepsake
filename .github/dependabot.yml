@@ -1,0 +1,63 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      cargo-minor-patch:
+        update-types: [minor, patch]
+    # For 0.x dependencies, a minor update can break compatibility.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: axum
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: http-body-util
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: reqwest
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: scraper
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: sqlx
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: tower
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: tower-http
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: tracing
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: tracing-subscriber
+        update-types: ["version-update:semver-minor"]
+
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: openapi-fetch
+        update-types: ["version-update:semver-minor"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Add Keepsake facts"
+  short_description: "Save source-linked facts and varied recall practice"
+  default_prompt: "Use $keepsake-add-facts to add these facts to my Keepsake library."

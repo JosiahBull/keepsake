@@ -1,0 +1,101 @@
+name: Checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
+
+jobs:
+  versions:
+    name: Versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check package and tag versions
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import tomllib
+
+          version = tomllib.loads(Path("Cargo.toml").read_text())["workspace"]["package"]["version"]
+          for path in ("package.json", "packages/web/package.json", "packages/client/package.json"):
+              actual = json.loads(Path(path).read_text())["version"]
+              if actual != version:
+                  raise SystemExit(f"{path}: version {actual} differs from workspace {version}")
+          if os.environ.get("GITHUB_REF_TYPE") == "tag":
+              tag = os.environ["GITHUB_REF_NAME"]
+              if tag != f"v{version}":
+                  raise SystemExit(f"Tag {tag} must match v{version}")
+          print(f"Package versions match {version}")
+          PY
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+
+  web:
+    name: Web
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm gen:client
+      - name: Check generated API client
+        run: git diff --exit-code -- packages/client/openapi.json packages/client/src/schema.d.ts
+      - run: pnpm --filter @keepsake/web check
+      - run: pnpm --filter @keepsake/web build
+
+  image:
+    name: Container build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: keepsake:ci
+          push: false
+          cache-from: type=gha,scope=image-amd64
+          cache-to: type=gha,scope=image-amd64,mode=max
+      - name: Smoke test container and shared SQLite storage
+        shell: bash
+        run: |
+          docker run -d --name keepsake-smoke --publish 127.0.0.1:8080:8080 keepsake:ci
+          trap 'docker logs keepsake-smoke; docker rm -fv keepsake-smoke' EXIT
+          for ((attempt=0; attempt<30; attempt++)); do
+            if curl --fail --silent http://127.0.0.1:8080/api/health > health.json; then break; fi
+            sleep 1
+          done
+          jq -e '.status == "ok"' health.json
+          curl --fail --silent http://127.0.0.1:8080/ > index.html
+          grep -q 'Keepsake' index.html
+          docker exec keepsake-smoke keepsake --json add \
+            --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' > fact.json
+          fact_id=$(jq -r '.id' fact.json)
+          curl --fail --silent "http://127.0.0.1:8080/api/facts/$fact_id" | jq -e '.answer == "Write-ahead logging"'
