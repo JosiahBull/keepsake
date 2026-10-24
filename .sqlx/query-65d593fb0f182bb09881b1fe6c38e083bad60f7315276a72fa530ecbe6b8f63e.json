@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE target_practices SET qualifying=1 WHERE practice_id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "65d593fb0f182bb09881b1fe6c38e083bad60f7315276a72fa530ecbe6b8f63e"
+}

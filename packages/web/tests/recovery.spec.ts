@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 import { test, expect } from "./fixtures";
+import { startExtraPractice } from "./actions";
 
 function gate() {
   let release!: () => void;
@@ -64,7 +65,7 @@ test("library retries a failed load and shows loading until the real response ar
   }
 });
 
-test("practice recovers from a dropped request without showing an empty session", async ({ app, page }) => {
+test("practice recovers from a dropped request without showing an empty session", async ({ app, page }, testInfo) => {
   const prompt = "Recall the recovery answer";
   await app.createFact({
     prompt,
@@ -87,11 +88,12 @@ test("practice recovers from a dropped request without showing an empty session"
 
   try {
     await page.goto("/");
-    await page.getByRole("button", { name: "Practise", exact: true }).click();
+    await startExtraPractice(page);
     await expect(page.getByRole("alert")).toContainText("Could not load practice.");
     await expect(page.getByRole("heading", { name: "No facts yet.", exact: true })).toBeHidden();
     await page.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(page.getByRole("status")).toHaveText("Loading practice…");
+    await page.screenshot({ path: testInfo.outputPath("extra-practice-loading.png"), fullPage: true });
     retry.release();
 
     await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
@@ -224,7 +226,7 @@ test("review retry keeps the revealed question and blocks navigation until one r
 
   try {
     await page.goto("/");
-    await page.getByRole("button", { name: "Practise", exact: true }).click();
+    await startExtraPractice(page);
     await page.getByLabel("Your answer").fill("My original attempt");
     await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
     await page.getByRole("button", { name: "Good Correct", exact: true }).click();

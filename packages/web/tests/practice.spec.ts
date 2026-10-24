@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 import type { components } from "@keepsake/client";
 import { test, expect, type Fact, type NewFact } from "./fixtures";
+import { startExtraPractice } from "./actions";
 
 type PracticeKind = components["schemas"]["PracticeKind"];
 type PracticeQuestion = components["schemas"]["PracticeQuestion"];
@@ -52,8 +53,7 @@ async function beginPractice(page: Page): Promise<PracticeSession> {
   const response = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/practice" && response.request().method() === "GET",
   );
-  await page.getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Practise", exact: true }).click();
+  await startExtraPractice(page);
   const loaded = await response;
   expect(loaded.ok()).toBeTruthy();
   expect(new URL(loaded.url()).searchParams.get("limit")).toBe("20");
@@ -176,6 +176,14 @@ for (const scenario of cases) {
     // Review history uses ascending IDs so after_id can continue chronologically.
     expect(durable.items).toEqual(saved);
     expect(durable.next_cursor).toBeNull();
+    const target = await app.request.get(`/api/study/facts/${fact.id}`);
+    expect(target.ok()).toBeTruthy();
+    expect(await target.json()).toMatchObject({
+      stability: null,
+      difficulty: null,
+      due_at: null,
+      introduced_at: null,
+    });
   });
 }
 
@@ -298,6 +306,9 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
     const durable = await reviewHistory(app, review.fact_id);
     expect(durable.total).toBe(1);
     expect(durable.items).toEqual([review]);
+    const target = await app.request.get(`/api/study/facts/${review.fact_id}`);
+    expect(target.ok()).toBeTruthy();
+    expect(await target.json()).toMatchObject({ stability: null, difficulty: null, due_at: null });
   }
 });
 

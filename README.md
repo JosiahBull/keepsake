@@ -128,7 +128,8 @@ keepsake generate 1 --file practice.json
 
 Without `--dry-run`, `add --agent ...` saves the fact and generated variants together,
 and `generate ID --agent ...` appends variants immediately. These variants are unverified
-practice, available in the website; there is no approval queue. The original fact and
+practice, available through Extra practice. They do not supply scheduled recall evidence
+until checked and approved as equivalent prompts. The original fact and
 answer are preserved. Review new prompts, expected answers, explanations, and plausible
 wrong choices against the source before relying on them.
 
@@ -144,17 +145,40 @@ call sends the supplied fact, context, and source to that provider.
 
 ## Practise
 
-Practise shuffles all available flashcards, multiple choice, fill-the-gap, explanation,
-and application prompts into one session. Each prompt appears once per session; starting
-again reshuffles the queue. Matching draws three or four related facts from one topic tag,
+Practise starts a server-selected due queue using FSRS in Rust. Each fact has one recall
+schedule, shared by its approved equivalent prompts. Defaults are 90% desired retention,
+five new targets per local day, and a soft 15-minute daily budget. Again returns a target
+after ten minutes; successful recall uses the model's interval. Nothing is retired
+automatically. See [scheduling](docs/scheduling.md) for policy and history details.
+
+Type an answer or confirm a spoken attempt before revealing feedback. Viewing an answer
+without attempting it records exposure, with no successful recall rating. Hard means
+correct recall with difficulty; an incorrect answer means Again. Feedback is saved before
+the answer is shown, so reloading before grading preserves that exposure.
+
+Extra practice offers flashcards, multiple choice, fill-the-gap, explanation, and application
+without advancing the recall schedule. Matching draws three or four related facts from one topic tag,
 preferring the smallest topic with enough distinct question–answer pairs and similar question
 patterns within it. Add a shared tag such as `food` or `cargo` to build a matching bank.
 Rounds never pad a small bank with unrelated facts.
 
-Attempt before revealing feedback, then record Again, Hard, Good, or Easy. Hard means
-successful recall with difficulty; an incorrect answer means Again. Review history records
-method, outcome, and response time separately, so matching and choice are not counted as
-proof of unaided recall. A personalised spaced scheduler is not implemented yet.
+Matching, choice, and answer browsing cannot stand in for unaided recall. They record
+exposure and temporarily defer assessment of that fact for ten minutes, without changing
+its model due date. Review history retains each activity's method and conditions.
+
+```sh
+keepsake due
+keepsake --json due --limit 5
+keepsake study settings --timezone Europe/London --new-limit 5 --daily-budget-seconds 900
+keepsake study approve PRACTICE_ID
+keepsake study submit --file attempt.json
+keepsake study events --after 0 --limit 100
+```
+
+Only the canonical flashcard starts as scheduled evidence. After checking an equivalent
+flashcard or cloze against its source, `study approve` permits it to share that schedule.
+Generating additional variants creates no additional review obligations. Reuse the exact
+submission JSON, including its UUID, when retrying `study submit`.
 
 [Learning design](docs/learning-design.md) explains the rationale and limitations, based on
 the [saved research](docs/research/learning-and-retention-2026-10-24.md). The research supports
@@ -167,9 +191,9 @@ are case-sensitive. JSON output is `{items, next_cursor, total}`;
 continue with `--before NEXT_CURSOR` and the same search until the cursor is null.
 `list` accepts 1–100 facts per page; `show ID` includes that fact's practice variants.
 
-The website has Previous/Next library navigation. Practice sessions sample up to 20
-random prompts from the whole library, across formats; matching samples up to four
-distinct pairs. Library pages and searches do not restrict those samples. Review-history
+The website has Previous/Next library navigation. Due queues contain up to 20 eligible
+targets; Extra practice samples up to 20 prompts across formats. Library pages and
+searches do not restrict either queue. Review-history
 requests return up to 50 reviews by default (maximum 100), with `after_id` for the next page.
 
 ## Agent skill

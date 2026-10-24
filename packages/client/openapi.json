@@ -598,6 +598,532 @@
           }
         }
       }
+    },
+    "/api/study/events": {
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "events",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Continue after this event ID (default 0)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, from 1 to 1000 (default 100)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "submit",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudySubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/exposures": {
+      "post": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "expose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExposureSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExposureResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/facts/{id}": {
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "target",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Schedule"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/practices/{id}/approve": {
+      "post": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "A source-checked flashcard or cloze practice ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Practice approved without resetting its recall schedule"
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/queue": {
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "queue",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum questions, from 1 to 20 (default 20)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudyQueue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/settings": {
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "settings",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulerSettings"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "update_settings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulerSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -612,6 +1138,49 @@
             "type": "string"
           }
         }
+      },
+      "EventKind": {
+        "type": "string",
+        "enum": [
+          "attempt",
+          "exposure"
+        ]
+      },
+      "ExposureResult": {
+        "type": "object",
+        "required": [
+          "recorded"
+        ],
+        "properties": {
+          "recorded": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ExposureSubmission": {
+        "type": "object",
+        "required": [
+          "submission_id",
+          "fact_ids",
+          "method"
+        ],
+        "properties": {
+          "fact_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "method": {
+            "$ref": "#/components/schemas/ReviewMethod"
+          },
+          "submission_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "Fact": {
         "type": "object",
@@ -929,6 +1498,33 @@
           }
         }
       },
+      "RatingIntervals": {
+        "type": "object",
+        "required": [
+          "again",
+          "hard",
+          "good",
+          "easy"
+        ],
+        "properties": {
+          "again": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "easy": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "good": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "hard": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Review": {
         "type": "object",
         "required": [
@@ -1015,6 +1611,494 @@
             "format": "int64"
           }
         }
+      },
+      "Schedule": {
+        "type": "object",
+        "required": [
+          "target_id",
+          "fact_id",
+          "content_revision",
+          "phase",
+          "lapses",
+          "version"
+        ],
+        "properties": {
+          "blocked_until": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "content_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "difficulty": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "due_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "fact_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "introduced_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "lapses": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "last_review_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "stability": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "target_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SchedulerSettings": {
+        "type": "object",
+        "required": [
+          "desired_retention",
+          "new_limit",
+          "daily_budget_seconds",
+          "timezone",
+          "algorithm",
+          "parameter_version",
+          "parameters",
+          "version"
+        ],
+        "properties": {
+          "algorithm": {
+            "type": "string"
+          },
+          "daily_budget_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "desired_retention": {
+            "type": "number",
+            "format": "float"
+          },
+          "new_limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parameter_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "SettingsUpdate": {
+        "type": "object",
+        "required": [
+          "timezone",
+          "new_limit",
+          "daily_budget_seconds",
+          "expected_version"
+        ],
+        "properties": {
+          "daily_budget_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "new_limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "StudyContext": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "supplementary",
+          "audit"
+        ]
+      },
+      "StudyEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "submission_id",
+          "target_id",
+          "content_revision",
+          "occurred_at",
+          "kind",
+          "context",
+          "method",
+          "response_ms",
+          "qualifying",
+          "algorithm",
+          "parameter_version",
+          "elapsed_seconds",
+          "request_json",
+          "before_json",
+          "after_json",
+          "result_json"
+        ],
+        "properties": {
+          "after_json": {
+            "type": "string"
+          },
+          "algorithm": {
+            "type": "string"
+          },
+          "before_json": {
+            "type": "string"
+          },
+          "content_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "context": {
+            "type": "string"
+          },
+          "elapsed_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "model_interval_days": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "float"
+          },
+          "occurred_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parameter_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "policy_override_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "qualifying": {
+            "type": "boolean"
+          },
+          "request_json": {
+            "type": "string"
+          },
+          "response_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "result_json": {
+            "type": "string"
+          },
+          "submission_id": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StudyEventPage": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyEvent"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "StudyQuestion": {
+        "type": "object",
+        "required": [
+          "fact",
+          "practice",
+          "target_id",
+          "content_revision",
+          "schedule_version",
+          "intervals"
+        ],
+        "properties": {
+          "content_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fact": {
+            "$ref": "#/components/schemas/FactSummary"
+          },
+          "intervals": {
+            "$ref": "#/components/schemas/RatingIntervals"
+          },
+          "practice": {
+            "$ref": "#/components/schemas/Practice"
+          },
+          "schedule_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "target_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StudyQueue": {
+        "type": "object",
+        "required": [
+          "items",
+          "total_due",
+          "new_remaining",
+          "timezone",
+          "budget_seconds",
+          "spent_seconds",
+          "budget_reached"
+        ],
+        "properties": {
+          "budget_reached": {
+            "type": "boolean"
+          },
+          "budget_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyQuestion"
+            }
+          },
+          "new_remaining": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_due_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "spent_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "total_due": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StudyResult": {
+        "type": "object",
+        "required": [
+          "event_id",
+          "submission_id",
+          "schedule",
+          "qualifying"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_due_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "qualifying": {
+            "type": "boolean"
+          },
+          "review": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Review"
+              }
+            ]
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/Schedule"
+          },
+          "submission_id": {
+            "type": "string"
+          }
+        }
+      },
+      "StudySubmission": {
+        "type": "object",
+        "required": [
+          "submission_id",
+          "target_id",
+          "content_revision",
+          "expected_version",
+          "kind",
+          "context",
+          "method",
+          "response_ms",
+          "attempted",
+          "assisted",
+          "prior_exposure"
+        ],
+        "properties": {
+          "assisted": {
+            "type": "boolean"
+          },
+          "attempted": {
+            "type": "boolean"
+          },
+          "content_revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "context": {
+            "$ref": "#/components/schemas/StudyContext"
+          },
+          "expected_version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "feedback_event_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EventKind"
+          },
+          "method": {
+            "$ref": "#/components/schemas/ReviewMethod"
+          },
+          "outcome": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewOutcome"
+              }
+            ]
+          },
+          "practice_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "prior_exposure": {
+            "type": "boolean"
+          },
+          "response_ms": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "submission_id": {
+            "type": "string"
+          },
+          "target_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "additionalProperties": false
       }
     }
   }

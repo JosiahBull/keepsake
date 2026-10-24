@@ -7,6 +7,7 @@ pub mod health;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;
+mod study_api;
 
 use axum::{
     Json, Router,
@@ -57,7 +58,15 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts_api::get,
         facts_api::add_practices,
         facts_api::review,
-        facts_api::reviews
+        facts_api::reviews,
+        study_api::queue,
+        study_api::submit,
+        study_api::expose,
+        study_api::settings,
+        study_api::update_settings,
+        study_api::approve,
+        study_api::target,
+        study_api::events
     ),
     components(schemas(
         Health,
@@ -76,7 +85,21 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::paging::PracticeQuestion,
         keepsake_core::paging::PracticeSession,
         keepsake_core::paging::FactSample,
-        facts_api::ErrorBody
+        facts_api::ErrorBody,
+        keepsake_core::scheduling::StudyQueue,
+        keepsake_core::scheduling::StudyQuestion,
+        keepsake_core::scheduling::RatingIntervals,
+        keepsake_core::scheduling::Schedule,
+        keepsake_core::scheduling::StudySubmission,
+        keepsake_core::scheduling::StudyResult,
+        keepsake_core::scheduling::EventKind,
+        keepsake_core::scheduling::StudyContext,
+        keepsake_core::scheduling::ExposureSubmission,
+        keepsake_core::scheduling::ExposureResult,
+        keepsake_core::scheduling::SchedulerSettings,
+        keepsake_core::scheduling::SettingsUpdate,
+        keepsake_core::scheduling::StudyEvent,
+        keepsake_core::scheduling::StudyEventPage
     ))
 )]
 pub struct ApiDoc;
@@ -95,6 +118,18 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
         .route("/facts/{id}/practices", post(facts_api::add_practices))
         .route("/facts/{id}/reviews", get(facts_api::reviews))
         .route("/reviews", post(facts_api::review))
+        .route("/study/queue", get(study_api::queue))
+        .route(
+            "/study/events",
+            get(study_api::events).post(study_api::submit),
+        )
+        .route("/study/exposures", post(study_api::expose))
+        .route(
+            "/study/settings",
+            get(study_api::settings).put(study_api::update_settings),
+        )
+        .route("/study/practices/{id}/approve", post(study_api::approve))
+        .route("/study/facts/{id}", get(study_api::target))
         .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
         .fallback(|| async { StatusCode::NOT_FOUND });
     let app = Router::new()

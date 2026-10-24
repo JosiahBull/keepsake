@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO study_events(submission_id, target_id, content_revision, occurred_at, kind, context, method, outcome,\n           response_ms, qualifying, algorithm, parameter_version, elapsed_seconds, model_interval_days,\n           policy_override_seconds, request_json, before_json, after_json, result_json)\n         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 18
+    },
+    "nullable": []
+  },
+  "hash": "9526773421babcd3484917a1866d606e6c89719a91e11f63a99380819982323d"
+}

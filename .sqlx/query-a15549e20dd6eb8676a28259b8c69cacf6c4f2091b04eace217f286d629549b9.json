@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT practice_id FROM target_practices WHERE target_id=? AND qualifying=1\n             ORDER BY random() LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "practice_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "target_practices",
+            "name": "practice_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a15549e20dd6eb8676a28259b8c69cacf6c4f2091b04eace217f286d629549b9"
+}

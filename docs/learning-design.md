@@ -51,8 +51,11 @@ engagement, unaided recall, and application separately.
 The CLI can ask Claude Haiku or Codex Luna to draft alternative questions and
 plausible wrong answers. Preserve the canonical fact, source, and context. Treat
 generated practice as unverified until checked against that source. Saved variants
-are immediately available for practice; there is no separate approval state or
-draft review queue. To inspect before saving, capture `--dry-run` JSON and import
+are available for supplementary practice. Only the canonical prompt initially supplies
+scheduled recall evidence. Approve an equivalent flashcard or cloze with
+`keepsake study approve PRACTICE_ID` after checking it; approval adds no schedule.
+Explanation, application and recognition remain supplementary to this recall target.
+To inspect before saving, capture `--dry-run` JSON and import
 that exact content with `add --file` for a new fact or `generate ID --file` for an
 existing fact.
 
@@ -64,11 +67,16 @@ and understand feedback rather than supplying the answer before the attempt.
 
 ## Assess retention across time
 
-This implementation stores review history with the method, outcome, response
-time, and timestamp. These records can support later evaluation, while the first
-practice formats remain available on demand. Personalised spaced scheduling and
-delayed assessment still need implementation and validation. A method catalogue
-does not demonstrate retention benefits.
+The [scheduler](scheduling.md) uses a pinned Rust FSRS implementation and one recall
+target per fact. Qualifying unaided attempts update memory estimates; recognition,
+assistance and answer exposure do not. Feedback is recorded before showing the answer,
+including when the learner leaves without rating it. Legacy reviews remain available
+without being reinterpreted as verified recall evidence.
+
+Desired retention starts at 90%. Five new targets per day, a soft 15-minute budget
+and ten-minute retries are product defaults to evaluate. Neither these settings nor
+the combination of formats has been established as optimal. Event export supports
+inspection; delayed audits, parameter fitting and held-out evaluation remain future work.
 
 Keep valued knowledge eligible for future maintenance. Interpret a successful
 round as evidence about that attempt. Assess learning with delayed unaided recall

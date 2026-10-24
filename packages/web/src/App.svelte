@@ -6,6 +6,12 @@
   type Outcome = components["schemas"]["ReviewOutcome"];
   type Fact = components["schemas"]["FactSummary"];
   type Question = components["schemas"]["PracticeQuestion"];
+  type StudyQuestion = components["schemas"]["StudyQuestion"];
+  type StudyQueue = components["schemas"]["StudyQueue"];
+  type StudySubmission = components["schemas"]["StudySubmission"];
+  type StudyResult = components["schemas"]["StudyResult"];
+  type ExposureSubmission = components["schemas"]["ExposureSubmission"];
+  type PendingExposure = { body: ExposureSubmission; error: string; busy: boolean };
 
   const modes: { id: Method; name: string; instruction: string }[] = [
     {
@@ -68,12 +74,28 @@
   let tags = $state("");
 
   // Practice session
-  let queue = $state<Question[]>([]);
+  let queue = $state<(Question | StudyQuestion)[]>([]);
+  let practiceMode = $state<"scheduled" | "extra">("scheduled");
+  let studyQueue = $state<StudyQueue | null>(null);
+  let recalled = $state(false);
+  let pendingSubmission = $state<StudySubmission | null>(null);
+  let feedbackEventId = $state<number | null>(null);
+  let studyConflict = $state(false);
+  let exposureOnly = $state(false);
+  let exposures = $state<PendingExposure[]>([]);
+  let matchingExposureId = $state<string | null>(null);
+  const locallyExposed = new Map<number, number>();
   let practiceLoading = $state(false);
   let practiceError = $state("");
   let practiceTotal = $state(0);
   let cursor = $state(0);
   let revealed = $state(false);
+  let revealRequested = $state(false);
+  let pendingAnswerExposureId = $state<string | null>(null);
+  let choiceExposureId = $state<string | null>(null);
+  let choicesReady = $state(false);
+  let disclosedFacts = $state<number[]>([]);
+  const disclosureRequests = new Map<number, string>();
   let response = $state("");
   let choice = $state<string | null>(null);
   let startedAt = $state(0);
@@ -102,6 +124,17 @@
   const choiceOptions = $derived(current ? shuffled(current.practice.choices) : []);
   const selectedMode = $derived(modes.find((item) => item.id === mode));
   const pendingFact = $derived(matchFacts.find((fact) => fact.id === pendingMatch));
+  const scheduledQuestion = $derived(
+    practiceMode === "scheduled" && current && "target_id" in current ? current : null,
+  );
+  const exposing = $derived(exposures.some((exposure) => exposure.busy));
+  const navigationBlocked = $derived(
+    recording || exposing || pendingSubmission !== null,
+  );
+  const matchingBlocked = $derived(exposures.some((exposure) =>
+    exposure.body.submission_id === matchingExposureId));
+  const answerExposurePending = $derived(Boolean(current && exposures.some((exposure) =>
+    exposure.body.fact_ids.includes(current.fact.id))));
 
   onMount(() => {
     void loadFacts();
@@ -190,13 +223,13 @@
   }
 
   function showLibrary() {
-    if (!recording) {
+    if (!navigationBlocked) {
       view = "library";
     }
   }
 
   function openAdd() {
-    if (!recording) {
+    if (!navigationBlocked) {
       view = "library";
       showAdd = !showAdd;
     }
@@ -256,15 +289,43 @@
   // Practice actions
   function resetQuestion() {
     revealed = false;
+    revealRequested = false;
+    pendingAnswerExposureId = null;
+    choiceExposureId = null;
+    choicesReady = false;
     response = "";
     choice = null;
     startedAt = Date.now();
     responseMs = 0;
     reviewError = "";
+    recalled = false;
+    pendingSubmission = null;
+    feedbackEventId = null;
+    studyConflict = false;
+    exposureOnly = false;
+    if (practiceMode === "extra" && current?.practice.kind === "multiple_choice") {
+      void exposeChoices(current);
+    }
   }
 
-  async function startPractice() {
-    if (recording) {
+  async function exposeChoices(question: Question) {
+    const id = await recordExposure([question.fact.id], "multiple_choice");
+    if (current?.practice.id !== question.practice.id) {
+      return;
+    }
+
+    choiceExposureId = id;
+    choicesReady = !exposures.some((entry) => entry.body.submission_id === id);
+  }
+
+  async function startPractice(extra = false) {
+    if (navigationBlocked) {
+      return;
+    }
+
+    if (!extra && exposures.length) {
+      view = "practice";
+      practiceError = "Save the pending activity before starting practice.";
       return;
     }
 
@@ -272,24 +333,29 @@
     view = "practice";
     practiceLoading = true;
     practiceError = "";
+    practiceMode = extra ? "extra" : "scheduled";
+    studyQueue = null;
     queue = [];
     cursor = 0;
     sessionCount = 0;
     resetQuestion();
 
     try {
-      const session = unwrap(
-        await api.GET("/api/practice", {
-          params: { query: { limit: 20 } },
-        }),
-      );
+      const session = extra
+        ? unwrap(await api.GET("/api/practice", { params: { query: { limit: 20 } } }))
+        : unwrap(await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }));
 
       if (request !== practiceRequest) {
         return;
       }
 
       queue = session.items;
-      practiceTotal = session.total;
+      if ("total_due" in session) {
+        studyQueue = session;
+        practiceTotal = session.total_due + session.new_remaining;
+      } else {
+        practiceTotal = session.total;
+      }
       resetQuestion();
     } catch (caught) {
       if (request === practiceRequest) {
@@ -302,9 +368,193 @@
     }
   }
 
-  function reveal() {
+  async function reveal() {
+    if (revealRequested || recording) {
+      return;
+    }
+
     responseMs = Math.max(0, Date.now() - startedAt);
-    revealed = true;
+    revealRequested = true;
+    if (scheduledQuestion) {
+      exposureOnly = !recalled && !response.trim();
+      pendingSubmission = studySubmission(null, "exposure");
+      await saveStudySubmission(false);
+    } else if (!scheduledQuestion && current) {
+      pendingAnswerExposureId = await recordExposure([current.fact.id], current.practice.kind);
+      if (!exposures.some((entry) => entry.body.submission_id === pendingAnswerExposureId)) {
+        revealed = true;
+      }
+    }
+  }
+
+  function studySubmission(outcome: Outcome | null, kind: "attempt" | "exposure"): StudySubmission {
+    if (!scheduledQuestion) {
+      throw new Error("No scheduled question is available.");
+    }
+    return {
+      submission_id: crypto.randomUUID(),
+      target_id: scheduledQuestion.target_id,
+      practice_id: scheduledQuestion.practice.id,
+      content_revision: scheduledQuestion.content_revision,
+      expected_version: scheduledQuestion.schedule_version,
+      kind,
+      context: "scheduled",
+      method: scheduledQuestion.practice.kind,
+      outcome,
+      response_ms: responseMs,
+      attempted: recalled || Boolean(response.trim()),
+      assisted: false,
+      prior_exposure: Date.now() - (locallyExposed.get(scheduledQuestion.fact.id) ?? -Infinity) < 600_000,
+      ...(kind === "attempt" && feedbackEventId !== null ? { feedback_event_id: feedbackEventId } : {}),
+    };
+  }
+
+  async function saveStudySubmission(advance = pendingSubmission?.kind === "attempt") {
+    if (!pendingSubmission || recording) {
+      return;
+    }
+    recording = true;
+    reviewError = "";
+    try {
+      const response = await api.POST("/api/study/events", { body: pendingSubmission });
+      if (response.response.status === 409) {
+        studyConflict = true;
+        pendingSubmission = null;
+        reviewError = "This question changed in another tab. Refresh practice.";
+        return;
+      }
+      const result: StudyResult = unwrap(response);
+      if (pendingSubmission.kind === "exposure" && pendingSubmission.attempted) {
+        feedbackEventId = result.event_id;
+      }
+      if (pendingSubmission.kind === "exposure") {
+        revealed = true;
+      }
+      if (scheduledQuestion && result.schedule.target_id === scheduledQuestion.target_id) {
+        scheduledQuestion.schedule_version = result.schedule.version;
+      }
+      if (studyQueue) {
+        studyQueue = { ...studyQueue, next_due_at: result.next_due_at };
+      }
+      pendingSubmission = null;
+
+      if (advance) {
+        sessionCount += 1;
+        cursor += 1;
+        resetQuestion();
+        if (cursor >= queue.length) {
+          await refreshStudyOverview();
+        }
+      }
+    } catch (caught) {
+      const action = pendingSubmission?.kind === "exposure"
+        ? "Could not save this activity."
+        : "Could not save this attempt.";
+      reviewError = `${action} ${message(caught)}`;
+    } finally {
+      recording = false;
+    }
+  }
+
+  async function continueAfterExposure() {
+    if (recording || pendingSubmission || studyConflict) {
+      return;
+    }
+
+    cursor += 1;
+    resetQuestion();
+    if (cursor >= queue.length) {
+      await refreshStudyOverview();
+    }
+  }
+
+  async function refreshStudyOverview() {
+    try {
+      studyQueue = unwrap(await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }));
+    } catch (caught) {
+      practiceError = `Could not check the next review. ${message(caught)}`;
+    }
+  }
+
+  function intervalLabel(seconds: number): string {
+    if (seconds < 3600) {
+      return `${Math.round(seconds / 60)} min`;
+    }
+    if (seconds < 86_400) {
+      return `${Math.round(seconds / 3600)} hr`;
+    }
+
+    const days = Math.round(seconds / 86_400);
+    return `${days} ${days === 1 ? "day" : "days"}`;
+  }
+
+  function dueLabel(timestamp: number): string {
+    return new Intl.DateTimeFormat(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+      timeZone: studyQueue?.timezone ?? "Europe/London",
+    }).format(new Date(timestamp * 1000));
+  }
+
+  async function saveExposure(submissionId: string) {
+    const exposure = exposures.find((entry) => entry.body.submission_id === submissionId);
+    if (!exposure || exposure.busy) {
+      return;
+    }
+
+    exposures = exposures.map((entry) =>
+      entry === exposure ? { ...entry, busy: true, error: "" } : entry,
+    );
+    try {
+      unwrap(await api.POST("/api/study/exposures", { body: exposure.body }));
+      const authorizedFacts = exposure.body.fact_ids.filter((id) => disclosureRequests.get(id) === submissionId);
+      disclosedFacts = [...new Set([...disclosedFacts, ...authorizedFacts])];
+      exposures = exposures.filter((entry) => entry.body.submission_id !== submissionId);
+      if (pendingAnswerExposureId === submissionId) {
+        revealed = true;
+      }
+      if (choiceExposureId === submissionId) {
+        choicesReady = true;
+      }
+    } catch (caught) {
+      exposures = exposures.map((entry) =>
+        entry.body.submission_id === submissionId
+          ? { ...entry, busy: false, error: message(caught) }
+          : entry,
+      );
+    }
+  }
+
+  async function recordExposure(factIds: number[], method: Method | "matching", disclosureFactId?: number) {
+    const body: ExposureSubmission = {
+      submission_id: crypto.randomUUID(),
+      fact_ids: factIds,
+      method,
+    };
+    factIds.forEach((id) => locallyExposed.set(id, Date.now()));
+    if (disclosureFactId !== undefined) {
+      disclosureRequests.set(disclosureFactId, body.submission_id);
+    }
+    exposures = [...exposures, { body, error: "", busy: false }];
+    await saveExposure(body.submission_id);
+    return body.submission_id;
+  }
+
+  function discloseFact(event: Event, factId: number) {
+    if ((event.currentTarget as HTMLDetailsElement).open) {
+      void recordExposure([factId], "flashcard", factId);
+    } else {
+      clearDisclosure(factId);
+    }
+  }
+
+  function clearDisclosure(factId: number) {
+    disclosedFacts = disclosedFacts.filter((id) => id !== factId);
+    disclosureRequests.delete(factId);
   }
 
   async function recordReview(
@@ -322,7 +572,16 @@
   }
 
   async function grade(outcome: Outcome) {
-    if (!current || recording) {
+    if (!current || recording || answerExposurePending) {
+      return;
+    }
+
+    if (scheduledQuestion) {
+      if (exposureOnly || studyConflict || pendingSubmission) {
+        return;
+      }
+      pendingSubmission = studySubmission(outcome, "attempt");
+      await saveStudySubmission();
       return;
     }
 
@@ -349,7 +608,7 @@
 
   // Matching actions
   async function startMatching() {
-    if (recording) {
+    if (navigationBlocked) {
       return;
     }
 
@@ -381,6 +640,9 @@
 
       matchFacts = sample.items;
       matchAnswers = shuffled(matchFacts);
+      if (matchFacts.length >= 3) {
+        matchingExposureId = await recordExposure(matchFacts.map((fact) => fact.id), "matching");
+      }
     } catch (caught) {
       if (request === matchingRequest) {
         matchingError = `Could not load matching pairs. ${message(caught)}`;
@@ -393,7 +655,7 @@
   }
 
   function choosePrompt(id: number) {
-    if (pendingMatch !== null || recording) {
+    if (pendingMatch !== null || recording || matchingBlocked) {
       return;
     }
 
@@ -489,26 +751,35 @@
       <img src="/keepsake-logo.png" alt="Keepsake" width="2172" height="724" />
     </a>
     <nav aria-label="Main navigation">
-      <button class:active={view === "library"} disabled={recording} onclick={showLibrary}>
+      <button class:active={view === "library"} disabled={navigationBlocked} onclick={showLibrary}>
         Library
       </button>
       <button
         class:active={view === "practice"}
-        disabled={recording}
+        disabled={navigationBlocked}
         onclick={() => startPractice()}
       >
         Practise
       </button>
-      <button class:active={view === "matching"} disabled={recording} onclick={startMatching}>
+      <button class:active={view === "matching"} disabled={navigationBlocked} onclick={startMatching}>
         Match pairs
       </button>
     </nav>
-    <button class="primary add-top" disabled={recording} onclick={openAdd}>
+    <button class="primary add-top" disabled={navigationBlocked} onclick={openAdd}>
       {showAdd ? "Close form" : "Add a fact"}
     </button>
   </header>
 
   <main>
+    {#if exposing}
+      <p role="status">Saving…</p>
+    {/if}
+    {#each exposures.filter((entry) => entry.error) as exposure (exposure.body.submission_id)}
+      <div class="message error" role="alert">
+        Could not save this activity. {exposure.error}
+        <button class="text-button" disabled={exposure.busy} onclick={() => saveExposure(exposure.body.submission_id)}>Retry save</button>
+      </div>
+    {/each}
     {#if error && view === "library"}
       <div class="message error" role="alert">
         {error}
@@ -611,10 +882,11 @@
         <section class="fact-list" aria-label="Saved facts">
           {#each facts as fact (fact.id)}
             <article class="fact-row">
-              <details class="fact-details">
-                <summary>
+              <details class="fact-details" ontoggle={(event) => discloseFact(event, fact.id)}>
+                <summary onclick={() => clearDisclosure(fact.id)}>
                   <h2>{fact.prompt}</h2>
                 </summary>
+                {#if disclosedFacts.includes(fact.id)}
                 <div class="fact-body">
                   <p class="answer-copy">{fact.answer}</p>
 
@@ -639,6 +911,7 @@
                     <p class="tags">Tags: {fact.tags.join(", ")}</p>
                   {/if}
                 </div>
+                {/if}
               </details>
             </article>
           {:else}
@@ -658,18 +931,28 @@
     {:else if view === "practice"}
       <h1 class="sr-only">Practise</h1>
       <div class="practice-layout">
+        <div class="practice-toolbar">
+          <span class="muted">{practiceMode === "scheduled" ? "Scheduled recall" : "Extra practice · does not advance recall"}</span>
+          <button class="text-button" disabled={navigationBlocked} onclick={() => startPractice(practiceMode === "scheduled")}>
+            {practiceMode === "scheduled" ? "Extra practice" : "Scheduled recall"}
+          </button>
+        </div>
+        {#if studyQueue?.budget_reached}
+          <p class="message" role="status">Daily study budget reached. You can stop here or keep going.</p>
+        {/if}
         <section class="practice-stage" aria-label={selectedMode?.name ?? "Practice session"}>
           {#if practiceLoading}
             <p role="status">Loading practice…</p>
           {:else if practiceError}
             <div class="message error" role="alert">{practiceError}</div>
-            <button class="quiet" onclick={startPractice}>Try again</button>
+            <button class="quiet" onclick={() => startPractice(practiceMode === "extra")}>Try again</button>
           {:else if current}
             <p class="card-meta">{selectedMode?.name} · {cursor + 1} of {queue.length}</p>
             <h2 class="question">{current.practice.prompt}</h2>
 
             {#if mode === "multiple_choice"}
-              <fieldset class="choices" disabled={revealed}>
+              {#if choicesReady}
+              <fieldset class="choices" disabled={revealed || revealRequested}>
                 <legend class="sr-only">Choose an answer</legend>
 
                 {#each choiceOptions as option}
@@ -685,22 +968,29 @@
                   </label>
                 {/each}
               </fieldset>
+              {/if}
             {:else}
               <label class="response-label">
                 Your answer <span class="optional">optional</span>
                 <textarea
                   rows={mode === "flashcard" || mode === "cloze" ? 3 : 5}
                   bind:value={response}
-                  readonly={revealed}
+                  readonly={revealed || revealRequested}
                   placeholder="Write or say your answer before revealing."
                 ></textarea>
               </label>
+              {#if scheduledQuestion && !revealRequested}
+                <label class="recall-confirmation">
+                  <input type="checkbox" bind:checked={recalled} />
+                  I tried to recall
+                </label>
+              {/if}
             {/if}
 
             {#if !revealed}
               <button
                 class="primary"
-                disabled={mode === "multiple_choice" && choice === null}
+                disabled={recording || revealRequested || (mode === "multiple_choice" && choice === null)}
                 onclick={reveal}
               >
                 {mode === "multiple_choice" ? "Check answer" : "Reveal answer"}
@@ -745,36 +1035,56 @@
                   </p>
                 {/if}
 
-                <p class="verification-note">Check generated answers against their source.</p>
+                {#if practiceMode === "extra"}
+                  <p class="verification-note">Check generated answers against their source.</p>
+                {/if}
               </div>
               <div class="grade-panel">
-                <h3>Rate your attempt</h3>
-                <div class="ratings">
-                  {#each ratings as rating}
-                    <button class="rating" disabled={recording} onclick={() => grade(rating.id)}>
-                      <strong>{rating.name}</strong>
-                      <span>{rating.detail}</span>
-                    </button>
-                  {/each}
-                </div>
-
-                {#if reviewError}
-                  <p class="error inline-error" role="alert">
-                    {reviewError}
-                  </p>
+                {#if exposureOnly}
+                  <p>Answer viewed without a recall attempt. This does not advance its schedule.</p>
+                  <button class="primary" disabled={recording || pendingSubmission !== null || studyConflict} onclick={continueAfterExposure}>Continue</button>
+                {:else}
+                  <h3>Rate your attempt</h3>
+                  <div class="ratings">
+                    {#each ratings as rating}
+                      <button class="rating" disabled={recording || pendingSubmission !== null || studyConflict || answerExposurePending} onclick={() => grade(rating.id)}>
+                        <strong>{rating.name}</strong>
+                        <span>{rating.detail}</span>
+                        {#if scheduledQuestion}<span>{intervalLabel(scheduledQuestion.intervals[rating.id])}</span>{/if}
+                      </button>
+                    {/each}
+                  </div>
                 {/if}
 
-                {#if recording}
-                  <p role="status">Saving review…</p>
-                {/if}
               </div>
             {/if}
+            {#if reviewError}
+              <p class="error inline-error" role="alert">{reviewError}</p>
+              {#if studyConflict}
+                <button class="quiet" onclick={() => startPractice()}>Refresh practice</button>
+              {:else if pendingSubmission}
+                <button class="quiet" disabled={recording} onclick={() => saveStudySubmission()}>Retry save</button>
+              {/if}
+            {/if}
+            {#if recording}
+              <p role="status">{pendingSubmission?.kind === "exposure" ? "Saving…" : "Saving review…"}</p>
+            {/if}
+          {:else if practiceMode === "scheduled"}
+            <div class="session-done">
+              <h2>{sessionCount > 0 ? "Session complete" : "Nothing due right now"}</h2>
+              {#if sessionCount > 0}<p>{sessionCount} {sessionCount === 1 ? "review" : "reviews"} saved.</p>{/if}
+              {#if studyQueue?.next_due_at}<p>Next review: {dueLabel(studyQueue.next_due_at)}.</p>{/if}
+              {#if studyQueue && studyQueue.items.length > 0}
+                <button class="primary" onclick={() => startPractice()}>Continue practice</button>
+              {/if}
+              <button class="quiet" onclick={showLibrary}>Library</button>
+            </div>
           {:else if sessionCount > 0}
             <div class="session-done">
               <h2>Session complete</h2>
               <p>{sessionCount} {sessionCount === 1 ? "review" : "reviews"} saved.</p>
               <button class="primary" onclick={showLibrary}>Library</button>
-              <button class="quiet" onclick={() => startPractice()}>Practise again</button>
+              <button class="quiet" onclick={() => startPractice(true)}>Practise again</button>
             </div>
           {:else}
             <div class="session-done">
@@ -802,9 +1112,12 @@
           <details class="study-notes">
             <summary>Practice notes</summary>
             <p>
-              {selectedMode.instruction} Each session samples up to 20 prompts from the whole library.
-              Reviews are recorded by method. Choice and matching test recognition,
-              which differs from unaided recall.
+              {selectedMode.instruction}
+              {#if practiceMode === "scheduled"}
+                Only an unaided recall attempt changes the review schedule. Viewing an answer delays assessment for ten minutes.
+              {:else}
+                Extra practice samples up to 20 prompts. Recognition, explanation and application do not advance the recall schedule.
+              {/if}
             </p>
           </details>
         {/if}
@@ -820,10 +1133,12 @@
       {:else if matchFacts.length < 3}
         <section class="empty-state">
           <h2>Add three related facts with a shared topic tag to play.</h2>
-          <button class="primary" onclick={startPractice}>
+          <button class="primary" onclick={() => startPractice()}>
             Practise
           </button>
         </section>
+      {:else if matchingBlocked}
+        <!-- The global save status or retry alert explains why the round is hidden. -->
       {:else}
         <section class="matching-stage" aria-label="Matching pairs game">
           <p class="card-meta">{matched.length} of {matchFacts.length} matched</p>
@@ -836,7 +1151,7 @@
                   class="match-tile"
                   class:selected={selectedPrompt === fact.id}
                   class:matched={matched.includes(fact.id)}
-                  disabled={matched.includes(fact.id) || pendingMatch !== null || recording}
+                  disabled={matched.includes(fact.id) || pendingMatch !== null || recording || matchingBlocked}
                   onclick={() => choosePrompt(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -858,7 +1173,7 @@
                   disabled={matched.includes(fact.id) ||
                     selectedPrompt === null ||
                     pendingMatch !== null ||
-                    recording}
+                    recording || matchingBlocked}
                   onclick={() => chooseAnswer(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -931,7 +1246,7 @@
           {#if matched.length === matchFacts.length}
             <div class="form-actions">
               <button class="primary" onclick={startMatching}>Play again</button>
-              <button class="quiet" onclick={startPractice}>
+              <button class="quiet" onclick={() => startPractice()}>
                 Practise
               </button>
             </div>
@@ -1305,6 +1620,26 @@
     display: grid;
     gap: 1rem;
     max-width: 53rem;
+  }
+
+  .practice-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .recall-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.4rem;
+    font-size: 0.9rem;
+  }
+
+  .recall-confirmation input {
+    width: auto;
+    accent-color: #244c44;
   }
 
   .study-notes {

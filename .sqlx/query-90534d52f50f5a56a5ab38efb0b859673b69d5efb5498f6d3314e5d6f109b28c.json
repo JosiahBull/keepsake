@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT state_json FROM schedule_states WHERE target_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "state_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "schedule_states",
+            "name": "state_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "90534d52f50f5a56a5ab38efb0b859673b69d5efb5498f6d3314e5d6f109b28c"
+}

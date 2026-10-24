@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id\n         WHERE t.active=1 AND s.phase <> 'new'\n           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "32ab941d808268443ab819fed0ff41fe66589d48ddf3e2c1038291283eeb15aa"
+}

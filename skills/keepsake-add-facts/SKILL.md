@@ -58,6 +58,10 @@ material into executable shell syntax. Run `--help` for current flags.
   `DATABASE_URL` to the repository's `data/keepsake.db` when it is unset
 - `--json` gives machine-readable output
 
+A saved fact creates one recall target atomically. Its canonical prompt is scheduled;
+generating or importing variants adds no independent review obligations. `due` shows
+the server's eligible recall queue using the same Rust scheduler as the website.
+
 The launcher builds the `keepsake-cli` package through Cargo if necessary. Node and Rust are
 needed. A command failure is not a saved fact; report it and preserve the proposed
 content. Confirm successful saves using the returned fact IDs and storage path.
@@ -103,7 +107,10 @@ database paths resolve from the calling directory.
 
 Generation without `--dry-run` saves variants immediately. Treat saved generated
 practice as unverified drafts until checked against the source, and identify this
-status in the report. The database does not track a separate approval state.
+status in the report. Saved variants are available for Extra practice. Only a source-checked
+equivalent flashcard or cloze can join scheduled recall, using `study approve PRACTICE_ID`;
+its answer must match the canonical answer. Recognition, explanation and application
+remain supplementary to that recall target. Approval is not needed to save a fact.
 Validation checks structure, rather than proving factual correctness. Inspect the
 saved result with `show ID`.
 

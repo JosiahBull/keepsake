@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT request_json, after_json, occurred_at FROM study_events WHERE id=? AND target_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "request_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "request_json"
+          }
+        }
+      },
+      {
+        "name": "after_json",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "after_json"
+          }
+        }
+      },
+      {
+        "name": "occurred_at",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "occurred_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f30db95341b7158a0eb3f2ef43f45ccc2e674fdff4704c1d177ca44c82757b14"
+}

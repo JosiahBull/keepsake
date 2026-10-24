@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT request_json, result_json FROM study_exposure_batches WHERE submission_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "request_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_exposure_batches",
+            "name": "request_json"
+          }
+        }
+      },
+      {
+        "name": "result_json",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_exposure_batches",
+            "name": "result_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c6907fd872e92ce8e3c664351fe77475c767ed2a8c56ca335b7bd58a0bc903fb"
+}

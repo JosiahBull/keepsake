@@ -11,6 +11,8 @@ use keepsake_core::{
 };
 use std::{io::Read, path::PathBuf};
 
+mod study;
+
 const AFTER_HELP: &str = concat!(
     "Examples:\n",
     "  keepsake add --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' --tag sqlite\n",
@@ -19,6 +21,8 @@ const AFTER_HELP: &str = concat!(
     "  keepsake generate 1 --agent codex --dry-run\n",
     "  keepsake add --file reviewed-fact.json\n",
     "  keepsake --json list\n",
+    "  keepsake --json due\n",
+    "  keepsake study submit --file attempt.json\n",
     "\n",
     "Agent calls send the supplied fact/context to your chosen provider using your local CLI login.\n",
     "Review generated drafts: use --dry-run before importing with add --file. No agent is called for manual facts by default; --url uses Claude Haiku unless --agent is supplied.",
@@ -63,6 +67,18 @@ enum Commands {
 
     /// Show a saved fact and its practice variants.
     Show { id: i64 },
+
+    /// List due recall questions and today's remaining intake.
+    Due {
+        #[arg(long, default_value_t = 20, value_parser = clap::value_parser!(i64).range(1..=20))]
+        limit: i64,
+    },
+
+    /// Record study attempts, inspect settings, and export events.
+    Study {
+        #[command(subcommand)]
+        command: study::StudyCommand,
+    },
 
     /// Draft additional practice for an existing fact.
     Generate {
@@ -163,6 +179,8 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Restore { source, to } => {
             output_snapshot(backup::restore(&source, &to).await?, json)
         }
+        Commands::Due { limit } => study::due(&database(database_url), limit, json).await,
+        Commands::Study { command } => study::run(&database(database_url), command, json).await,
         command => {
             let pool = db::connect(&database(database_url)).await?;
 
@@ -216,7 +234,9 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 Commands::Add(_)
                 | Commands::Methods
                 | Commands::Backup { .. }
-                | Commands::Restore { .. } => unreachable!(),
+                | Commands::Restore { .. }
+                | Commands::Due { .. }
+                | Commands::Study { .. } => unreachable!(),
             }
             Ok(())
         }

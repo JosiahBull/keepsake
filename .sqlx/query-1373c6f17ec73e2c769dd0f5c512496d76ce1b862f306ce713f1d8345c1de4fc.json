@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE study_events SET result_json=? WHERE id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "1373c6f17ec73e2c769dd0f5c512496d76ce1b862f306ce713f1d8345c1de4fc"
+}

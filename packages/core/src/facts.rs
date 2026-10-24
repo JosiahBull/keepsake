@@ -226,7 +226,10 @@ async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result
     })
 }
 
-async fn load_id(connection: &mut SqliteConnection, id: i64) -> anyhow::Result<Option<Fact>> {
+pub(crate) async fn load_id(
+    connection: &mut SqliteConnection,
+    id: i64,
+) -> anyhow::Result<Option<Fact>> {
     let row = sqlx::query_as!(
         FactRow,
         "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts WHERE id = ?",
@@ -327,6 +330,7 @@ async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> an
     for practice in &fact.practices {
         insert_practice(connection, id, practice).await?;
     }
+    crate::scheduling::register_fact(connection, id).await?;
     load_id(connection, id)
         .await?
         .context("inserted fact missing")
@@ -349,6 +353,7 @@ pub async fn add_practices(
             for practice in &practices {
                 insert_practice(connection, id, practice).await?;
             }
+            crate::scheduling::map_practices(connection, id).await?;
             load_id(connection, id).await?.context("fact missing")
         })
     })
@@ -367,7 +372,7 @@ pub enum ReviewMethod {
 }
 
 impl ReviewMethod {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Flashcard => "flashcard",
             Self::MultipleChoice => "multiple_choice",
@@ -389,7 +394,7 @@ pub enum ReviewOutcome {
 }
 
 impl ReviewOutcome {
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Again => "again",
             Self::Hard => "hard",
@@ -409,7 +414,7 @@ pub struct NewReview {
     pub response_ms: i64,
 }
 
-#[derive(Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct Review {
     pub id: i64,
     pub fact_id: i64,
@@ -470,7 +475,7 @@ pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Resu
             .fetch_one(&mut *connection)
             .await?;
 
-            Ok(Review {
+            let review = Review {
                 id: saved.id,
                 fact_id: review.fact_id,
                 practice_id: review.practice_id,
@@ -478,7 +483,9 @@ pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Resu
                 outcome: review.outcome,
                 response_ms: review.response_ms,
                 reviewed_at: saved.reviewed_at,
-            })
+            };
+            crate::scheduling::record_supplementary(connection, &review).await?;
+            Ok(review)
         })
     })
     .await

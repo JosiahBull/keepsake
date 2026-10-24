@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id\n             WHERE t.active=1 AND s.phase='new' AND coalesce(s.blocked_until, 0) <= ?\n             ORDER BY s.target_id LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "target_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_states",
+            "name": "target_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ce2d507c52466e631b8af444a776465688ee36a1a67927c3d361d1aa4fcfd018"
+}

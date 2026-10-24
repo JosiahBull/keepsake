@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO target_practices(practice_id, target_id, qualifying)\n         SELECT p.id, t.id, p.kind = 'flashcard' AND p.prompt = t.prompt AND p.answer = t.answer\n         FROM practices p JOIN learning_targets t ON t.fact_id = p.fact_id AND t.active = 1\n         WHERE p.fact_id = ? AND NOT EXISTS (SELECT 1 FROM target_practices m WHERE m.practice_id = p.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "9e6074558b849017c0ad6d3e3ef0c12fc565797aeae095a2c78afff9385dc730"
+}

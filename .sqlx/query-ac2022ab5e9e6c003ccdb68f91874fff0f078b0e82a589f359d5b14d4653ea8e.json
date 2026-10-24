@@ -1,0 +1,254 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", submission_id, target_id, content_revision, occurred_at, kind, context,\n         method, outcome, response_ms, qualifying AS \"qualifying: bool\", algorithm, parameter_version,\n         elapsed_seconds, model_interval_days AS \"model_interval_days: f32\", policy_override_seconds,\n         request_json, before_json, after_json, result_json\n         FROM study_events WHERE id > ? ORDER BY id LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "submission_id",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "submission_id"
+          }
+        }
+      },
+      {
+        "name": "target_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "target_id"
+          }
+        }
+      },
+      {
+        "name": "content_revision",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "content_revision"
+          }
+        }
+      },
+      {
+        "name": "occurred_at",
+        "ordinal": 4,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "occurred_at"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "context",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "context"
+          }
+        }
+      },
+      {
+        "name": "method",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "method"
+          }
+        }
+      },
+      {
+        "name": "outcome",
+        "ordinal": 8,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "name": "response_ms",
+        "ordinal": 9,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "response_ms"
+          }
+        }
+      },
+      {
+        "name": "qualifying: bool",
+        "ordinal": 10,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "qualifying"
+          }
+        }
+      },
+      {
+        "name": "algorithm",
+        "ordinal": 11,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "algorithm"
+          }
+        }
+      },
+      {
+        "name": "parameter_version",
+        "ordinal": 12,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "parameter_version"
+          }
+        }
+      },
+      {
+        "name": "elapsed_seconds",
+        "ordinal": 13,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "elapsed_seconds"
+          }
+        }
+      },
+      {
+        "name": "model_interval_days: f32",
+        "ordinal": 14,
+        "type_info": "Float",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "model_interval_days"
+          }
+        }
+      },
+      {
+        "name": "policy_override_seconds",
+        "ordinal": 15,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "policy_override_seconds"
+          }
+        }
+      },
+      {
+        "name": "request_json",
+        "ordinal": 16,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "request_json"
+          }
+        }
+      },
+      {
+        "name": "before_json",
+        "ordinal": 17,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "before_json"
+          }
+        }
+      },
+      {
+        "name": "after_json",
+        "ordinal": 18,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "after_json"
+          }
+        }
+      },
+      {
+        "name": "result_json",
+        "ordinal": 19,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "result_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ac2022ab5e9e6c003ccdb68f91874fff0f078b0e82a589f359d5b14d4653ea8e"
+}

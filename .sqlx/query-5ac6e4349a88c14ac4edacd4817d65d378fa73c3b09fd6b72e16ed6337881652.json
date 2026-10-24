@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id\n         WHERE t.active=1 AND s.phase <> 'new'\n           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?\n         ORDER BY CASE WHEN s.phase IN ('learning', 'relearning') THEN 0 ELSE 1 END,\n           coalesce(s.due_at, s.blocked_until, 0) / 3600, random() LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "target_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_states",
+            "name": "target_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5ac6e4349a88c14ac4edacd4817d65d378fa73c3b09fd6b72e16ed6337881652"
+}
