@@ -198,10 +198,41 @@ Node is only needed to build the frontend.
 | `BIND_ADDR` | `127.0.0.1:8080` | HTTP listening address |
 | `WEB_DIR` | `packages/web/dist` | Built frontend directory |
 | `RUST_LOG` | `info` | Server log filter |
+| `SHUTDOWN_GRACE_SECS` | `10` | Shutdown budget for HTTP draining and database closure |
+| `HEADER_READ_TIMEOUT_SECS` | `15` | Deadline for receiving an HTTP request head |
+| `CONNECTION_TIMEOUT_SECS` | `120` | Maximum connection lifetime, including keep-alive and blocked writes |
+| `REQUEST_TIMEOUT_SECS` | `30` | Request deadline after headers, including body receipt and handler work |
+| `MAX_CONNECTIONS` | `128` | Concurrent TCP connections |
+| `MAX_IN_FLIGHT` | `32` | Concurrent requests; excess requests receive 503 with `Retry-After` |
+| `MAX_BODY_BYTES` | `524288` | Request-body size limit in bytes |
 
 Run the server from the repository root with its defaults. `.env` files are not loaded
 automatically. Embedded, append-only migrations run on startup. SQLite uses WAL, foreign
 keys, and a four-connection pool. Keep the database on local persistent storage.
+
+An explicitly configured `WEB_DIR` must contain a readable `index.html`; startup fails
+before opening SQLite when it is missing. With `WEB_DIR` unset, the development API can
+start before the frontend is built. [`.env.example`](.env.example) lists the defaults.
+Duration settings accept 1–3600 seconds; connection and request counts accept 1–16384;
+the body-size setting accepts 1–16777216 bytes. Invalid settings fail startup.
+
+SIGINT or SIGTERM starts graceful shutdown. A second signal forces shutdown. The grace
+budget includes closing SQLite; runtime cleanup can take up to one additional second.
+Give the container or service manager a longer stop grace than this combined budget.
+
+```sh
+keepsake-server --health-check
+```
+
+The probe asks the running `/api/health` endpoint, with a two-second deadline and bounded
+response headers. It bypasses startup configuration, never opens SQLite, and maps wildcard
+bind addresses to loopback. The endpoint itself checks the running server's database.
+
+API failures use JSON, with `X-Request-ID` for log correlation. Request summaries record
+method, route template, status and duration without query strings, headers or fact content.
+API responses are `no-store`; fingerprinted frontend assets are immutable and the shell
+revalidates. Browser security headers apply to ordinary responses and rejections. These
+controls do not add authentication or cross-origin access.
 
 The Dockerfile packages both Rust binaries and the website into one image. `compose.yaml`
 mounts `/data` for persistence. CI builds and smoke-tests the container before release.

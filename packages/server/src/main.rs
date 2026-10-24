@@ -1,9 +1,12 @@
-use keepsake_server::{config::Config, db, http, lifecycle, router_with_limits};
+use keepsake_server::{config::Config, db, health, http, lifecycle, router_with_limits};
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
 fn main() -> anyhow::Result<()> {
+    if std::env::args().nth(1).as_deref() == Some(health::FLAG) {
+        return health::probe();
+    }
     tracing_subscriber::fmt()
         .with_ansi(false)
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()))
