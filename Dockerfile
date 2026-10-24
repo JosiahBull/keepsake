@@ -7,6 +7,8 @@ FROM --platform=$BUILDPLATFORM rust:${RUST_VERSION}-trixie AS spec
 RUN apt-get update && apt-get install -y --no-install-recommends cmake clang && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
+COPY .cargo .cargo
+COPY .sqlx .sqlx
 COPY packages/core packages/core
 COPY packages/server packages/server
 COPY packages/cli packages/cli
@@ -29,6 +31,8 @@ FROM rust:${RUST_VERSION}-trixie AS backend
 RUN apt-get update && apt-get install -y --no-install-recommends cmake clang && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
+COPY .cargo .cargo
+COPY .sqlx .sqlx
 COPY packages/core packages/core
 COPY packages/server packages/server
 COPY packages/cli packages/cli
