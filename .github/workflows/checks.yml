@@ -40,6 +40,8 @@ jobs:
                   raise SystemExit(f"Tag {tag} must match v{version}")
           print(f"Package versions match {version}")
           PY
+      - name: Check release publication policy
+        run: python3 -m unittest discover -s scripts -p 'test_release.py'
 
   rust:
     name: Rust
