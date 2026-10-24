@@ -172,6 +172,13 @@ jobs:
           outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=image-${{ matrix.arch }}
           cache-to: type=gha,scope=image-${{ matrix.arch }},mode=max
+      - name: Smoke test native container digest
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker pull "$IMAGE@$DIGEST"
+          bash scripts/container-smoke.sh "$IMAGE@$DIGEST"
       - name: Export digest
         shell: bash
         env:
