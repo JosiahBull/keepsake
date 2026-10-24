@@ -118,7 +118,7 @@ impl Default for PracticeQuery {
 #[serde(default, deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
 pub struct SampleQuery {
-    /// Number of distinct matching pairs, from 1 to 4 (default 4).
+    /// Number of related pairs from one topic bank, from 1 to 4 (default 4).
     pub limit: i64,
 }
 
@@ -349,48 +349,7 @@ pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Resul
 }
 
 pub async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Result<FactSample> {
-    query.validate()?;
-
-    // Ambiguous questions cannot form a fair matching pair. Pick one representative per
-    // answer only after removing questions that have conflicting answers.
-    let rows = sqlx::query_as!(
-        FactRow,
-        "WITH eligible AS (
-           SELECT f.* FROM facts f WHERE NOT EXISTS (
-             SELECT 1 FROM facts other
-             WHERE lower(trim(other.prompt)) = lower(trim(f.prompt))
-               AND lower(trim(other.answer)) <> lower(trim(f.answer))
-           )
-         ), representatives AS (
-           SELECT min(id) AS id FROM eligible GROUP BY lower(trim(answer))
-         )
-         SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at
-         FROM facts WHERE id IN (SELECT id FROM representatives) ORDER BY random() LIMIT 100"
-    )
-    .fetch_all(pool)
-    .await?;
-
-    let mut prompts = std::collections::HashSet::new();
-    let mut answers = std::collections::HashSet::new();
-    let mut items = Vec::new();
-
-    for row in rows {
-        let prompt = row.prompt.trim().to_lowercase();
-        let answer = row.answer.trim().to_lowercase();
-        if prompts.contains(&prompt) || answers.contains(&answer) {
-            continue;
-        }
-
-        prompts.insert(prompt);
-        answers.insert(answer);
-        items.push(row.try_into()?);
-
-        if items.len() == query.limit as usize {
-            break;
-        }
-    }
-
-    Ok(FactSample { items })
+    crate::matching::sample(pool, query).await
 }
 
 pub async fn fact_exists(pool: &SqlitePool, id: i64) -> anyhow::Result<bool> {

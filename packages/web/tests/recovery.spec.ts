@@ -106,6 +106,7 @@ test("matching retries an unavailable sample against the real library", async ({
   const facts = await Promise.all([1, 2, 3].map((number) => app.createFact({
     prompt: `Matching recovery question ${number}`,
     answer: `Matching recovery answer ${number}`,
+    tags: ["synthetic-recovery-matching-bank"],
   })));
   const retry = gate();
   let requests = 0;
@@ -125,7 +126,7 @@ test("matching retries an unavailable sample against the real library", async ({
     await page.goto("/");
     await page.getByRole("button", { name: "Match pairs", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Could not load matching pairs.");
-    await expect(page.getByRole("heading", { name: "Add three distinct question–answer pairs to play." })).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Add three related facts with a shared topic tag to play." })).toBeHidden();
     await page.getByRole("button", { name: "Try again", exact: true }).click();
     await expect(page.getByRole("status")).toHaveText("Loading matching pairs…");
     retry.release();
@@ -259,6 +260,7 @@ test("matching review retry preserves the pair and only counts a durable review"
   const facts = await Promise.all([1, 2, 3].map((number) => app.createFact({
     prompt: `Durable matching question ${number}`,
     answer: `Durable matching answer ${number}`,
+    tags: ["synthetic-durable-matching-bank"],
   })));
   const fact = facts[0];
   const retry = gate();

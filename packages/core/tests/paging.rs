@@ -11,7 +11,7 @@ fn fact(index: usize) -> NewFact {
         answer: format!("Answer {index}"),
         context: format!("Context {index}"),
         source: format!("https://example.org/{index}"),
-        tags: vec![format!("tag-{index}")],
+        tags: vec![format!("tag-{index}"), "paging-fixture".into()],
         practices: vec![],
     }
 }

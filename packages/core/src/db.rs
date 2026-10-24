@@ -7,7 +7,12 @@ pub async fn connect(url: &str) -> anyhow::Result<sqlx::SqlitePool> {
         .journal_mode(SqliteJournalMode::Wal)
         .synchronous(SqliteSynchronous::Normal)
         .foreign_keys(true)
-        .busy_timeout(Duration::from_millis(250));
+        .busy_timeout(Duration::from_millis(250))
+        // Matching keys ignore surrounding whitespace and Unicode letter case.
+        // SQLite's built-in NOCASE only handles ASCII.
+        .collation("NOCASE", |left, right| {
+            left.trim().to_lowercase().cmp(&right.trim().to_lowercase())
+        });
     if let Some(parent) = options
         .get_filename()
         .parent()

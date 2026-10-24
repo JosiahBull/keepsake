@@ -21,12 +21,17 @@ below is a product design proposal, not a validated intervention.
 | Cloze | Supplies a missing part of a statement | Leave enough context to identify one intended answer without leaking it |
 | Explain | Reconstructs why or how a relationship holds | Supply essential answer points supported by the source |
 | Apply | Uses knowledge in a short scenario | Check the scenario and expected reasoning against the source |
-| Matching game | Connects related prompts and answers | Use distinct pairings; repeated exposure within a game does not establish delayed recall |
+| Matching game | Connects related prompts and answers | Use similar questions from one topic tag, with distinct pairings; repeated exposure within a game does not establish delayed recall |
 
 Choice and matching exercise recognition and discrimination. Their outcomes do
 not by themselves show that a learner could produce the answer without options.
 Keep the method visible when interpreting performance. Provide the correct answer
 and context after an attempt, including after an error.
+
+Matching chooses a narrow shared topic and favours similar question wording, so unrelated
+subjects do not give away the pairings. This is a design choice informed by the saved
+research's discussion of distinguishing related concepts. That evidence is task-dependent;
+it does not establish that harder matching rounds improve long-term vocabulary recall.
 
 ## Extend interactivity around meaningful retrieval
 
