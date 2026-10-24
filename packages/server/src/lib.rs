@@ -1,5 +1,6 @@
 pub use keepsake_core::{db, facts};
 pub mod config;
+mod context;
 mod facts_api;
 pub mod http;
 pub mod lifecycle;
@@ -18,7 +19,6 @@ use std::path::Path;
 use tower_http::{
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
-    trace::TraceLayer,
 };
 use utoipa::{OpenApi, ToSchema};
 
@@ -85,7 +85,7 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
         .route("/reviews", post(facts_api::review))
         .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
         .fallback(|| async { StatusCode::NOT_FOUND });
-    Router::new()
+    let app = Router::new()
         .nest("/api", api)
         .route("/api", get(|| async { StatusCode::NOT_FOUND }))
         .fallback_service(
@@ -97,6 +97,6 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
         .layer(from_fn_with_state(
             limits::Admission::new(limits),
             limits::admit,
-        ))
-        .layer(TraceLayer::new_for_http())
+        ));
+    context::wrap(app)
 }
