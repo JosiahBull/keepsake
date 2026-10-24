@@ -5,7 +5,7 @@ use keepsake_cli::{
     source,
 };
 use keepsake_core::{
-    db,
+    backup, db,
     facts::{self, Fact, NewFact},
 };
 use std::{io::Read, path::PathBuf};
@@ -70,6 +70,16 @@ enum Commands {
 
     /// Describe supported practice methods and study activities.
     Methods,
+
+    /// Save a consistent SQLite snapshot without changing the source.
+    Backup { destination: PathBuf },
+
+    /// Restore a backup into a new file, without running migrations.
+    Restore {
+        source: PathBuf,
+        #[arg(long)]
+        to: PathBuf,
+    },
 }
 
 #[derive(Args)]
@@ -136,6 +146,13 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     match command {
         Commands::Methods => show_methods(json),
         Commands::Add(add) => add_facts(add, database_url, json).await,
+        Commands::Backup { destination } => output_snapshot(
+            backup::create(&database(database_url), &destination).await?,
+            json,
+        ),
+        Commands::Restore { source, to } => {
+            output_snapshot(backup::restore(&source, &to).await?, json)
+        }
         command => {
             let pool = db::connect(&database(database_url)).await?;
 
@@ -171,11 +188,29 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         output_fact(saved, json)?;
                     }
                 }
-                Commands::Add(_) | Commands::Methods => unreachable!(),
+                Commands::Add(_)
+                | Commands::Methods
+                | Commands::Backup { .. }
+                | Commands::Restore { .. } => unreachable!(),
             }
             Ok(())
         }
     }
+}
+
+fn output_snapshot(snapshot: backup::Snapshot, json: bool) -> anyhow::Result<()> {
+    if json {
+        print_json(&snapshot)?;
+    } else {
+        println!(
+            "{} ({} facts, {} practices, {} reviews)",
+            snapshot.path.display(),
+            snapshot.facts,
+            snapshot.practices,
+            snapshot.reviews
+        );
+    }
+    Ok(())
 }
 
 fn show_methods(json: bool) -> anyhow::Result<()> {

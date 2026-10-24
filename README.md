@@ -59,6 +59,27 @@ SQLite file. The repository and skill launchers select this checkout's database
 from any directory. Point the CLI and server at the same file to share a library.
 There is no remote HTTP CLI mode.
 
+## Back up and restore
+
+Create a backup before upgrading. Choose an existing destination directory:
+
+```sh
+keepsake --database sqlite:/absolute/path/keepsake.db backup /backups/keepsake-2026-10-24.db
+keepsake restore /backups/keepsake-2026-10-24.db --to /data/keepsake-restored.db
+```
+
+`backup` captures a consistent SQLite snapshot while the server is running, including
+committed WAL data. Both commands check database integrity and foreign keys before
+publishing the file. They preserve IDs, reviews and migration history, run no migrations,
+and refuse existing destinations or SQLite sidecars. Snapshot files are private to the
+current user on Unix. Keep copies on another volume with retention appropriate to your library.
+
+Restore to a new path, inspect it with `keepsake --database sqlite:/data/keepsake-restored.db list`,
+then stop the server before switching `DATABASE_URL` to that file and restarting.
+Keep the original until you have verified the restored library. Do not copy only the live
+database file: committed changes may still be in its WAL. Container users can run the CLI
+inside the container with a writable backup directory mounted alongside `/data`.
+
 ## Add from a URL
 
 ```sh

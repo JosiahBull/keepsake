@@ -36,4 +36,5 @@ signature or proof of publisher identity.
 
 The server has no authentication. Bind it to loopback or put an authenticated
 reverse proxy in front of it. Keep `/data` on persistent local storage and back up
-SQLite through its backup API, or stop the server before copying the data directory.
+SQLite using the CLI's `backup` command before upgrading. See the README's backup and
+restore commands; restore into a new file and verify it before switching the server.
