@@ -3,6 +3,7 @@ pub mod config;
 mod context;
 mod facts_api;
 mod headers;
+pub mod health;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;

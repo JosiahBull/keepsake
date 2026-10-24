@@ -13,15 +13,36 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
+        let web_dir = match std::env::var_os("WEB_DIR") {
+            Some(directory) => {
+                let directory = PathBuf::from(directory);
+                ensure!(
+                    !directory.as_os_str().is_empty(),
+                    "WEB_DIR must not be empty"
+                );
+                let index = directory.join("index.html");
+                let file = std::fs::File::open(&index).with_context(|| {
+                    format!(
+                        "WEB_DIR must contain a readable index.html: {}",
+                        index.display()
+                    )
+                })?;
+                ensure!(
+                    file.metadata()?.is_file(),
+                    "WEB_DIR/index.html must be a file"
+                );
+                directory
+            }
+            // The development API can run before Vite has built any static files.
+            None => PathBuf::from("packages/web/dist"),
+        };
         Ok(Self {
             bind_addr: std::env::var("BIND_ADDR")
                 .unwrap_or_else(|_| "127.0.0.1:8080".into())
                 .parse()?,
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite:data/keepsake.db".into()),
-            web_dir: std::env::var_os("WEB_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("packages/web/dist")),
+            web_dir,
             shutdown_grace: seconds_from_env("SHUTDOWN_GRACE_SECS", 10)?,
             http: HttpConfig {
                 max_connections: count_from_env("MAX_CONNECTIONS", 128, 16_384)?,
