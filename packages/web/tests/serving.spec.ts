@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { startExtraPractice } from "./actions";
 
 const securityHeaders = {
   "x-content-type-options": "nosniff",
@@ -20,8 +21,7 @@ function expectResponsePolicy(headers: Record<string, string>, cache: string) {
 test("empty practice offers a working path to the fact form", async ({ app, page }) => {
   await page.goto("/");
   await expect(page.getByText("No facts yet. Add a fact to start.", { exact: true })).toBeVisible();
-  await page.getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: "Practise", exact: true }).click();
+  await startExtraPractice(page);
 
   const practice = page.getByRole("region", { name: "Practice session", exact: true });
   await expect(practice.getByRole("heading", { name: "No facts yet.", exact: true })).toBeVisible();

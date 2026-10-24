@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT prompt, answer, content_revision, active FROM learning_targets WHERE id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "prompt",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "content_revision",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "content_revision"
+          }
+        }
+      },
+      {
+        "name": "active",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "active"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "625ea9d3126ba30c25efd2968e08882bd171b779d6ce0c03518186f793446fc8"
+}

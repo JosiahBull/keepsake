@@ -132,12 +132,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/study/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["events"];
+        put?: never;
+        post: operations["submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["expose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/facts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["target"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/practices/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["settings"];
+        put: operations["update_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         ErrorBody: {
             error: string;
+        };
+        /** @enum {string} */
+        EventKind: "attempt" | "exposure";
+        ExposureResult: {
+            /** Format: int64 */
+            recorded: number;
+        };
+        ExposureSubmission: {
+            fact_ids: number[];
+            method: components["schemas"]["ReviewMethod"];
+            submission_id: string;
         };
         Fact: {
             answer: string;
@@ -220,6 +327,16 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        RatingIntervals: {
+            /** Format: int64 */
+            again: number;
+            /** Format: int64 */
+            easy: number;
+            /** Format: int64 */
+            good: number;
+            /** Format: int64 */
+            hard: number;
+        };
         Review: {
             /** Format: int64 */
             fact_id: number;
@@ -243,6 +360,151 @@ export interface components {
             next_cursor?: number | null;
             /** Format: int64 */
             total: number;
+        };
+        Schedule: {
+            /** Format: int64 */
+            blocked_until?: number | null;
+            /** Format: int64 */
+            content_revision: number;
+            /** Format: float */
+            difficulty?: number | null;
+            /** Format: int64 */
+            due_at?: number | null;
+            /** Format: int64 */
+            fact_id: number;
+            /** Format: int64 */
+            introduced_at?: number | null;
+            /** Format: int64 */
+            lapses: number;
+            /** Format: int64 */
+            last_review_at?: number | null;
+            phase: string;
+            /** Format: float */
+            stability?: number | null;
+            /** Format: int64 */
+            target_id: number;
+            /** Format: int64 */
+            version: number;
+        };
+        SchedulerSettings: {
+            algorithm: string;
+            /** Format: int64 */
+            daily_budget_seconds: number;
+            /** Format: float */
+            desired_retention: number;
+            /** Format: int64 */
+            new_limit: number;
+            /** Format: int64 */
+            parameter_version: number;
+            parameters: number[];
+            timezone: string;
+            /** Format: int64 */
+            version: number;
+        };
+        SettingsUpdate: {
+            /** Format: int64 */
+            daily_budget_seconds: number;
+            /** Format: int64 */
+            expected_version: number;
+            /** Format: int64 */
+            new_limit: number;
+            timezone: string;
+        };
+        /** @enum {string} */
+        StudyContext: "scheduled" | "supplementary" | "audit";
+        StudyEvent: {
+            after_json: string;
+            algorithm: string;
+            before_json: string;
+            /** Format: int64 */
+            content_revision: number;
+            context: string;
+            /** Format: int64 */
+            elapsed_seconds: number;
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            method: string;
+            /** Format: float */
+            model_interval_days?: number | null;
+            /** Format: int64 */
+            occurred_at: number;
+            outcome?: string | null;
+            /** Format: int64 */
+            parameter_version: number;
+            /** Format: int64 */
+            policy_override_seconds?: number | null;
+            qualifying: boolean;
+            request_json: string;
+            /** Format: int64 */
+            response_ms: number;
+            result_json: string;
+            submission_id: string;
+            /** Format: int64 */
+            target_id: number;
+        };
+        StudyEventPage: {
+            items: components["schemas"]["StudyEvent"][];
+            /** Format: int64 */
+            next_cursor?: number | null;
+        };
+        StudyQuestion: {
+            /** Format: int64 */
+            content_revision: number;
+            fact: components["schemas"]["FactSummary"];
+            intervals: components["schemas"]["RatingIntervals"];
+            practice: components["schemas"]["Practice"];
+            /** Format: int64 */
+            schedule_version: number;
+            /** Format: int64 */
+            target_id: number;
+        };
+        StudyQueue: {
+            budget_reached: boolean;
+            /** Format: int64 */
+            budget_seconds: number;
+            items: components["schemas"]["StudyQuestion"][];
+            /** Format: int64 */
+            new_remaining: number;
+            /** Format: int64 */
+            next_due_at?: number | null;
+            /** Format: int64 */
+            spent_seconds: number;
+            timezone: string;
+            /** Format: int64 */
+            total_due: number;
+        };
+        StudyResult: {
+            /** Format: int64 */
+            event_id: number;
+            /** Format: int64 */
+            next_due_at?: number | null;
+            qualifying: boolean;
+            review?: null | components["schemas"]["Review"];
+            schedule: components["schemas"]["Schedule"];
+            submission_id: string;
+        };
+        StudySubmission: {
+            assisted: boolean;
+            attempted: boolean;
+            /** Format: int64 */
+            content_revision: number;
+            context: components["schemas"]["StudyContext"];
+            /** Format: int64 */
+            expected_version: number;
+            /** Format: int64 */
+            feedback_event_id?: number | null;
+            kind: components["schemas"]["EventKind"];
+            method: components["schemas"]["ReviewMethod"];
+            outcome?: null | components["schemas"]["ReviewOutcome"];
+            /** Format: int64 */
+            practice_id?: number | null;
+            prior_exposure: boolean;
+            /** Format: int64 */
+            response_ms: number;
+            submission_id: string;
+            /** Format: int64 */
+            target_id: number;
         };
     };
     responses: never;
@@ -659,6 +921,414 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    events: {
+        parameters: {
+            query?: {
+                /** @description Continue after this event ID (default 0) */
+                after?: number;
+                /** @description Page size, from 1 to 1000 (default 100) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyEventPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudySubmission"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    expose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExposureSubmission"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    target: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A source-checked flashcard or cloze practice ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Practice approved without resetting its recall schedule */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    queue: {
+        parameters: {
+            query?: {
+                /** @description Maximum questions, from 1 to 20 (default 20) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudyQueue"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulerSettings"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SchedulerSettings"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

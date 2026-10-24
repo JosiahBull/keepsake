@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT p.kind, p.answer, t.answer AS target_answer FROM target_practices m\n             JOIN practices p ON p.id=m.practice_id JOIN learning_targets t ON t.id=m.target_id\n             WHERE m.practice_id = ? AND t.active=1",
+  "describe": {
+    "columns": [
+      {
+        "name": "kind",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "target_answer",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "answer"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "088ae09127c9f85e8ed8f53639ccaca0dd0ada647344c6819693dd20b775cc8b"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT min(coalesce(s.blocked_until, 0)) AS \"due: i64\"\n         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id WHERE t.active=1 AND s.phase='new'",
+  "describe": {
+    "columns": [
+      {
+        "name": "due: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "03ff03f7b024336bf4b530ced9bbfc632fae9919af0bd8cf50906ccffc3ccc62"
+}

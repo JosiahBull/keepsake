@@ -22,7 +22,7 @@ pub struct ErrorBody {
 pub struct ApiError(StatusCode, String);
 
 impl ApiError {
-    fn bad(error: anyhow::Error) -> Self {
+    pub(crate) fn bad(error: anyhow::Error) -> Self {
         Self(StatusCode::BAD_REQUEST, error.to_string())
     }
 
@@ -30,18 +30,29 @@ impl ApiError {
         Self(StatusCode::NOT_FOUND, "Fact not found".into())
     }
 
-    fn internal(error: anyhow::Error) -> Self {
+    pub(crate) fn internal(error: anyhow::Error) -> Self {
         if crate::db::is_overloaded(&error) {
             return Self(
                 StatusCode::SERVICE_UNAVAILABLE,
                 "Library is busy. Try again shortly.".into(),
             );
         }
-        tracing::error!(%error, "fact storage operation failed");
+        tracing::error!(%error, "library storage operation failed");
         Self(
             StatusCode::INTERNAL_SERVER_ERROR,
             "Could not access the library".into(),
         )
+    }
+
+    pub(crate) fn study(error: anyhow::Error) -> Self {
+        use keepsake_core::scheduling::StudyError;
+
+        match error.downcast_ref::<StudyError>() {
+            Some(StudyError::Invalid(message)) => Self(StatusCode::BAD_REQUEST, message.clone()),
+            Some(StudyError::Conflict(message)) => Self(StatusCode::CONFLICT, message.clone()),
+            Some(StudyError::Missing(message)) => Self(StatusCode::NOT_FOUND, message.clone()),
+            None => Self::internal(error),
+        }
     }
 }
 

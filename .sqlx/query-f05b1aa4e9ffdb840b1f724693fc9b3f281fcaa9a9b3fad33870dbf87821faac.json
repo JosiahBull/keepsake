@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO schedule_states(target_id, phase, due_at, blocked_until, introduced_at, version, state_json)\n         VALUES (?, ?, ?, ?, ?, ?, ?)\n         ON CONFLICT(target_id) DO UPDATE SET phase=excluded.phase, due_at=excluded.due_at,\n           blocked_until=excluded.blocked_until, introduced_at=excluded.introduced_at,\n           version=excluded.version, state_json=excluded.state_json",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "f05b1aa4e9ffdb840b1f724693fc9b3f281fcaa9a9b3fad33870dbf87821faac"
+}
