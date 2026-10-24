@@ -113,6 +113,7 @@ wrong choices against the source before relying on them.
 
 `--model` overrides the selected agent's model. `--timeout-seconds` sets a 1–600 second
 deadline (default 120); `--agent-command` selects an executable for custom installations.
+On Windows, include the extension for npm shims, for example `--agent-command codex.cmd`.
 Input is passed through stdin, with no shell interpolation. Agent stdout is capped; stderr is drained without retaining it.
 Invalid output or generation failure does not partially save a new fact. A provider
 call sends the supplied fact, context, and source to that provider.
