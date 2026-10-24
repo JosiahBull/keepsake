@@ -146,8 +146,10 @@ call sends the supplied fact, context, and source to that provider.
 
 Practise shuffles all available flashcards, multiple choice, fill-the-gap, explanation,
 and application prompts into one session. Each prompt appears once per session; starting
-again reshuffles the queue. A matching game combines three or four facts with distinct questions
-and answers. Additional methods can share the same source-linked knowledge units.
+again reshuffles the queue. Matching draws three or four related facts from one topic tag,
+preferring the smallest topic with enough distinct question–answer pairs and similar question
+patterns within it. Add a shared tag such as `food` or `cargo` to build a matching bank.
+Rounds never pad a small bank with unrelated facts.
 
 Attempt before revealing feedback, then record Again, Hard, Good, or Easy. Hard means
 successful recall with difficulty; an incorrect answer means Again. Review history records

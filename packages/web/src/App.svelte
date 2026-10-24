@@ -819,7 +819,7 @@
         <button class="quiet" onclick={startMatching}>Try again</button>
       {:else if matchFacts.length < 3}
         <section class="empty-state">
-          <h2>Add three distinct question–answer pairs to play.</h2>
+          <h2>Add three related facts with a shared topic tag to play.</h2>
           <button class="primary" onclick={startPractice}>
             Practise
           </button>

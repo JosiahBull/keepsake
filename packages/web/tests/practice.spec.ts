@@ -246,6 +246,7 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
       answer: `Synthetic matching answer ${index}.`,
       context: `Synthetic matching context ${index}.`,
       source: `https://example.invalid/matching/${index}`,
+      tags: ["synthetic-matching-bank"],
     }));
   }
   await freezeClock(page);
@@ -297,5 +298,83 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
     const durable = await reviewHistory(app, review.fact_id);
     expect(durable.total).toBe(1);
     expect(durable.items).toEqual([review]);
+  }
+});
+
+test("matching keeps one topic bank across rounds despite library pagination and search", async ({ app, page }) => {
+  const banks: { tag: string; facts: Fact[] }[] = [
+    { tag: "synthetic-maori-food", facts: [] },
+    { tag: "synthetic-cargo-commands", facts: [] },
+  ];
+  const examples = [
+    [
+      ["Synthetic te reo food: water?", "wai"],
+      ["Synthetic te reo food: bread?", "parāoa"],
+      ["Synthetic te reo food: milk?", "miraka"],
+      ["Synthetic te reo food: apple?", "āporo"],
+    ],
+    [
+      ["Synthetic Cargo command: build release?", "cargo build --release"],
+      ["Synthetic Cargo command: run tests?", "cargo test"],
+      ["Synthetic Cargo command: check types?", "cargo check"],
+      ["Synthetic Cargo command: format source?", "cargo fmt"],
+    ],
+  ];
+  for (const [index, bank] of banks.entries()) {
+    for (const [prompt, answer] of examples[index]) {
+      bank.facts.push(await app.createFact({ prompt, answer, tags: [bank.tag] }));
+    }
+  }
+  for (let index = 0; index < 24; index += 1) {
+    await app.createFact({
+      prompt: `Synthetic unrelated item ${index}?`,
+      answer: `Synthetic unrelated answer ${index}.`,
+      tags: [`synthetic-isolated-topic-${index}`],
+    });
+  }
+
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Library pages" })
+    .getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "Library pages" })
+    .getByText("Page 2", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: banks[0].facts[0].prompt, exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search facts" }).fill("unrelated item 23");
+  await expect(page.getByRole("region", { name: "Saved facts" }).getByRole("article")).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: "Synthetic unrelated item 23?", exact: true })).toBeVisible();
+
+  const start = page.getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Match pairs", exact: true });
+  for (let round = 0; round < 3; round += 1) {
+    const loaded = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/facts/sample" &&
+      response.request().method() === "GET");
+    await start.click();
+    const response = await loaded;
+    expect(response.ok()).toBeTruthy();
+    expect(new URL(response.url()).searchParams.get("search")).toBeNull();
+    expect(new URL(response.url()).searchParams.get("before_id")).toBeNull();
+    const sample: components["schemas"]["FactSample"] = await response.json();
+    expect(sample.items).toHaveLength(4);
+    const bank = banks.find((candidate) => sample.items[0].tags.includes(candidate.tag));
+    expect(bank, "every round must select one eligible topic bank").toBeDefined();
+    expect(sample.items.map((fact) => fact.id).sort((left, right) => left - right))
+      .toEqual(bank!.facts.map((fact) => fact.id).sort((left, right) => left - right));
+    expect(sample.items.every((fact) => fact.tags.includes(bank!.tag))).toBeTruthy();
+
+    const game = page.getByRole("region", { name: "Matching pairs game" });
+    await expect(game.getByText("0 of 4 matched", { exact: true })).toBeVisible();
+    await expect(game.getByRole("button")).toHaveCount(8);
+    for (const fact of bank!.facts) {
+      await expect(game.getByRole("button", { name: fact.prompt, exact: true })).toBeEnabled();
+      await expect(game.getByRole("button", { name: fact.answer, exact: true })).toBeDisabled();
+    }
+    for (const other of banks.filter((candidate) => candidate !== bank)) {
+      for (const fact of other.facts) {
+        await expect(game.getByRole("button", { name: fact.prompt, exact: true })).toHaveCount(0);
+        await expect(game.getByRole("button", { name: fact.answer, exact: true })).toHaveCount(0);
+      }
+    }
+    await expect(game.getByText("Synthetic unrelated", { exact: false })).toHaveCount(0);
   }
 });

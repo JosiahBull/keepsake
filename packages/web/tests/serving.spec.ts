@@ -39,12 +39,12 @@ test("empty practice offers a working path to the fact form", async ({ app, page
   expect(await facts.json()).toMatchObject({ total: 0, items: [] });
 });
 
-test("matching requires three distinct pairs even when duplicate records make three facts", async ({ app, page }) => {
+test("matching requires three distinct pairs within a topic bank even when duplicate records make three facts", async ({ app, page }) => {
   await page.goto("/");
   const start = page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true });
   const empty = page.getByRole("heading", {
-    name: "Add three distinct question–answer pairs to play.",
+    name: "Add three related facts with a shared topic tag to play.",
     exact: true,
   });
   await start.click();
@@ -56,7 +56,7 @@ test("matching requires three distinct pairs even when duplicate records make th
     { prompt: "Synthetic household pair one?", answer: "Synthetic answer one" },
     { prompt: "Synthetic household pair two?", answer: "Synthetic answer two" },
   ]) {
-    await app.createFact(fact);
+    await app.createFact({ ...fact, tags: ["synthetic-household-bank"] });
   }
   const listed = await app.request.get("/api/facts");
   expect(listed.ok()).toBe(true);
@@ -68,14 +68,36 @@ test("matching requires three distinct pairs even when duplicate records make th
   const response = await sample;
   expect(response.ok()).toBe(true);
   const pairs = await response.json();
-  expect(pairs.items).toHaveLength(2);
-  expect(new Set(pairs.items.map((fact: { prompt: string; answer: string }) =>
-    JSON.stringify([fact.prompt, fact.answer]))).size).toBe(2);
+  expect(pairs.items).toEqual([]);
   await expect(empty).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rate your recognition", exact: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Matching pairs game" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Practise", exact: true })).toHaveCount(2);
+});
+
+test("untagged facts from different topics do not form a matching bank", async ({ app, page }) => {
+  for (const [prompt, answer] of [
+    ["Synthetic food question?", "Synthetic food answer"],
+    ["Synthetic Cargo question?", "Synthetic Cargo answer"],
+    ["Synthetic astronomy question?", "Synthetic astronomy answer"],
+    ["Synthetic gardening question?", "Synthetic gardening answer"],
+  ]) {
+    await app.createFact({ prompt, answer, tags: [] });
+  }
+  await page.goto("/");
+  const sample = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/facts/sample");
+  await page.getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Match pairs", exact: true }).click();
+  const response = await sample;
+  expect(response.ok()).toBeTruthy();
+  expect(await response.json()).toEqual({ items: [] });
+  await expect(page.getByRole("heading", {
+    name: "Add three related facts with a shared topic tag to play.",
+    exact: true,
+  })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Matching pairs game" })).toHaveCount(0);
 });
 
 test("the production document, browser-loaded assets and API enforce their response policies", async ({ page }) => {

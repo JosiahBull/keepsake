@@ -353,7 +353,7 @@ export interface operations {
     sample: {
         parameters: {
             query?: {
-                /** @description Number of distinct matching pairs, from 1 to 4 (default 4). */
+                /** @description Number of related pairs from one topic bank, from 1 to 4 (default 4). */
                 limit?: number;
             };
             header?: never;
