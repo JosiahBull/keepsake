@@ -123,8 +123,9 @@ call sends the supplied fact, context, and source to that provider.
 
 ## Practise
 
-The website offers flashcards, multiple choice, fill-the-gap, explanation, and application
-prompts when present. A matching game combines three or four facts with distinct questions
+Practise shuffles all available flashcards, multiple choice, fill-the-gap, explanation,
+and application prompts into one session. Each prompt appears once per session; starting
+again reshuffles the queue. A matching game combines three or four facts with distinct questions
 and answers. Additional methods can share the same source-linked knowledge units.
 
 Attempt before revealing feedback, then record Again, Hard, Good, or Easy. Hard means
