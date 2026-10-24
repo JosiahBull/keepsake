@@ -5,6 +5,7 @@
   type Method = components["schemas"]["PracticeKind"];
   type Outcome = components["schemas"]["ReviewOutcome"];
   type Fact = components["schemas"]["Fact"];
+  type Question = { fact: Fact; practice: Fact["practices"][number] };
 
   const modes: { id: Method; name: string; instruction: string }[] = [
     {
@@ -59,7 +60,7 @@
   let tags = $state("");
 
   // Practice session
-  let mode = $state<Method>("flashcard");
+  let queue = $state<Question[]>([]);
   let cursor = $state(0);
   let revealed = $state(false);
   let response = $state("");
@@ -90,16 +91,10 @@
         .includes(search.toLowerCase()),
     ),
   );
-  const queue = $derived(
-    facts.flatMap((fact) =>
-      fact.practices
-        .filter((practice) => practice.kind === mode)
-        .map((practice) => ({ fact, practice })),
-    ),
-  );
   const current = $derived(queue[cursor]);
+  const mode = $derived(current?.practice.kind);
   const choiceOptions = $derived(current ? shuffled(current.practice.choices) : []);
-  const selectedMode = $derived(modes.find((item) => item.id === mode)!);
+  const selectedMode = $derived(modes.find((item) => item.id === mode));
   const matchingPool = $derived.by(() => {
     const answers = new Set<string>();
     const prompts = new Set<string>();
@@ -207,13 +202,15 @@
     reviewError = "";
   }
 
-  function startPractice(nextMode: Method = mode) {
+  function startPractice() {
     if (recording) {
       return;
     }
 
     view = "practice";
-    mode = nextMode;
+    queue = shuffled(
+      facts.flatMap((fact) => fact.practices.map((practice) => ({ fact, practice }))),
+    );
     cursor = 0;
     sessionCount = 0;
     resetQuestion();
@@ -247,7 +244,13 @@
     reviewError = "";
 
     try {
-      await recordReview(current.fact.id, current.practice.id, mode, outcome, responseMs);
+      await recordReview(
+        current.fact.id,
+        current.practice.id,
+        current.practice.kind,
+        outcome,
+        responseMs,
+      );
       cursor += 1;
       sessionCount += 1;
       resetQuestion();
@@ -535,27 +538,9 @@
     {:else if view === "practice"}
       <h1 class="sr-only">Practise</h1>
       <div class="practice-layout">
-        <label class="method-picker">
-          <span class="sr-only">Practice method</span>
-          <select
-            value={mode}
-            disabled={recording}
-            onchange={(event) => startPractice(event.currentTarget.value as Method)}
-          >
-            {#each modes as item}
-              <option value={item.id}>
-                {item.name} ({facts.reduce(
-                  (count, fact) =>
-                    count + fact.practices.filter((practice) => practice.kind === item.id).length,
-                  0,
-                )})
-              </option>
-            {/each}
-          </select>
-        </label>
-        <section class="practice-stage" aria-label={selectedMode.name}>
+        <section class="practice-stage" aria-label={selectedMode?.name ?? "Practice session"}>
           {#if current}
-            <p class="card-meta">{cursor + 1} of {queue.length}</p>
+            <p class="card-meta">{selectedMode?.name} · {cursor + 1} of {queue.length}</p>
             <h2 class="question">{current.practice.prompt}</h2>
 
             {#if mode === "multiple_choice"}
@@ -670,7 +655,7 @@
             <div class="session-done">
               <h2>
                 {facts.length
-                  ? `No ${selectedMode.name.toLowerCase()} prompts yet.`
+                  ? "No practice prompts yet."
                   : "No facts yet."}
               </h2>
 
@@ -690,13 +675,15 @@
             </div>
           {/if}
         </section>
-        <details class="study-notes">
-          <summary>Practice notes</summary>
-          <p>
-            {selectedMode.instruction} Reviews are recorded by method. Choice and matching test recognition,
-            which differs from unaided recall.
-          </p>
-        </details>
+        {#if selectedMode}
+          <details class="study-notes">
+            <summary>Practice notes</summary>
+            <p>
+              {selectedMode.instruction} Reviews are recorded by method. Choice and matching test recognition,
+              which differs from unaided recall.
+            </p>
+          </details>
+        {/if}
       </div>
     {:else}
       <h1 class="sr-only">Match pairs</h1>
@@ -704,8 +691,8 @@
       {#if matchingPool.length < 3}
         <section class="empty-state">
           <h2>Add three distinct question–answer pairs to play.</h2>
-          <button class="primary" onclick={() => startPractice("flashcard")}>
-            Practise flashcards
+          <button class="primary" onclick={startPractice}>
+            Practise
           </button>
         </section>
       {:else}
@@ -815,14 +802,14 @@
           {#if matched.length === matchFacts.length}
             <div class="form-actions">
               <button class="primary" onclick={startMatching}>Play again</button>
-              <button class="quiet" onclick={() => startPractice("flashcard")}>
-                Practise flashcards
+              <button class="quiet" onclick={startPractice}>
+                Practise
               </button>
             </div>
           {/if}
         </section>
         <p class="study-notes">
-          Matching tests recognition. Use flashcards to check unaided recall.
+          Matching tests recognition, which differs from unaided recall.
         </p>
       {/if}
     {/if}
@@ -845,8 +832,7 @@
 
   :global(button),
   :global(input),
-  :global(textarea),
-  :global(select) {
+  :global(textarea) {
     font: inherit;
   }
 
@@ -865,8 +851,7 @@
   :global(a:focus-visible),
   :global(summary:focus-visible),
   :global(input:focus-visible),
-  :global(textarea:focus-visible),
-  :global(select:focus-visible) {
+  :global(textarea:focus-visible) {
     outline: 3px solid #97712d;
     outline-offset: 4px;
   }
@@ -888,8 +873,7 @@
   }
 
   :global(input),
-  :global(textarea),
-  :global(select) {
+  :global(textarea) {
     width: 100%;
     background: #fff;
     color: #18362f;
@@ -1184,11 +1168,6 @@
     display: grid;
     gap: 1rem;
     max-width: 53rem;
-  }
-
-  .method-picker {
-    display: block;
-    width: min(100%, 260px);
   }
 
   .study-notes {
