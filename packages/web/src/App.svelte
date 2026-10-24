@@ -420,7 +420,7 @@
       if (response.response.status === 409) {
         studyConflict = true;
         pendingSubmission = null;
-        reviewError = "This question changed in another tab. Refresh practice.";
+        reviewError = "This attempt is no longer current. Refresh practice.";
         return;
       }
       const result: StudyResult = unwrap(response);

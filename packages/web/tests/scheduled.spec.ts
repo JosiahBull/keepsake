@@ -302,7 +302,7 @@ test("a stale browser tab cannot overwrite a newer schedule and can refresh the 
     new URL(response.url()).pathname === "/api/study/events" && response.request().method() === "POST");
   await attempt(other, "My unaided synthetic answer", false);
   expect((await rejected).status()).toBe(409);
-  await expect(other.getByRole("alert")).toHaveText("This question changed in another tab. Refresh practice.");
+  await expect(other.getByRole("alert")).toHaveText("This attempt is no longer current. Refresh practice.");
   await other.getByRole("button", { name: "Refresh practice", exact: true }).click();
   await expect(other.getByRole("heading", { name: "Nothing due right now", exact: true })).toBeVisible();
   expect(await schedule(app, fact.id)).toEqual(accepted.schedule);
