@@ -2,6 +2,7 @@ pub use keepsake_core::{db, facts};
 pub mod config;
 mod context;
 mod facts_api;
+mod headers;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;
@@ -10,7 +11,7 @@ use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
-    middleware::from_fn_with_state,
+    middleware::{from_fn, from_fn_with_state},
     routing::{get, post},
 };
 use serde::Serialize;
@@ -98,5 +99,5 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
             limits::Admission::new(limits),
             limits::admit,
         ));
-    context::wrap(app)
+    context::wrap(app).layer(from_fn(headers::response_headers))
 }
