@@ -49,7 +49,11 @@ material into executable shell syntax. Run `--help` for current flags.
 - `add --prompt ... --answer ...` saves one fact; repeat `--tag` for multiple tags
 - `add ... --dry-run` previews without saving; `add --file reviewed.json` saves
   that exact reviewed JSON without regenerating it
-- `list` and `show ID` inspect saved knowledge; `methods` describes practice types
+- `list --search '...' --limit 25` finds a page of saved knowledge; `show ID`
+  includes its practice variants; `methods` describes practice types
+- `--json list` returns `{items, next_cursor, total}`. Continue with
+  `list --before CURSOR` and the same search until `next_cursor` is null;
+  the first page is not the whole library. `--limit` accepts 1–100
 - `--database sqlite:PATH` selects another database; the launcher defaults
   `DATABASE_URL` to the repository's `data/keepsake.db` when it is unset
 - `--json` gives machine-readable output

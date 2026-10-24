@@ -50,9 +50,9 @@ async fn snapshots_committed_wal_and_restores_ids_history_and_schema() {
         serde_json::to_value(facts::get(&reopened, saved.id).await.unwrap().unwrap()).unwrap(),
         serde_json::to_value(saved).unwrap()
     );
-    assert_eq!(facts::list(&reopened).await.unwrap().len(), 1);
+    assert_eq!(facts::list(&reopened).await.unwrap().items.len(), 1);
     assert_eq!(
-        facts::reviews(&reopened, 1).await.unwrap()[0].response_ms,
+        facts::reviews(&reopened, 1).await.unwrap().items[0].response_ms,
         123
     );
     #[cfg(unix)]

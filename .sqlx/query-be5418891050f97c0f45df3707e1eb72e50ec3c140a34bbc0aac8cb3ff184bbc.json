@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts\n         WHERE (? IS NULL OR id < ?) AND\n           (prompt LIKE ? ESCAPE '#' OR answer LIKE ? ESCAPE '#'\n            OR context LIKE ? ESCAPE '#' OR tags LIKE ? ESCAPE '#')\n         ORDER BY id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "prompt",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "context",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "context"
+          }
+        }
+      },
+      {
+        "name": "source",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "tags",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "tags"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "be5418891050f97c0f45df3707e1eb72e50ec3c140a34bbc0aac8cb3ff184bbc"
+}

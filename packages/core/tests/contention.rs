@@ -40,7 +40,7 @@ async fn retries_after_a_temporary_writer_and_saves_each_fact_once() {
     writer.rollback().await.unwrap();
     let saved = write.await.unwrap().unwrap();
     assert_eq!(saved.len(), 2);
-    assert_eq!(facts::list(&pool).await.unwrap().len(), 2);
+    assert_eq!(facts::list(&pool).await.unwrap().items.len(), 2);
     let practices: i64 = sqlx::query_scalar("SELECT count(*) FROM practices")
         .fetch_one(&pool)
         .await
@@ -62,7 +62,7 @@ async fn sustained_contention_stops_and_is_typed_as_overload() {
     ));
     assert!(started.elapsed() < Duration::from_secs(3));
     writer.rollback().await.unwrap();
-    assert!(facts::list(&pool).await.unwrap().is_empty());
+    assert!(facts::list(&pool).await.unwrap().items.is_empty());
     pool.close().await;
 }
 
@@ -102,7 +102,7 @@ async fn retries_the_whole_body_only_after_confirmed_rollback() {
     .await
     .unwrap();
     assert_eq!(attempts.load(Ordering::SeqCst), 2);
-    assert_eq!(facts::list(&pool).await.unwrap().len(), 1);
+    assert_eq!(facts::list(&pool).await.unwrap().items.len(), 1);
     pool.close().await;
 }
 

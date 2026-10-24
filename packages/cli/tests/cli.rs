@@ -90,7 +90,7 @@ fn capture_from_any_directory_and_read_back() {
     assert_eq!(saved["id"], 1);
     assert_eq!(saved["practices"][0]["kind"], "flashcard");
     assert_eq!(
-        json(&cli(&db, &["list"]))[0]["answer"],
+        json(&cli(&db, &["list"]))["items"][0]["answer"],
         "Write-ahead logging"
     );
     assert_eq!(json(&cli(&db, &["show", "1"]))["tags"][0], "sqlite");
@@ -109,7 +109,10 @@ fn standalone_default_database_is_relative_to_the_calling_directory() {
     assert_eq!(json(&output)["id"], 1);
     let database = temp.path().join("data/keepsake.db");
     assert!(database.exists());
-    assert_eq!(json(&cli(&database, &["list"]))[0]["answer"], "Yes");
+    assert_eq!(
+        json(&cli(&database, &["list"]))["items"][0]["answer"],
+        "Yes"
+    );
 }
 
 #[test]
@@ -198,7 +201,13 @@ printf '%s' '{"practices":[{"kind":"multiple_choice","prompt":"Which journal mod
         &["generate", "1", "--file", file.to_str().unwrap()],
     ));
     assert_eq!(saved["practices"].as_array().unwrap().len(), 3);
-    assert_eq!(json(&cli(&db, &["list"])).as_array().unwrap().len(), 1);
+    assert_eq!(
+        json(&cli(&db, &["list"]))["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[cfg(unix)]
@@ -369,7 +378,13 @@ fn url_prompt_previews_source_grounded_batch_and_imports_exact_json() {
     std::fs::write(&file, serde_json::to_vec(&draft).unwrap()).unwrap();
     let saved = json(&cli(&db, &["add", "--file", file.to_str().unwrap()]));
     assert_eq!(saved.as_array().unwrap().len(), 2);
-    assert_eq!(json(&cli(&db, &["list"])).as_array().unwrap().len(), 2);
+    assert_eq!(
+        json(&cli(&db, &["list"]))["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert_eq!(saved[0]["practices"][0]["kind"], "flashcard");
 }
 
@@ -465,4 +480,34 @@ printf '%s' '{"practices":[{"kind":"flashcard","prompt":"Question?","answer":"An
     ));
     assert_eq!(draft["practices"][0]["answer"], "Answer");
     assert!(!db.exists());
+}
+
+#[test]
+fn lists_bounded_pages_with_visible_cursors_and_server_equivalent_search() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("paged.db");
+    for index in 0..4 {
+        let prompt = format!("Question {index}");
+        assert!(
+            cli(
+                &database,
+                &["add", "--prompt", &prompt, "--answer", "Answer"]
+            )
+            .status
+            .success()
+        );
+    }
+    let first = json(&cli(&database, &["list", "--limit", "2"]));
+    assert_eq!(first["items"].as_array().unwrap().len(), 2);
+    assert_eq!(first["total"], 4);
+    let cursor = first["next_cursor"].as_i64().unwrap().to_string();
+    let second = json(&cli(
+        &database,
+        &["list", "--limit", "2", "--before", &cursor],
+    ));
+    assert!(second["next_cursor"].is_null());
+    assert_eq!(second["items"][0]["id"], 2);
+    let filtered = json(&cli(&database, &["list", "--search", "Question 1"]));
+    assert_eq!(filtered["total"], 1);
+    assert!(!cli(&database, &["list", "--limit", "101"]).status.success());
 }

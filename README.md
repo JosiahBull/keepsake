@@ -158,6 +158,17 @@ proof of unaided recall. A personalised spaced scheduler is not implemented yet.
 the [saved research](docs/research/learning-and-retention-2026-10-24.md). The research supports
 retrieval, feedback, and spacing; the particular mix of formats is a product proposal.
 
+Library reads use bounded pages. `keepsake list --search 'sqlite' --limit 25` searches
+questions, answers, context, and tags. Search treats `%` and `_` literally and uses
+SQLite's case-insensitive ASCII matching. JSON output is `{items, next_cursor, total}`;
+continue with `--before NEXT_CURSOR` and the same search until the cursor is null.
+`list` accepts 1–100 facts per page; `show ID` includes that fact's practice variants.
+
+The website has Previous/Next library navigation. Practice sessions sample up to 20
+random prompts from the whole library, across formats; matching samples up to four
+distinct pairs. Library pages and searches do not restrict those samples. Review-history
+requests return up to 50 reviews by default (maximum 100), with `after_id` for the next page.
+
 ## Agent skill
 
 The canonical [keepsake-add-facts skill](skills/keepsake-add-facts/SKILL.md) is stored here.

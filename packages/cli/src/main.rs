@@ -7,6 +7,7 @@ use keepsake_cli::{
 use keepsake_core::{
     backup, db,
     facts::{self, Fact, NewFact},
+    paging,
 };
 use std::{io::Read, path::PathBuf};
 
@@ -48,8 +49,17 @@ enum Commands {
     /// Save manual facts or extract them from a URL.
     Add(Add),
 
-    /// List saved facts.
-    List,
+    /// List one page of facts, newest first.
+    List {
+        #[arg(long, default_value_t = 25, value_parser = clap::value_parser!(i64).range(1..=100))]
+        limit: i64,
+        /// Continue with the next_cursor returned by the preceding page.
+        #[arg(long, value_parser = clap::value_parser!(i64).range(1..))]
+        before: Option<i64>,
+        /// Literal substring search across question, answer, context, and tags.
+        #[arg(long, default_value = "")]
+        search: String,
+    },
 
     /// Show a saved fact and its practice variants.
     Show { id: i64 },
@@ -157,15 +167,32 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
             let pool = db::connect(&database(database_url)).await?;
 
             match command {
-                Commands::List => {
-                    let saved = facts::list(&pool).await?;
+                Commands::List {
+                    limit,
+                    before,
+                    search,
+                } => {
+                    let saved = paging::facts(
+                        &pool,
+                        &paging::FactQuery {
+                            limit,
+                            before_id: before,
+                            search,
+                        },
+                    )
+                    .await?;
                     if json {
                         print_json(&saved)?;
-                    } else if saved.is_empty() {
+                    } else if saved.items.is_empty() {
                         println!("No facts yet. Use keepsake add --prompt '...' --answer '...'.");
                     } else {
-                        for fact in saved {
+                        for fact in &saved.items {
                             println!("{}\t{}", fact.id, fact.prompt);
+                        }
+                        if let Some(cursor) = saved.next_cursor {
+                            println!(
+                                "\nMore facts available. Continue with --before {cursor} and the same search."
+                            );
                         }
                     }
                 }

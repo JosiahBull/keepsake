@@ -15,16 +15,54 @@
           "facts_api"
         ],
         "operationId": "list",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, from 1 to 100 (default 25).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "before_id",
+            "in": "query",
+            "description": "Return facts older than this ID; omit for the newest page.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Literal substring search across question, answer, context, and tags.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Fact"
-                  }
+                  "$ref": "#/components/schemas/FactPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -73,6 +111,68 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Fact"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/facts/sample": {
+      "get": {
+        "tags": [
+          "facts_api"
+        ],
+        "operationId": "sample",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of distinct matching pairs, from 1 to 4 (default 4).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactSample"
                 }
               }
             }
@@ -270,6 +370,26 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, from 1 to 100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "after_id",
+            "in": "query",
+            "description": "Return reviews newer than this ID.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
           }
         ],
         "responses": {
@@ -278,10 +398,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Review"
-                  }
+                  "$ref": "#/components/schemas/ReviewPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -336,6 +463,68 @@
           },
           "503": {
             "description": "Database unavailable"
+          }
+        }
+      }
+    },
+    "/api/practice": {
+      "get": {
+        "tags": [
+          "facts_api"
+        ],
+        "operationId": "practice",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of random prompts, from 1 to 50 (default 20).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PracticeSession"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
           }
         }
       }
@@ -455,6 +644,85 @@
             "items": {
               "$ref": "#/components/schemas/Practice"
             }
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FactPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactSummary"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "FactSample": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FactSummary"
+            }
+          }
+        }
+      },
+      "FactSummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "prompt",
+          "answer",
+          "context",
+          "source",
+          "tags",
+          "created_at"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "context": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
           },
           "prompt": {
             "type": "string"
@@ -627,6 +895,40 @@
           "apply"
         ]
       },
+      "PracticeQuestion": {
+        "type": "object",
+        "required": [
+          "fact",
+          "practice"
+        ],
+        "properties": {
+          "fact": {
+            "$ref": "#/components/schemas/FactSummary"
+          },
+          "practice": {
+            "$ref": "#/components/schemas/Practice"
+          }
+        }
+      },
+      "PracticeSession": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PracticeQuestion"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Review": {
         "type": "object",
         "required": [
@@ -687,6 +989,32 @@
           "good",
           "easy"
         ]
+      },
+      "ReviewPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Review"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       }
     }
   }

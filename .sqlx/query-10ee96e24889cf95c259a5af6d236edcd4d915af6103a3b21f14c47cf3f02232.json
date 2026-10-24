@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", fact_id, practice_id, method, outcome, response_ms, reviewed_at FROM reviews\n         WHERE fact_id = ? AND (? IS NULL OR id > ?) ORDER BY id LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "fact_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "fact_id"
+          }
+        }
+      },
+      {
+        "name": "practice_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "practice_id"
+          }
+        }
+      },
+      {
+        "name": "method",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "method"
+          }
+        }
+      },
+      {
+        "name": "outcome",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "outcome"
+          }
+        }
+      },
+      {
+        "name": "response_ms",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "response_ms"
+          }
+        }
+      },
+      {
+        "name": "reviewed_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "reviewed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "10ee96e24889cf95c259a5af6d236edcd4d915af6103a3b21f14c47cf3f02232"
+}

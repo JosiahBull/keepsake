@@ -105,7 +105,10 @@ async fn api_round_trip_and_validation_statuses() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::CREATED);
-    assert_eq!(facts::reviews(&pool, saved.id).await.unwrap().len(), 1);
+    assert_eq!(
+        facts::reviews(&pool, saved.id).await.unwrap().items.len(),
+        1
+    );
     pool.close().await;
 }
 
@@ -138,6 +141,6 @@ async fn write_contention_returns_retryable_service_unavailable() {
         "Library is busy. Try again shortly."
     );
     writer.rollback().await.unwrap();
-    assert!(facts::list(&pool).await.unwrap().is_empty());
+    assert!(facts::list(&pool).await.unwrap().items.is_empty());
     pool.close().await;
 }
