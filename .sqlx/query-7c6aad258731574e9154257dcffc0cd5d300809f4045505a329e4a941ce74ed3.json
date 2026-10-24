@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO practices (fact_id, kind, prompt, answer, choices, explanation)\n         VALUES (?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "7c6aad258731574e9154257dcffc0cd5d300809f4045505a329e4a941ce74ed3"
+}

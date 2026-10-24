@@ -34,7 +34,7 @@ pub struct Health {
     (status = 503, description = "Database unavailable")
 ))]
 async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCode> {
-    sqlx::query_scalar::<_, i64>("SELECT 1")
+    sqlx::query_scalar!("SELECT 1")
         .fetch_one(&pool)
         .await
         .map_err(|error| {

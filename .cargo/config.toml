@@ -1,0 +1,3 @@
+# Builds verify SQL against committed metadata and never open a developer database.
+[env]
+SQLX_OFFLINE = "true"
