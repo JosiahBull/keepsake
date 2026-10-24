@@ -25,6 +25,11 @@ jobs:
           import tomllib
 
           version = tomllib.loads(Path("Cargo.toml").read_text())["workspace"]["package"]["version"]
+          for path in Path("packages").glob("*/Cargo.toml"):
+              declared = tomllib.loads(path.read_text())["package"]["version"]
+              actual = version if isinstance(declared, dict) and declared.get("workspace") else declared
+              if actual != version:
+                  raise SystemExit(f"{path}: version {actual} differs from workspace {version}")
           for path in ("package.json", "packages/web/package.json", "packages/client/package.json"):
               actual = json.loads(Path(path).read_text())["version"]
               if actual != version:
