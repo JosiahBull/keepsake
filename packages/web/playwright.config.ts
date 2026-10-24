@@ -5,6 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
+  updateSnapshots: "none",
   workers: process.env.CI ? 4 : 3,
   timeout: 45_000,
   globalSetup: "./tests/global-setup.ts",
