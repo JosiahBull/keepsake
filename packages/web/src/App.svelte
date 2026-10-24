@@ -124,40 +124,67 @@
     nextCursor = null;
 
     try {
-      const page = unwrap(await api.GET("/api/facts", {
-        params: { query: { limit: 25, ...(cursor === null ? {} : { before_id: cursor }), search } },
-      }));
-      if (request !== libraryRequest) return;
+      const page = unwrap(
+        await api.GET("/api/facts", {
+          params: {
+            query: {
+              limit: 25,
+              ...(cursor === null ? {} : { before_id: cursor }),
+              search,
+            },
+          },
+        }),
+      );
+
+      if (request !== libraryRequest) {
+        return;
+      }
+
       facts = page.items;
       totalFacts = page.total;
       nextCursor = page.next_cursor ?? null;
     } catch (caught) {
-      if (request === libraryRequest) error = `Could not load your library. ${message(caught)}`;
+      if (request === libraryRequest) {
+        error = `Could not load your library. ${message(caught)}`;
+      }
     } finally {
-      if (request === libraryRequest) loading = false;
+      if (request === libraryRequest) {
+        loading = false;
+      }
     }
   }
 
   function searchLibrary(event: Event) {
     search = (event.currentTarget as HTMLInputElement).value;
     clearTimeout(searchTimer);
+
     // Invalidate an earlier search immediately, before the debounce expires.
     libraryRequest += 1;
-    searchTimer = setTimeout(() => { void loadFacts(null, []); }, 200);
+    searchTimer = setTimeout(() => {
+      void loadFacts(null, []);
+    }, 200);
   }
 
   function focusPageContent() {
-    if (!error) document.querySelector<HTMLElement>(".fact-details > summary")?.focus();
+    if (!error) {
+      document.querySelector<HTMLElement>(".fact-details > summary")?.focus();
+    }
   }
 
   async function previousPage() {
-    if (pageHistory.length === 0 || loading) return;
+    if (pageHistory.length === 0 || loading) {
+      return;
+    }
+
     await loadFacts(pageHistory.at(-1) ?? null, pageHistory.slice(0, -1));
     focusPageContent();
   }
 
   async function nextPage() {
-    if (nextCursor === null || loading) return;
+    if (nextCursor === null || loading) {
+      return;
+    }
+
     await loadFacts(nextCursor, [...pageHistory, beforeCursor]);
     focusPageContent();
   }
@@ -237,7 +264,10 @@
   }
 
   async function startPractice() {
-    if (recording) return;
+    if (recording) {
+      return;
+    }
+
     const request = ++practiceRequest;
     view = "practice";
     practiceLoading = true;
@@ -246,16 +276,29 @@
     cursor = 0;
     sessionCount = 0;
     resetQuestion();
+
     try {
-      const session = unwrap(await api.GET("/api/practice", { params: { query: { limit: 20 } } }));
-      if (request !== practiceRequest) return;
+      const session = unwrap(
+        await api.GET("/api/practice", {
+          params: { query: { limit: 20 } },
+        }),
+      );
+
+      if (request !== practiceRequest) {
+        return;
+      }
+
       queue = session.items;
       practiceTotal = session.total;
       resetQuestion();
     } catch (caught) {
-      if (request === practiceRequest) practiceError = `Could not load practice. ${message(caught)}`;
+      if (request === practiceRequest) {
+        practiceError = `Could not load practice. ${message(caught)}`;
+      }
     } finally {
-      if (request === practiceRequest) practiceLoading = false;
+      if (request === practiceRequest) {
+        practiceLoading = false;
+      }
     }
   }
 
@@ -306,7 +349,10 @@
 
   // Matching actions
   async function startMatching() {
-    if (recording) return;
+    if (recording) {
+      return;
+    }
+
     const request = ++matchingRequest;
     view = "matching";
     matchingLoading = true;
@@ -321,15 +367,28 @@
     matchStarted = {};
     matchMisses = {};
     reviewError = "";
+
     try {
-      const sample = unwrap(await api.GET("/api/facts/sample", { params: { query: { limit: 4 } } }));
-      if (request !== matchingRequest) return;
+      const sample = unwrap(
+        await api.GET("/api/facts/sample", {
+          params: { query: { limit: 4 } },
+        }),
+      );
+
+      if (request !== matchingRequest) {
+        return;
+      }
+
       matchFacts = sample.items;
       matchAnswers = shuffled(matchFacts);
     } catch (caught) {
-      if (request === matchingRequest) matchingError = `Could not load matching pairs. ${message(caught)}`;
+      if (request === matchingRequest) {
+        matchingError = `Could not load matching pairs. ${message(caught)}`;
+      }
     } finally {
-      if (request === matchingRequest) matchingLoading = false;
+      if (request === matchingRequest) {
+        matchingLoading = false;
+      }
     }
   }
 

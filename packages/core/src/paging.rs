@@ -19,6 +19,7 @@ pub struct FactSummary {
 
 impl TryFrom<FactRow> for FactSummary {
     type Error = anyhow::Error;
+
     fn try_from(row: FactRow) -> anyhow::Result<Self> {
         Ok(Self {
             id: row.id,
@@ -198,9 +199,11 @@ fn search_pattern(search: &str) -> String {
 
 pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactPage> {
     query.validate()?;
+
     let pattern = search_pattern(&query.search);
     let fetch_limit = query.limit + 1;
     let mut connection = pool.acquire().await?;
+
     // JSON's table-valued function applies the same fold to each searchable field
     // without joining unrelated field boundaries into a possible substring match.
     let total = sqlx::query_scalar!(
@@ -232,9 +235,11 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     )
     .fetch_all(&mut *connection)
     .await?;
+
     let has_more = rows.len() > query.limit as usize;
     rows.truncate(query.limit as usize);
     let next_cursor = has_more.then(|| rows.last().expect("nonempty page").id);
+
     Ok(FactPage {
         items: rows
             .into_iter()
@@ -262,6 +267,7 @@ pub async fn reviews(
     query: &ReviewQuery,
 ) -> anyhow::Result<ReviewPage> {
     query.validate()?;
+
     let fetch_limit = query.limit + 1;
     let total = sqlx::query_scalar!(
         "SELECT count(*) AS \"count!: i64\" FROM reviews WHERE fact_id = ?",
@@ -269,14 +275,22 @@ pub async fn reviews(
     )
     .fetch_one(pool)
     .await?;
-    let mut rows = sqlx::query_as!(ReviewRow,
+    let mut rows = sqlx::query_as!(
+        ReviewRow,
         "SELECT id AS \"id!\", fact_id, practice_id, method, outcome, response_ms, reviewed_at FROM reviews
          WHERE fact_id = ? AND (? IS NULL OR id > ?) ORDER BY id LIMIT ?",
-        fact_id, query.after_id, query.after_id, fetch_limit
-    ).fetch_all(pool).await?;
+        fact_id,
+        query.after_id,
+        query.after_id,
+        fetch_limit
+    )
+    .fetch_all(pool)
+    .await?;
+
     let has_more = rows.len() > query.limit as usize;
     rows.truncate(query.limit as usize);
     let next_cursor = has_more.then(|| rows.last().expect("nonempty page").id);
+
     let items = rows
         .into_iter()
         .map(|row| {
@@ -291,6 +305,7 @@ pub async fn reviews(
             })
         })
         .collect::<anyhow::Result<_>>()?;
+
     Ok(ReviewPage {
         items,
         next_cursor,
@@ -300,30 +315,42 @@ pub async fn reviews(
 
 pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Result<PracticeSession> {
     query.validate()?;
+
     let mut connection = pool.acquire().await?;
     let total = sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM practices")
         .fetch_one(&mut *connection)
         .await?;
-    let practices = sqlx::query_as!(PracticeRow,
+    let practices = sqlx::query_as!(
+        PracticeRow,
         "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation FROM practices ORDER BY random() LIMIT ?",
         query.limit
-    ).fetch_all(&mut *connection).await?;
+    )
+    .fetch_all(&mut *connection)
+    .await?;
+
     let mut items = Vec::with_capacity(practices.len());
+
     for practice in practices {
-        let fact = sqlx::query_as!(FactRow,
+        let fact = sqlx::query_as!(
+            FactRow,
             "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts WHERE id = ?",
             practice.fact_id
-        ).fetch_one(&mut *connection).await?;
+        )
+        .fetch_one(&mut *connection)
+        .await?;
+
         items.push(PracticeQuestion {
             fact: fact.try_into()?,
             practice: practice.try_into()?,
         });
     }
+
     Ok(PracticeSession { items, total })
 }
 
 pub async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Result<FactSample> {
     query.validate()?;
+
     // Ambiguous questions cannot form a fair matching pair. Pick one representative per
     // answer only after removing questions that have conflicting answers.
     let rows = sqlx::query_as!(
@@ -342,22 +369,27 @@ pub async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Result<Fa
     )
     .fetch_all(pool)
     .await?;
+
     let mut prompts = std::collections::HashSet::new();
     let mut answers = std::collections::HashSet::new();
     let mut items = Vec::new();
+
     for row in rows {
         let prompt = row.prompt.trim().to_lowercase();
         let answer = row.answer.trim().to_lowercase();
         if prompts.contains(&prompt) || answers.contains(&answer) {
             continue;
         }
+
         prompts.insert(prompt);
         answers.insert(answer);
         items.push(row.try_into()?);
+
         if items.len() == query.limit as usize {
             break;
         }
     }
+
     Ok(FactSample { items })
 }
 
