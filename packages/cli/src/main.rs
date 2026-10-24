@@ -184,15 +184,13 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     if json {
                         print_json(&saved)?;
                     } else if saved.items.is_empty() {
-                        println!("No facts yet. Use keepsake add --prompt '...' --answer '...'.");
+                        println!("No facts found.");
                     } else {
                         for fact in &saved.items {
                             println!("{}\t{}", fact.id, fact.prompt);
                         }
                         if let Some(cursor) = saved.next_cursor {
-                            println!(
-                                "\nMore facts available. Continue with --before {cursor} and the same search."
-                            );
+                            println!("\nContinue with --before {cursor} and the same search.");
                         }
                     }
                 }
