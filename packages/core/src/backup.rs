@@ -83,22 +83,24 @@ async fn snapshot(options: SqliteConnectOptions, destination: &Path) -> anyhow::
     {
         bail!("snapshot contains invalid foreign keys");
     }
-    let dirty: i64 = sqlx::query_scalar("SELECT count(*) FROM _sqlx_migrations WHERE NOT success")
-        .fetch_one(&mut snapshot)
-        .await
-        .context("source is not a migrated Keepsake database")?;
+    let dirty: i64 = sqlx::query_scalar!(
+        "SELECT count(*) AS \"count!: i64\" FROM _sqlx_migrations WHERE NOT success"
+    )
+    .fetch_one(&mut snapshot)
+    .await
+    .context("source is not a migrated Keepsake database")?;
     if dirty != 0 {
         bail!("snapshot contains an unfinished migration");
     }
     let report = Snapshot {
         path: destination.clone(),
-        facts: sqlx::query_scalar("SELECT count(*) FROM facts")
+        facts: sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM facts")
             .fetch_one(&mut snapshot)
             .await?,
-        practices: sqlx::query_scalar("SELECT count(*) FROM practices")
+        practices: sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM practices")
             .fetch_one(&mut snapshot)
             .await?,
-        reviews: sqlx::query_scalar("SELECT count(*) FROM reviews")
+        reviews: sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM reviews")
             .fetch_one(&mut snapshot)
             .await?,
     };

@@ -182,6 +182,18 @@ pnpm dev
 Open http://localhost:5173. Vite proxies `/api` to the backend on port 8080.
 The backend rebuilds on Rust and migration changes; the frontend reloads through Vite.
 
+Builds check static SQL against committed `.sqlx` metadata, without opening a database.
+After changing queries or migrations, regenerate metadata against a temporary schema:
+
+```sh
+cargo install sqlx-cli --version 0.9.0 --locked --no-default-features --features sqlite
+pnpm sqlx:prepare
+pnpm sqlx:check
+```
+
+The preparation script ignores `DATABASE_URL` and `.env` settings and deletes its temporary
+database afterwards. Commit the updated `.sqlx` files with the query or migration change.
+
 ## Build and run
 
 ```sh

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO facts (prompt, answer, context, source, tags) VALUES (?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "2493a9c9012456524015b3398109ac70e51a9916d6baced4732c267dee3529d4"
+}

@@ -200,13 +200,14 @@ impl TryFrom<PracticeRow> for Practice {
 }
 
 async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result<Fact> {
-    let practices = sqlx::query_as::<_, PracticeRow>(
-        "SELECT id, fact_id, kind, prompt, answer, choices, explanation
+    let practices = sqlx::query_as!(
+        PracticeRow,
+        "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation
          FROM practices
          WHERE fact_id = ?
          ORDER BY id",
+        row.id
     )
-    .bind(row.id)
     .fetch_all(&mut *connection)
     .await?
     .into_iter()
@@ -226,10 +227,11 @@ async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result
 }
 
 async fn load_id(connection: &mut SqliteConnection, id: i64) -> anyhow::Result<Option<Fact>> {
-    let row = sqlx::query_as::<_, FactRow>(
-        "SELECT id, prompt, answer, context, source, tags, created_at FROM facts WHERE id = ?",
+    let row = sqlx::query_as!(
+        FactRow,
+        "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts WHERE id = ?",
+        id
     )
-    .bind(id)
     .fetch_optional(&mut *connection)
     .await?;
     match row {
@@ -245,8 +247,9 @@ pub async fn get(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Fact>> {
 
 pub async fn list(pool: &SqlitePool) -> anyhow::Result<Vec<Fact>> {
     let mut connection = pool.acquire().await?;
-    let rows = sqlx::query_as::<_, FactRow>(
-        "SELECT id, prompt, answer, context, source, tags, created_at FROM facts ORDER BY id DESC",
+    let rows = sqlx::query_as!(
+        FactRow,
+        "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts ORDER BY id DESC"
     )
     .fetch_all(&mut *connection)
     .await?;
@@ -262,16 +265,16 @@ async fn insert_practice(
     fact_id: i64,
     practice: &NewPractice,
 ) -> anyhow::Result<()> {
-    sqlx::query(
+    sqlx::query!(
         "INSERT INTO practices (fact_id, kind, prompt, answer, choices, explanation)
          VALUES (?, ?, ?, ?, ?, ?)",
+        fact_id,
+        practice.kind.as_str(),
+        practice.prompt,
+        practice.answer,
+        serde_json::to_string(&practice.choices)?,
+        practice.explanation
     )
-    .bind(fact_id)
-    .bind(practice.kind.as_str())
-    .bind(&practice.prompt)
-    .bind(&practice.answer)
-    .bind(serde_json::to_string(&practice.choices)?)
-    .bind(&practice.explanation)
     .execute(connection)
     .await?;
     Ok(())
@@ -321,14 +324,14 @@ async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> an
             },
         );
     }
-    let result = sqlx::query(
+    let result = sqlx::query!(
         "INSERT INTO facts (prompt, answer, context, source, tags) VALUES (?, ?, ?, ?, ?)",
+        fact.prompt,
+        fact.answer,
+        fact.context,
+        fact.source,
+        serde_json::to_string(&fact.tags)?
     )
-    .bind(&fact.prompt)
-    .bind(&fact.answer)
-    .bind(&fact.context)
-    .bind(&fact.source)
-    .bind(serde_json::to_string(&fact.tags)?)
     .execute(&mut *connection)
     .await?;
     let id = result.last_insert_rowid();
@@ -465,27 +468,27 @@ pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Resu
                 .await?
                 .context("fact does not exist")?;
             validate_review(&review, &fact)?;
-            let (id, reviewed_at): (i64, String) = sqlx::query_as(
+            let saved = sqlx::query!(
                 "INSERT INTO reviews (fact_id, practice_id, method, outcome, response_ms)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING id, reviewed_at",
+                 VALUES (?, ?, ?, ?, ?)
+                 RETURNING id AS \"id!\", reviewed_at",
+                review.fact_id,
+                review.practice_id,
+                review.method.as_str(),
+                review.outcome.as_str(),
+                review.response_ms
             )
-            .bind(review.fact_id)
-            .bind(review.practice_id)
-            .bind(review.method.as_str())
-            .bind(review.outcome.as_str())
-            .bind(review.response_ms)
             .fetch_one(&mut *connection)
             .await?;
 
             Ok(Review {
-                id,
+                id: saved.id,
                 fact_id: review.fact_id,
                 practice_id: review.practice_id,
                 method: review.method,
                 outcome: review.outcome,
                 response_ms: review.response_ms,
-                reviewed_at,
+                reviewed_at: saved.reviewed_at,
             })
         })
     })
@@ -504,13 +507,14 @@ struct ReviewRow {
 }
 
 pub async fn reviews(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<Vec<Review>> {
-    let rows = sqlx::query_as::<_, ReviewRow>(
-        "SELECT id, fact_id, practice_id, method, outcome, response_ms, reviewed_at
+    let rows = sqlx::query_as!(
+        ReviewRow,
+        "SELECT id AS \"id!\", fact_id, practice_id, method, outcome, response_ms, reviewed_at
          FROM reviews
          WHERE fact_id = ?
          ORDER BY id",
+        fact_id
     )
-    .bind(fact_id)
     .fetch_all(pool)
     .await?;
 
