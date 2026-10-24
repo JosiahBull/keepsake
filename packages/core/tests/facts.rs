@@ -173,7 +173,17 @@ async fn batch_import_rolls_back_on_database_failure() {
     ))
     .await
     .unwrap();
-    sqlx::query("CREATE TRIGGER reject_second BEFORE INSERT ON facts WHEN NEW.prompt = 'Rejected' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END").execute(&pool).await.unwrap();
+    sqlx::query(
+        "CREATE TRIGGER reject_second BEFORE INSERT ON facts
+         WHEN NEW.prompt = 'Rejected'
+         BEGIN
+             SELECT RAISE(ABORT, 'synthetic failure');
+         END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
     let first = fact();
     let mut second = fact();
     second.prompt = "Rejected".into();

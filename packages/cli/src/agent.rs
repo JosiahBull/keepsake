@@ -135,7 +135,7 @@ async fn run_prompt(
         Ok(output)
     };
     match tokio::time::timeout(Duration::from_secs(timeout_seconds), work).await {
-        Ok(Ok(practices)) => Ok(practices),
+        Ok(Ok(output)) => Ok(output),
         Ok(Err(error)) => {
             let _ = child.kill().await;
             Err(error)
@@ -173,7 +173,10 @@ async fn read_bounded(reader: impl AsyncRead + Unpin, limit: usize) -> anyhow::R
 
 fn prompt(fact: &NewFact) -> anyhow::Result<String> {
     let data = serde_json::to_string(&serde_json::json!({
-        "prompt": fact.prompt, "answer": fact.answer, "context": fact.context, "source": fact.source,
+        "prompt": fact.prompt,
+        "answer": fact.answer,
+        "context": fact.context,
+        "source": fact.source,
     }))?;
     Ok(format!(
         r#"You draft practice questions for a personal memory library. Use no tools, commands, web access or files. Output only valid JSON, no markdown.
@@ -193,15 +196,7 @@ fn parse_practices(output: &[u8]) -> anyhow::Result<Vec<NewPractice>> {
     struct Draft {
         practices: Vec<NewPractice>,
     }
-    let text = std::str::from_utf8(output)
-        .context("agent response was not UTF-8")?
-        .trim();
-    let text = text
-        .strip_prefix("```json")
-        .or_else(|| text.strip_prefix("```"))
-        .and_then(|inner| inner.strip_suffix("```"))
-        .unwrap_or(text)
-        .trim();
+    let text = response_json(output)?;
     let draft: Draft = serde_json::from_str(text)
         .context("agent response must be JSON with a practices array; no changes saved")?;
     if draft.practices.is_empty() || draft.practices.len() > 32 {
@@ -232,7 +227,9 @@ pub async fn extract_facts(
         "URL prompt must contain 1 to 8000 bytes"
     );
     let content = serde_json::to_string(&serde_json::json!({
-        "url": request.document.url, "title": request.document.title, "text": request.document.text
+        "url": request.document.url,
+        "title": request.document.title,
+        "text": request.document.text
     }))?;
     let instruction = serde_json::to_string(request.instruction)?;
     let prompt = format!(
@@ -256,15 +253,7 @@ fn parse_extracted_facts(output: &[u8], request: &Extraction<'_>) -> anyhow::Res
     struct Extracted {
         facts: Vec<NewFact>,
     }
-    let text = std::str::from_utf8(output)
-        .context("agent response was not UTF-8")?
-        .trim();
-    let text = text
-        .strip_prefix("```json")
-        .or_else(|| text.strip_prefix("```"))
-        .and_then(|inner| inner.strip_suffix("```"))
-        .unwrap_or(text)
-        .trim();
+    let text = response_json(output)?;
     let mut extracted: Extracted = serde_json::from_str(text)
         .context("agent response must be JSON with a facts array; no changes saved")?;
     anyhow::ensure!(
@@ -292,9 +281,23 @@ fn normalized(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+fn response_json(output: &[u8]) -> anyhow::Result<&str> {
+    let text = std::str::from_utf8(output)
+        .context("agent response was not UTF-8")?
+        .trim();
+
+    Ok(text
+        .strip_prefix("```json")
+        .or_else(|| text.strip_prefix("```"))
+        .and_then(|inner| inner.strip_suffix("```"))
+        .unwrap_or(text)
+        .trim())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn rejects_non_json_and_empty_drafts() {
         assert!(parse_practices(b"I cannot help").is_err());

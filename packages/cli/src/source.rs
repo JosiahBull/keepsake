@@ -252,12 +252,40 @@ mod tests {
     }
 
     async fn document(kind: &str, body: &str) -> String {
-        fixture(format!("HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).into_bytes()).await
+        let response = format!(
+            concat!(
+                "HTTP/1.1 200 OK\r\n",
+                "Content-Type: {kind}\r\n",
+                "Content-Length: {length}\r\n",
+                "Connection: close\r\n",
+                "\r\n",
+                "{body}",
+            ),
+            kind = kind,
+            length = body.len(),
+            body = body,
+        );
+        fixture(response.into_bytes()).await
     }
 
     #[tokio::test]
     async fn html_keeps_article_text_and_omits_non_content() {
-        let url = document("text/html; charset=utf-8", r#"<html><head><title>Notes &amp; examples</title></head><body><nav>Navigation</nav><main><h1>SQLite</h1><p>WAL means <strong>write-ahead logging</strong>.</p><script>do bad things</script><style>secret css</style><noscript>fallback</noscript><template>template text</template><svg><text>vector text</text></svg><p hidden>hidden text</p><p aria-hidden="true">not readable</p><p>Changes enter the log first.</p></main><footer>Footer</footer></body></html>"#).await;
+        let html = concat!(
+            "<html><head><title>Notes &amp; examples</title></head><body>",
+            "<nav>Navigation</nav>",
+            "<main><h1>SQLite</h1>",
+            "<p>WAL means <strong>write-ahead logging</strong>.</p>",
+            "<script>do bad things</script>",
+            "<style>secret css</style>",
+            "<noscript>fallback</noscript>",
+            "<template>template text</template>",
+            "<svg><text>vector text</text></svg>",
+            "<p hidden>hidden text</p>",
+            "<p aria-hidden=\"true\">not readable</p>",
+            "<p>Changes enter the log first.</p></main>",
+            "<footer>Footer</footer></body></html>",
+        );
+        let url = document("text/html; charset=utf-8", html).await;
         let fetched = fetch(&url).await.unwrap();
         assert_eq!(fetched.url, url);
         assert_eq!(fetched.title, "Notes & examples");
@@ -352,9 +380,29 @@ mod tests {
     #[tokio::test]
     async fn follows_redirect_preserving_original_reference_and_limits_loops() {
         let target = document("text/plain", "Source facts").await;
-        let original = fixture(format!("HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").into_bytes()).await;
+        let response = format!(
+            concat!(
+                "HTTP/1.1 302 Found\r\n",
+                "Location: {target}\r\n",
+                "Content-Length: 0\r\n",
+                "Connection: close\r\n\r\n",
+            ),
+            target = target,
+        );
+        let original = fixture(response.into_bytes()).await;
         assert_eq!(fetch(&original).await.unwrap().url, original);
-        let credentials = fixture(b"HTTP/1.1 302 Found\r\nLocation: http://user:secret@127.0.0.1:1/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_vec()).await;
+
+        let credentials = fixture(
+            concat!(
+                "HTTP/1.1 302 Found\r\n",
+                "Location: http://user:secret@127.0.0.1:1/\r\n",
+                "Content-Length: 0\r\n",
+                "Connection: close\r\n\r\n",
+            )
+            .as_bytes()
+            .to_vec(),
+        )
+        .await;
         assert!(
             format!("{:#}", fetch(&credentials).await.unwrap_err())
                 .contains("must not contain credentials")
@@ -366,7 +414,13 @@ mod tests {
                 let (mut stream, _) = listener.accept().await.unwrap();
                 let mut request = [0; 4096];
                 let _ = stream.read(&mut request).await;
-                let _ = stream.write_all(b"HTTP/1.1 302 Found\r\nLocation: /loop\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+                let response = concat!(
+                    "HTTP/1.1 302 Found\r\n",
+                    "Location: /loop\r\n",
+                    "Content-Length: 0\r\n",
+                    "Connection: close\r\n\r\n",
+                );
+                let _ = stream.write_all(response.as_bytes()).await;
             }
         });
         assert!(fetch(&format!("http://{address}/loop")).await.is_err());

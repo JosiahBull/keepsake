@@ -16,13 +16,16 @@ pub struct ErrorBody {
 }
 
 pub struct ApiError(StatusCode, String);
+
 impl ApiError {
     fn bad(error: anyhow::Error) -> Self {
         Self(StatusCode::BAD_REQUEST, error.to_string())
     }
+
     fn missing() -> Self {
         Self(StatusCode::NOT_FOUND, "Fact not found".into())
     }
+
     fn internal(error: anyhow::Error) -> Self {
         tracing::error!(%error, "fact storage operation failed");
         Self(
@@ -31,6 +34,7 @@ impl ApiError {
         )
     }
 }
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         (self.0, Json(ErrorBody { error: self.1 })).into_response()
@@ -50,14 +54,11 @@ pub async fn create(
     Json(fact): Json<NewFact>,
 ) -> Result<(StatusCode, Json<Fact>), ApiError> {
     facts::validate_new_fact(&fact).map_err(ApiError::bad)?;
-    Ok((
-        StatusCode::CREATED,
-        Json(
-            facts::create(&pool, fact)
-                .await
-                .map_err(ApiError::internal)?,
-        ),
-    ))
+    let saved = facts::create(&pool, fact)
+        .await
+        .map_err(ApiError::internal)?;
+
+    Ok((StatusCode::CREATED, Json(saved)))
 }
 
 #[utoipa::path(get, path = "/api/facts/{id}", params(("id" = i64, Path)), responses(
