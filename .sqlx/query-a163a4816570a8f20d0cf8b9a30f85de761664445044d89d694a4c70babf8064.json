@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO reviews(profile_id, fact_id, practice_id, method, outcome, response_ms, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 7
+    },
+    "nullable": []
+  },
+  "hash": "a163a4816570a8f20d0cf8b9a30f85de761664445044d89d694a4c70babf8064"
+}

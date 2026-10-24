@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO study_exposure_batches(profile_id, submission_id, request_json, result_json) VALUES (?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "61f1c31f814e7428c149bb8bf081b64907c208af980f0ff654f8f228eda8e5e7"
+}

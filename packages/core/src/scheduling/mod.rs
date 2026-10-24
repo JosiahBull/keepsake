@@ -6,10 +6,15 @@ mod selection;
 mod storage;
 
 pub(crate) use events::record_supplementary;
-pub use events::{expose, expose_at, submit, submit_at};
+pub use events::{
+    expose, expose_at, expose_at_for, expose_for, submit, submit_at, submit_at_for, submit_for,
+};
 pub use models::*;
-pub use selection::{queue, queue_at};
-pub use storage::{approve_practice, export_events, settings, target, update_settings};
+pub use selection::{queue, queue_at, queue_at_for, queue_for};
+pub use storage::{
+    approve_practice, approve_practice_for, export_events, export_events_for, settings,
+    settings_for, target, target_for, update_settings, update_settings_for,
+};
 pub(crate) use storage::{map_practices, register_fact};
 
 pub(super) const RETRY_SECONDS: i64 = 600;

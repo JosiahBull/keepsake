@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO share_submissions(submission_id, profile_id, request_json, result_json)\n                 VALUES(?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "daa8ec15bb8e357c2386aec3cba3ccb861d1232fbd4da7ace8f2aa6eb5eb377f"
+}

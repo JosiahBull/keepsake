@@ -7,6 +7,10 @@ pub mod health;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;
+mod profile_context;
+mod profile_schema;
+mod profiles_api;
+mod shares_api;
 mod study_api;
 
 use axum::{
@@ -16,6 +20,7 @@ use axum::{
     middleware::{from_fn, from_fn_with_state},
     routing::{get, post},
 };
+use profile_schema::ProfilePaths;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::path::Path;
@@ -66,7 +71,17 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         study_api::update_settings,
         study_api::approve,
         study_api::target,
-        study_api::events
+        study_api::events,
+        profiles_api::list,
+        profiles_api::create,
+        profiles_api::get,
+        profiles_api::rename,
+        shares_api::list,
+        shares_api::send,
+        shares_api::accept_batch,
+        shares_api::accept,
+        shares_api::decline,
+        shares_api::withdraw
     ),
     components(schemas(
         Health,
@@ -99,8 +114,16 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::scheduling::SchedulerSettings,
         keepsake_core::scheduling::SettingsUpdate,
         keepsake_core::scheduling::StudyEvent,
-        keepsake_core::scheduling::StudyEventPage
-    ))
+        keepsake_core::scheduling::StudyEventPage,
+        keepsake_core::profiles::Profile,
+        keepsake_core::profiles::NewProfile,
+        keepsake_core::profiles::UpdateProfile,
+        keepsake_core::sharing::Share,
+        keepsake_core::sharing::SharePage,
+        keepsake_core::sharing::ShareRequest,
+        keepsake_core::sharing::ShareBatch
+    )),
+    modifiers(&ProfilePaths)
 )]
 pub struct ApiDoc;
 
@@ -109,8 +132,43 @@ pub fn router(pool: SqlitePool, web_dir: &Path) -> Router {
 }
 
 pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limits) -> Router {
-    let api = Router::new()
+    let scoped = content_routes()
+        .route("/shares", get(shares_api::list).post(shares_api::send))
+        .route("/shares/accept-batch", post(shares_api::accept_batch))
+        .route("/shares/{id}/accept", post(shares_api::accept))
+        .route("/shares/{id}/decline", post(shares_api::decline))
+        .route("/shares/{id}/withdraw", post(shares_api::withdraw));
+    let api = content_routes()
         .route("/health", get(health))
+        .route(
+            "/profiles",
+            get(profiles_api::list).post(profiles_api::create),
+        )
+        .route(
+            "/profiles/{profile_id}",
+            get(profiles_api::get).patch(profiles_api::rename),
+        )
+        .nest("/profiles/{profile_id}", scoped)
+        .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
+        .fallback(|| async { StatusCode::NOT_FOUND });
+    let app = Router::new()
+        .nest("/api", api)
+        .route("/api", get(|| async { StatusCode::NOT_FOUND }))
+        .fallback_service(
+            ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
+        )
+        .with_state(pool)
+        .layer(DefaultBodyLimit::max(limits.max_body_bytes))
+        .layer(CompressionLayer::new())
+        .layer(from_fn_with_state(
+            limits::Admission::new(limits),
+            limits::admit,
+        ));
+    context::wrap(app).layer(from_fn(headers::response_headers))
+}
+
+fn content_routes() -> Router<SqlitePool> {
+    Router::new()
         .route("/facts", get(facts_api::list).post(facts_api::create))
         .route("/practice", get(facts_api::practice))
         .route("/facts/sample", get(facts_api::sample))
@@ -130,20 +188,4 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
         )
         .route("/study/practices/{id}/approve", post(study_api::approve))
         .route("/study/facts/{id}", get(study_api::target))
-        .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
-        .fallback(|| async { StatusCode::NOT_FOUND });
-    let app = Router::new()
-        .nest("/api", api)
-        .route("/api", get(|| async { StatusCode::NOT_FOUND }))
-        .fallback_service(
-            ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
-        )
-        .with_state(pool)
-        .layer(DefaultBodyLimit::max(limits.max_body_bytes))
-        .layer(CompressionLayer::new())
-        .layer(from_fn_with_state(
-            limits::Admission::new(limits),
-            limits::admit,
-        ));
-    context::wrap(app).layer(from_fn(headers::response_headers))
 }

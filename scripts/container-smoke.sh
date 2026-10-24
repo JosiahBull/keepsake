@@ -79,4 +79,30 @@ curl "${curl_args[@]}" "$base/api/facts/$fact_id" | jq -e --argjson id "$fact_id
   .id == $id and .answer == "Write-ahead logging" and .source == "container-smoke"
   and .tags == ["ci"] and any(.practices[]; .kind == "flashcard" and .answer == "Write-ahead logging")
 ' >/dev/null
-printf 'Container confinement, health, built SPA and shared SQLite passed: %s\n' "$KEEPSAKE_IMAGE"
+# Both executables must agree on ownership, independent copies and fresh schedules.
+docker exec "$container" keepsake --json profiles create 'Smoke partner' \
+  --handle smoke-partner > "$scratch/profile.json"
+partner_id=$(jq -er '.id' "$scratch/profile.json")
+status=$(curl --silent --show-error --max-time 5 --output "$scratch/ambiguous.json" \
+  --write-out '%{http_code}' "$base/api/facts")
+[[ "$status" == 400 ]]
+jq -e '.error | contains("profile_required")' "$scratch/ambiguous.json" >/dev/null
+
+docker exec "$container" keepsake --json --profile 1 share "$fact_id" \
+  --to "$partner_id" > "$scratch/offer.json"
+share_id=$(jq -er '.[0].id' "$scratch/offer.json")
+docker exec "$container" keepsake --json --profile "$partner_id" shares accept \
+  "$share_id" > "$scratch/accepted.json"
+copy_id=$(jq -er '.[0].accepted_fact_id' "$scratch/accepted.json")
+[[ "$copy_id" != "$fact_id" ]]
+curl "${curl_args[@]}" "$base/api/profiles/$partner_id/facts/$copy_id" | \
+  jq -e '.answer == "Write-ahead logging" and .source == "container-smoke" and .shared_by != null' >/dev/null
+for profile_id in 1 "$partner_id"; do
+  expected_id="$fact_id"
+  if [[ "$profile_id" == "$partner_id" ]]; then expected_id="$copy_id"; fi
+  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/study/queue" | \
+    jq -e --argjson id "$expected_id" '.items | length == 1 and .[0].fact.id == $id' >/dev/null
+done
+curl "${curl_args[@]}" "$base/api/profiles/$partner_id/study/facts/$copy_id" | \
+  jq -e '.phase == "new" and .stability == null and .difficulty == null' >/dev/null
+printf 'Container confinement, health, built SPA, profile isolation and copied recall passed: %s\n' "$KEEPSAKE_IMAGE"

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Keepsake profiles — proposed UI</title>
+<style>
+:root{--page:#f5f8f7;--ink:#18362f;--green:#244c44;--line:#cedbd5;--muted:#52685d;--selected:#e3ede7;--focus:#97712d}
+*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:16px 'Avenir Next',Avenir,'Segoe UI',sans-serif}button,input,select,textarea{font:inherit}button,a,summary,input,select,textarea{outline-offset:4px}button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--focus)}button{cursor:pointer;border:0;border-radius:6px;color:var(--green);background:transparent;padding:.8rem 1rem}button:disabled{cursor:default;opacity:.5}a{color:#365c6a;text-underline-offset:3px}p{line-height:1.65;margin:0 0 1.3rem}h1,h2,h3{margin-top:0}h1{font:500 2rem/1.2 'Iowan Old Style',Palatino,serif;letter-spacing:-.035em}h2{font-size:1.15rem}small,.muted{font-size:.85rem;color:var(--muted)}.shell{max-width:1240px;margin:auto;padding:0 3rem}header{height:112px;display:flex;align-items:center;gap:1.25rem;border-bottom:1px solid var(--line)}.brand{width:165px;height:auto;display:block}.logo-link{padding:0}nav{display:flex;gap:.3rem;margin-left:auto}nav button{color:var(--muted);padding:.7rem .9rem}nav .active,.choice.active{background:var(--selected);color:var(--ink);font-weight:600}.primary{background:var(--green);color:white;font-weight:600;padding:.85rem 1.2rem}.quiet{border:1px solid #b4c8c0;background:transparent}.text-link{text-decoration:underline;padding:0}.profile{position:relative}.profile summary{list-style:none;cursor:pointer;padding:.65rem .7rem;border:1px solid #b4c8c0;border-radius:6px;font-weight:600;white-space:nowrap}.profile summary::-webkit-details-marker{display:none}.menu{position:absolute;right:0;top:calc(100% + .6rem);min-width:230px;padding:.5rem;background:white;border:1px solid #b4c8c0;border-radius:8px;box-shadow:0 5px 18px #18362f14;z-index:3}.menu button{display:block;width:100%;text-align:left}.menu .current{background:var(--selected)}.menu hr{border:0;border-top:1px solid var(--line);margin:.35rem}.menu .label{padding:.5rem 1rem .25rem;color:var(--muted);font-size:.8rem}main{padding:2rem 0 4rem;min-height:calc(100vh - 112px)}.entry{max-width:500px;margin:3rem auto}.entry>.brand{width:165px;margin-bottom:3rem}.entry h1{margin-bottom:1rem}.entry .profiles{margin:2rem 0 1rem;display:grid;gap:.8rem}.person{width:100%;text-align:left;display:flex;gap:1rem;align-items:center;background:white;border:1px solid #b4c8c0;border-radius:8px;padding:1.1rem}.initial{width:44px;height:44px;border-radius:50%;background:var(--selected);display:grid;place-items:center;font-weight:600;flex-shrink:0}.person strong,.person small{display:block}.person small{margin-top:.25rem}.entry .note{font-size:.85rem;color:var(--muted);margin-top:2rem}.heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1.4rem}.heading h1{margin:0}.tabs{display:flex;gap:.4rem;border-bottom:1px solid var(--line);margin-bottom:1.4rem}.tabs button{border-radius:6px 6px 0 0;padding:.7rem 1rem}.tabs .active{background:var(--selected);font-weight:600}.tools{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;justify-content:space-between}.search{width:min(100%,460px)}input,textarea,select{width:100%;color:var(--ink);background:white;border:1px solid #b4c8c0;border-radius:6px;padding:.8rem .9rem}.search input{background:transparent}.topics{display:flex;gap:.45rem;flex-wrap:wrap;margin:1rem 0}.topics button{padding:.45rem .7rem;border:1px solid var(--line);font-size:.85rem}.topics .active{background:var(--selected);border-color:#618573}.fact{padding:1.3rem 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:1rem;align-items:flex-start}.fact h2{font-size:1.05rem;line-height:1.6;margin:0 0 .4rem}.fact .tag{font-size:.8rem;color:var(--muted)}.fact .quiet{flex-shrink:0;min-width:88px;padding:.6rem .9rem}.fact .learning{background:var(--selected)}.empty{max-width:580px;padding:2rem 0}.panel{border:1px solid #c6d7cd;border-radius:10px;background:white;padding:2rem}.form{max-width:580px}.form label{display:block;font-size:.9rem;font-weight:600;margin-bottom:1.1rem}.form label input,.form label select{margin-top:.5rem;font-weight:400}.actions{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.5rem}.topic-option{display:flex;align-items:center;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--line);cursor:pointer}.topic-option input{width:20px;height:20px;accent-color:var(--green)}.topic-option strong{display:block}.topic-option small{display:block;margin-top:.3rem}.practice-layout{max-width:848px}.practice-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem}.practice-stage{background:white;border:1px solid #ccdad2;border-radius:12px;padding:2.2rem}.question{font:500 clamp(1.6rem,3vw,2.1rem)/1.4 'Iowan Old Style',Palatino,serif;margin:1.5rem 0}.response{display:block;font-size:.9rem;font-weight:600}.response textarea{display:block;margin:.6rem 0 1.4rem;min-height:95px;resize:vertical;font-weight:400}.check{display:flex;align-items:center;gap:.6rem;font-size:.9rem}.check input{width:auto;accent-color:var(--green)}.answer{background:#f0f5f1;border-left:3px solid #618573;padding:1.5rem;margin:2rem 0;border-radius:6px}.ratings{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:1.5rem;border-top:1px solid var(--line);padding-top:1.5rem}.rating{border:1px solid #b4c8c0;padding:.9rem .5rem}.rating strong,.rating small{display:block}.rating small{font-size:.75rem;margin-top:.35rem}.notice{background:var(--selected);padding:1rem 1.2rem;border-radius:6px;margin-bottom:1.5rem}.prototype-note{font-size:.75rem;color:var(--muted);position:fixed;bottom:.7rem;right:1rem;background:var(--page);padding:.25rem .6rem}.prototype-note a{margin-left:.8rem}dialog{color:var(--ink);border:1px solid #b4c8c0;border-radius:12px;padding:2rem;max-width:470px;width:calc(100% - 2rem)}dialog::backdrop{background:#18362f40}dialog h2{font-size:1.5rem;font-family:'Iowan Old Style',Palatino,serif}dialog p{margin-bottom:0}.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.settings-grid label{margin-bottom:0}.form .help{font-size:.85rem;color:var(--muted)}.back{margin-bottom:1.5rem}.saved{font-size:.9rem;color:var(--green)}
+@media(max-width:850px){.shell{padding:0 1.5rem}header{gap:.7rem}.brand{width:140px}nav button{padding:.65rem;font-size:.9rem}.add-top{padding:.7rem}.profile summary{font-size:.9rem}header{flex-wrap:wrap}}
+@media(max-width:580px){.shell{padding:0 1rem}header{height:auto;min-height:112px;padding:1.1rem 0 .8rem;gap:.5rem;justify-content:space-between}.brand{width:145px}.profile{margin-left:auto;order:2}nav{order:3;margin:.8rem 0 0;width:100%}nav button{flex:1}.add-top{display:none}.heading .mobile-add{display:block}.entry{margin:2.5rem auto;padding:0 .4rem}.entry>.brand{margin-bottom:2.5rem}main{padding-top:1.5rem}.heading h1{font-size:1.8rem}.tools{align-items:stretch;flex-direction:column}.tools .primary{align-self:flex-start}.fact{padding:1.1rem 0}.fact h2{font-size:1rem}.fact .quiet{min-width:68px;padding:.55rem .65rem}.panel,.practice-stage{padding:1.3rem}.ratings{grid-template-columns:1fr 1fr}.question{font-size:1.7rem}.settings-grid{grid-template-columns:1fr}.prototype-note{position:static;text-align:right;margin:.5rem}.menu{min-width:220px}.practice-toolbar{font-size:.85rem}}
+@media(min-width:581px){.mobile-add{display:none}}
+.select-fact{display:flex;align-items:flex-start;gap:1rem;cursor:pointer;line-height:1.6}.select-fact input{width:18px;height:18px;margin-top:.3rem;accent-color:var(--green);flex-shrink:0}.select-fact small{display:block;margin-top:.4rem}.shared-item{border-bottom:1px solid var(--line);padding:1rem 0}.shared-item p{margin-bottom:.4rem}.shared-item .text-link{font-size:.85rem}.preview{padding:.7rem 0;color:var(--green)}.share-preview{margin:1.2rem 0}.share-preview p{margin:.5rem 0;font-size:.9rem}.fact-disclosure{margin:0}.fact-disclosure summary{font-weight:600;cursor:pointer;color:var(--ink)}.fact-disclosure[open] p{margin:.8rem 0 .4rem}.fact-disclosure+small{margin-left:1rem}</style>
+</head>
+<body><div id="app"></div><div class="prototype-note">Proposed UI <a href="prototype.html?screen=picker">Start over</a><a href="index.html">Read the plan</a></div><dialog id="switch-dialog" aria-labelledby="switch-title"><h2 id="switch-title"></h2><p id="switch-copy"></p><div class="actions"><button class="quiet" id="keep">Keep practising</button><button class="primary" id="switch">Switch profile</button></div></dialog>
+<dialog id="share-dialog" aria-labelledby="share-title"><h2 id="share-title">Share 4 facts</h2><label>Share with<select id="share-target" style="margin:.5rem 0 1.2rem"><option>Partner</option><option>Josiah</option></select></label><p>They can accept copies into their library. Your reviews stay with you; later edits stay separate.</p><div class="actions"><button class="quiet" id="cancel-share">Cancel</button><button class="primary" id="send-share">Share with Partner</button></div></dialog><script>
+const params = new URLSearchParams(location.search);
+const defaults = () => ({ newLimit: 5, budget: 15, timezone: 'Europe/London' });
+const profiles = [
+  { id: 'josiah', name: 'Josiah', facts: [1, 2, 3, 4], settings: defaults() },
+  { id: 'partner', name: 'Partner', facts: [], settings: defaults() },
+];
+const facts = new Map([
+  [1, { id: 1, word: 'wai', answer: 'Water' }],
+  [2, { id: 2, word: 'miraka', answer: 'Milk' }],
+  [3, { id: 3, word: 'parāoa', answer: 'Bread' }],
+  [4, { id: 4, word: 'hēki', answer: 'Egg' }],
+]);
+const offers = [{ id: 1, sender: 'josiah', recipient: 'partner', status: 'pending', content: [...facts.values()].map(f => ({ ...f })) }];
+let activeId = params.get('profile') === 'partner' ? 'partner' : 'josiah';
+let screen = params.get('screen') || 'picker';
+let selected = new Set(), notice = '', response = '', revealed = false, nextProfile = '';
+let menu = params.has('menu'), nextFactId = 100;
+const actor = () => profiles.find(p => p.id === activeId);
+const myFacts = () => actor().facts.map(id => facts.get(id));
+const inboxOffer = () => offers.find(o => o.recipient === activeId && o.status === 'pending');
+const escape = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const prompt = f => f.prompt || `What does “${f.word}” mean in te reo Māori?`;
+const nameOf = id => profiles.find(p => p.id === id).name;
+function acceptOffer(offer) {
+  const recipient = profiles.find(p => p.id === offer.recipient);
+  for (const original of offer.content) {
+    const copy = { ...original, id: nextFactId++, sharedBy: nameOf(offer.sender) };
+    facts.set(copy.id, copy);
+    recipient.facts.push(copy.id);
+  }
+  offer.status = 'accepted';
+}
+if (activeId === 'partner' && ['practice', 'switch', 'feedback'].includes(screen)) acceptOffer(inboxOffer());
+function go(next) { screen = next; notice = ''; menu = false; render(); window.scrollTo(0, 0); }
+function entry(content) {
+  return `<div class="shell"><main class="entry"><img class="brand" src="assets/keepsake-logo.png" alt="Keepsake">${content}</main></div>`;
+}
+function header(view = 'library') {
+  return `<header>
+    <button class="logo-link" data-go="library" aria-label="Keepsake library"><img class="brand" src="assets/keepsake-logo.png" alt="Keepsake"></button>
+    <nav aria-label="Main navigation"><button data-go="library" class="${view === 'library' ? 'active' : ''}">Library</button><button data-go="practice" class="${view === 'practice' ? 'active' : ''}">Practise</button><button data-go="matching" class="${view === 'matching' ? 'active' : ''}">Match pairs</button></nav>
+    <button class="primary add-top" data-go="addfact">Add a fact</button>
+    <details class="profile" ${menu ? 'open' : ''}><summary aria-label="Profile: ${escape(actor().name)}">${escape(actor().name)} <span aria-hidden="true">⌄</span></summary>
+      <div class="menu"><div class="label">Switch profile</div>${profiles.map(p => `<button class="${activeId === p.id ? 'current' : ''}" data-profile="${p.id}">${escape(p.name)}${activeId === p.id ? ' <span aria-label="Selected">✓</span>' : ''}</button>`).join('')}
+      <hr><button data-go="addprofile">Add profile</button><button data-go="settings">Profile settings</button></div>
+    </details></header>`;
+}
+function tabs(view) {
+  const pending = offers.filter(o => o.recipient === activeId && o.status === 'pending').reduce((n, o) => n + o.content.length, 0);
+  return `<div class="tabs"><button data-go="library" class="${view === 'library' ? 'active' : ''}">My library</button><button data-go="inbox" class="${view === 'inbox' ? 'active' : ''}">Shared with me${pending ? ' (' + pending + ')' : ''}</button>${offers.some(o => o.sender === activeId) ? `<button data-go="sent" class="${view === 'sent' ? 'active' : ''}">Sent facts</button>` : ''}</div>`;
+}
+function library() {
+  const shown = myFacts();
+  return `<div class="heading"><h1>Library</h1><button class="primary mobile-add" data-go="addfact">Add a fact</button></div>${tabs('library')}
+    ${notice ? `<p class="notice" role="status">${escape(notice)}</p>` : ''}
+    ${shown.length ? `<div class="tools"><label class="search"><input id="search" type="search" aria-label="Search facts or tags" placeholder="Search facts or tags"></label><button class="quiet" id="share-selected" ${selected.size ? '' : 'disabled'}>Share${selected.size ? ' ' + selected.size + (selected.size === 1 ? ' fact' : ' facts') : ''}</button></div>
+    ${shown.map(f => `<article class="fact" data-text="${escape(prompt(f).toLowerCase())}"><div class="select-fact"><input type="checkbox" data-select="${f.id}" aria-label="Select ${escape(f.word || f.prompt)}" ${selected.has(f.id) ? 'checked' : ''}><div><details class="fact-disclosure"><summary>${escape(prompt(f))}</summary><p>${escape(f.answer)}</p></details><small>Food and drink${f.sharedBy ? ' · Shared by ' + escape(f.sharedBy) : ''}</small></div></div></article>`).join('')}` : `<div class="empty"><h2>Your library is empty</h2><p>Add your own facts${inboxOffer() ? ' or accept ones shared with you' : ''}.</p><div class="actions">${inboxOffer() ? `<button class="primary" data-go="inbox">View ${inboxOffer().content.length} shared facts</button><button class="quiet" data-go="addfact">Add a fact</button>` : '<button class="primary" data-go="addfact">Add a fact</button>'}</div></div>`}`;
+}
+function inbox() {
+  const offer = inboxOffer();
+  return `<div class="heading"><h1>Library</h1><button class="primary mobile-add" data-go="addfact">Add a fact</button></div>${tabs('inbox')}
+    ${notice ? `<p class="notice" role="status">${escape(notice)}</p>` : ''}
+    ${offer ? `<section class="panel" style="max-width:760px"><h2>${offer.content.length} facts from ${escape(nameOf(offer.sender))}</h2><p class="muted">Food and drink</p>${offer.content.map(f => `<div class="shared-item"><p>${escape(prompt(f))}</p></div>`).join('')}<div class="actions"><button class="primary" id="accept">Add ${offer.content.length} facts to my library</button><button class="quiet" id="decline">Decline</button></div><p class="muted" style="margin:1rem 0 0">Your copies will have fresh review schedules. Later edits stay separate.</p></section>` : '<div class="empty"><h2>No new shares</h2><button class="quiet" data-go="library">My library</button></div>'}`;
+}
+function sent() {
+  const sentOffers = offers.filter(o => o.sender === activeId);
+  return `<div class="heading"><h1>Library</h1></div>${tabs('sent')}${notice ? `<p class="notice" role="status">${escape(notice)}</p>` : ''}${sentOffers.map(o => `<article class="fact"><div><h2>${o.content.length} facts shared with ${escape(nameOf(o.recipient))}</h2><small>${o.status === 'pending' ? 'Waiting for acceptance' : o.status === 'withdrawn' ? 'Withdrawn' : o.status === 'accepted' ? 'Accepted' : 'Declined'}</small></div>${o.status === 'pending' ? `<button class="quiet" data-withdraw="${o.id}">Withdraw</button>` : ''}</article>`).join('')}`;
+}
+function practice() {
+  if (!myFacts().length) return '<div class="empty"><h1>No facts to practise yet</h1><button class="primary" data-go="library">Open your library</button></div>';
+  const question = myFacts()[0];
+  return `<div class="practice-layout"><div class="practice-toolbar"><span class="muted">Scheduled recall</span><button class="text-link" id="extra">Extra practice</button></div>${notice ? `<p class="notice" role="status">${escape(notice)}</p>` : ''}
+    <section class="practice-stage"><p class="muted">Flashcards · 1 of ${myFacts().length}</p><h1 class="question">${escape(prompt(question))}</h1><label class="response">Your answer <small>optional</small><textarea id="response">${escape(response)}</textarea></label>
+    ${revealed ? `<div class="answer"><h2>Answer</h2><p>${escape(question.answer)}</p></div><h2>Rate your attempt</h2><div class="ratings">${[['Again', '10 min'], ['Hard', '1 day'], ['Good', '2 days'], ['Easy', '8 days']].map(([name, time]) => `<button class="rating" data-grade="${name}"><strong>${name}</strong><small>${time}</small></button>`).join('')}</div>` : '<label class="check"><input type="checkbox" id="spoken">I tried answering aloud</label><div class="actions"><button class="primary" id="reveal">Show answer</button></div>'}</section></div>`;
+}
+function settingsPage() {
+  const settings = actor().settings;
+  return `<div class="form"><h1>Profile settings</h1><form id="settings-form"><label>Name<input id="name" required maxlength="80" value="${escape(actor().name)}"></label><div class="settings-grid"><label>New facts per day<input id="new-limit" type="number" value="${settings.newLimit}" min="0" max="100" required></label><label>Daily study budget (minutes)<input id="budget" type="number" value="${settings.budget}" min="1" max="240" required></label></div><label style="margin-top:1.1rem">Timezone<select id="timezone">${['Europe/London', 'Pacific/Auckland'].map(zone => `<option ${zone === settings.timezone ? 'selected' : ''}>${zone}</option>`).join('')}</select></label><p class="help">These settings apply to ${escape(actor().name)}.</p><div class="actions"><button class="primary" type="submit">Save changes</button><button class="quiet" type="button" data-go="library">Cancel</button></div>${notice ? `<p class="saved" role="status" style="margin-top:1rem">${escape(notice)}</p>` : ''}</form></div>`;
+}
+function render() {
+  let content;
+  if (screen === 'picker') content = entry(`<h1>Who’s practising?</h1><div class="profiles">${profiles.map(p => `<button class="person" data-profile="${p.id}"><span class="initial" aria-hidden="true">${escape(p.name[0])}</span><span><strong>${escape(p.name)}</strong><small>${p.id === 'partner' ? '4 facts shared with you' : 'Open your library and reviews'}</small></span></button>`).join('')}</div><button class="text-link" data-go="addprofile">Add profile</button>`);
+  else if (screen === 'upgrade') content = entry('<h1>Keep your existing progress</h1><p>Your existing library, reviews and schedule will stay with this profile.</p><form class="form" id="upgrade-form"><label>Your name<input id="name" required value="Josiah"></label><button class="primary" type="submit">Continue</button></form>');
+  else {
+    const view = ['practice', 'switch', 'feedback'].includes(screen) ? 'practice' : screen === 'matching' ? 'matching' : 'library';
+    const body = ['library', 'share'].includes(screen) ? library() : screen === 'inbox' ? inbox() : screen === 'sent' ? sent() : ['practice', 'switch', 'feedback'].includes(screen) ? practice() : screen === 'settings' ? settingsPage() : screen === 'addprofile' ? '<div class="form"><h1>Add profile</h1><p>Start with a separate library and review schedule.</p><form id="add-profile-form"><label>Name<input id="name" required maxlength="80" placeholder="Your partner’s name"></label><div class="actions"><button class="primary" type="submit">Create profile</button><button class="quiet" type="button" data-go="library">Cancel</button></div></form></div>' : screen === 'addfact' ? `<div class="form"><h1>Add a fact</h1><form id="fact-form"><label>Question<input id="fact-question" required placeholder="What do you want to remember?"></label><label>Answer<textarea id="fact-answer" required rows="3"></textarea></label><p class="help">Saved to ${escape(actor().name)}’s library.</p><button class="primary">Save fact</button></form></div>` : `<div class="empty"><h1>Match pairs</h1><p>Matching draws related facts from ${escape(actor().name)}’s library.</p><button class="primary" data-go="library">My library</button></div>`;
+    content = `<div class="shell">${header(view)}<main>${body}</main></div>`;
+  }
+  document.getElementById('app').innerHTML = content;
+  bind();
+  if (screen === 'switch') { response = 'Water'; document.getElementById('response').value = response; openSwitch(activeId === 'josiah' ? 'partner' : 'josiah'); }
+  if (screen === 'feedback' && !revealed) { revealed = true; response = 'Water'; render(); }
+  if (screen === 'share') { selected = new Set(actor().facts); openShare(); }
+}
+function switchTo(id) { activeId = id; response = ''; revealed = false; selected.clear(); go('library'); }
+function openSwitch(id) {
+  document.querySelector('details.profile')?.removeAttribute('open');
+  nextProfile = id;
+  document.getElementById('switch-title').textContent = `Switch to ${nameOf(id)}?`;
+  document.getElementById('switch-copy').textContent = `Your typed answer will be discarded. Saved reviews stay with ${actor().name}.`;
+  document.getElementById('switch-dialog').showModal();
+}
+function openShare() {
+  const count = selected.size;
+  document.getElementById('share-title').textContent = `Share ${count === 1 ? 'a fact' : count + ' facts'}`;
+  document.getElementById('share-target').innerHTML = profiles.filter(p => p.id !== activeId).map(p => `<option value="${p.id}">${escape(p.name)}</option>`).join('');
+  updateShareButton();
+  document.getElementById('share-dialog').showModal();
+}
+function updateShareButton() { document.getElementById('send-share').textContent = `Share with ${nameOf(document.getElementById('share-target').value)}`; }
+function bind() {
+  document.querySelectorAll('[data-go]').forEach(el => el.onclick = () => go(el.dataset.go));
+  document.querySelectorAll('[data-profile]').forEach(el => el.onclick = () => {
+    const id = el.dataset.profile;
+    if (id === activeId) { if (screen === 'picker') go('library'); return; }
+    if (document.getElementById('response')?.value && !revealed) openSwitch(id); else switchTo(id);
+  });
+  document.querySelectorAll('[data-select]').forEach(el => el.onchange = () => {
+    el.checked ? selected.add(Number(el.dataset.select)) : selected.delete(Number(el.dataset.select));
+    const button = document.getElementById('share-selected'); button.disabled = !selected.size;
+    button.textContent = selected.size ? 'Share ' + selected.size + (selected.size === 1 ? ' fact' : ' facts') : 'Share';
+  });
+  document.getElementById('share-selected')?.addEventListener('click', openShare);
+  document.querySelectorAll('[data-withdraw]').forEach(el => el.onclick = () => { offers.find(o => o.id === Number(el.dataset.withdraw) && o.sender === activeId).status = 'withdrawn'; notice = 'Share withdrawn.'; render(); });
+  document.getElementById('accept')?.addEventListener('click', () => {
+    const offer = inboxOffer(), count = offer.content.length; acceptOffer(offer); screen = 'library';
+    notice = count + ' facts added to ' + actor().name + '’s library. Review schedules start fresh.'; render();
+  });
+  document.getElementById('decline')?.addEventListener('click', () => { inboxOffer().status = 'declined'; notice = 'Shared facts declined.'; render(); });
+  document.getElementById('search')?.addEventListener('input', e => { const q = e.target.value.toLowerCase(); document.querySelectorAll('.fact').forEach(el => el.hidden = !el.dataset.text.includes(q)); });
+  document.getElementById('response')?.addEventListener('input', e => response = e.target.value);
+  document.getElementById('reveal')?.addEventListener('click', () => { const attempted = response.trim() || document.getElementById('spoken').checked; revealed = true; render(); if (!attempted) document.querySelector('.ratings').remove(); });
+  document.querySelectorAll('[data-grade]').forEach(el => el.onclick = () => { notice = 'Review saved for ' + actor().name + '.'; revealed = false; response = ''; render(); });
+  document.getElementById('add-profile-form')?.addEventListener('submit', e => { e.preventDefault(); const profile = { id: 'profile-' + profiles.length, name: document.getElementById('name').value.trim(), facts: [], settings: defaults() }; profiles.push(profile); switchTo(profile.id); });
+  document.getElementById('upgrade-form')?.addEventListener('submit', e => { e.preventDefault(); actor().name = document.getElementById('name').value.trim(); go('library'); });
+  document.getElementById('settings-form')?.addEventListener('submit', e => { e.preventDefault(); actor().name = document.getElementById('name').value.trim(); actor().settings = { newLimit: Number(document.getElementById('new-limit').value), budget: Number(document.getElementById('budget').value), timezone: document.getElementById('timezone').value }; notice = 'Changes saved.'; render(); });
+  document.getElementById('fact-form')?.addEventListener('submit', e => { e.preventDefault(); const fact = { id: nextFactId++, prompt: document.getElementById('fact-question').value, answer: document.getElementById('fact-answer').value }; facts.set(fact.id, fact); actor().facts.push(fact.id); go('library'); });
+  document.getElementById('extra')?.addEventListener('click', () => { notice = 'Extra practice uses ' + actor().name + '’s library.'; render(); });
+}
+document.getElementById('keep').onclick = () => document.getElementById('switch-dialog').close();
+document.getElementById('switch').onclick = () => { document.getElementById('switch-dialog').close(); switchTo(nextProfile); };
+document.getElementById('cancel-share').onclick = () => document.getElementById('share-dialog').close();
+document.getElementById('share-target').onchange = updateShareButton;
+document.getElementById('send-share').onclick = () => {
+  const recipient = document.getElementById('share-target').value;
+  const content = [...selected].map(id => ({ ...facts.get(id) }));
+  if (!offers.some(o => o.sender === activeId && o.recipient === recipient && o.status === 'pending' && JSON.stringify(o.content) === JSON.stringify(content))) {
+    offers.push({ id: offers.length + 1, sender: activeId, recipient, status: 'pending', content });
+  }
+  document.getElementById('share-dialog').close(); screen = 'library';
+  notice = 'Shared with ' + nameOf(recipient) + '. They can add the facts to their own library.'; selected.clear(); render();
+};
+render();
+</script>
+</body></html>

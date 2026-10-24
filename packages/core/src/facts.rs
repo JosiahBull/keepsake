@@ -81,6 +81,8 @@ pub struct Fact {
     pub tags: Vec<String>,
     pub created_at: String,
     pub practices: Vec<Practice>,
+    #[serde(default)]
+    pub shared_by: Option<String>,
 }
 
 fn bounded(value: &str, label: &str, limit: usize, required: bool) -> anyhow::Result<()> {
@@ -214,7 +216,15 @@ async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result
     .map(Practice::try_from)
     .collect::<anyhow::Result<Vec<_>>>()?;
 
+    let shared_by = sqlx::query_scalar::<_, String>(
+        "SELECT p.name FROM fact_shares s JOIN profiles p ON p.id=s.sender_id
+         WHERE s.accepted_fact_id=? AND s.status='accepted' LIMIT 1",
+    )
+    .bind(row.id)
+    .fetch_optional(&mut *connection)
+    .await?;
     Ok(Fact {
+        shared_by,
         id: row.id,
         prompt: row.prompt,
         answer: row.answer,
@@ -243,13 +253,26 @@ pub(crate) async fn load_id(
     }
 }
 
-pub async fn get(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Fact>> {
+pub async fn get_for(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<Option<Fact>> {
     let mut connection = pool.acquire().await?;
+    crate::profiles::require(&mut connection, profile_id).await?;
+    let owned: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM facts WHERE id=? AND profile_id=?)")
+            .bind(id)
+            .bind(profile_id)
+            .fetch_one(&mut *connection)
+            .await?;
+    if !owned {
+        return Ok(None);
+    }
     load_id(&mut connection, id).await
 }
 
-pub async fn list(pool: &SqlitePool) -> anyhow::Result<crate::paging::FactPage> {
-    crate::paging::facts(pool, &crate::paging::FactQuery::default()).await
+pub async fn list_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+) -> anyhow::Result<crate::paging::FactPage> {
+    crate::paging::facts_for(pool, profile_id, &crate::paging::FactQuery::default()).await
 }
 
 async fn insert_practice(
@@ -272,15 +295,19 @@ async fn insert_practice(
     Ok(())
 }
 
-pub async fn create(pool: &SqlitePool, fact: NewFact) -> anyhow::Result<Fact> {
-    create_many(pool, vec![fact])
+pub async fn create_for(pool: &SqlitePool, profile_id: i64, fact: NewFact) -> anyhow::Result<Fact> {
+    create_many_for(pool, profile_id, vec![fact])
         .await?
         .pop()
         .context("inserted fact missing")
 }
 
 /// Validate the whole import before writing, then commit all facts together.
-pub async fn create_many(pool: &SqlitePool, facts: Vec<NewFact>) -> anyhow::Result<Vec<Fact>> {
+pub async fn create_many_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    facts: Vec<NewFact>,
+) -> anyhow::Result<Vec<Fact>> {
     ensure!(
         (1..=20).contains(&facts.len()),
         "provide between 1 and 20 facts"
@@ -291,9 +318,10 @@ pub async fn create_many(pool: &SqlitePool, facts: Vec<NewFact>) -> anyhow::Resu
     crate::db::write_transaction(pool, move |connection| {
         let facts = facts.clone();
         Box::pin(async move {
+            crate::profiles::require(connection, profile_id).await?;
             let mut saved = Vec::with_capacity(facts.len());
             for fact in facts {
-                saved.push(insert_fact(connection, fact).await?);
+                saved.push(insert_fact(connection, profile_id, fact).await?);
             }
             Ok(saved)
         })
@@ -301,7 +329,11 @@ pub async fn create_many(pool: &SqlitePool, facts: Vec<NewFact>) -> anyhow::Resu
     .await
 }
 
-async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> anyhow::Result<Fact> {
+pub(crate) async fn insert_fact(
+    connection: &mut SqliteConnection,
+    profile_id: i64,
+    mut fact: NewFact,
+) -> anyhow::Result<Fact> {
     if !fact.practices.iter().any(|p| {
         p.kind == PracticeKind::Flashcard && p.prompt == fact.prompt && p.answer == fact.answer
     }) {
@@ -317,7 +349,8 @@ async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> an
         );
     }
     let result = sqlx::query!(
-        "INSERT INTO facts (prompt, answer, context, source, tags) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO facts (profile_id, prompt, answer, context, source, tags) VALUES (?, ?, ?, ?, ?, ?)",
+        profile_id,
         fact.prompt,
         fact.answer,
         fact.context,
@@ -336,8 +369,9 @@ async fn insert_fact(connection: &mut SqliteConnection, mut fact: NewFact) -> an
         .context("inserted fact missing")
 }
 
-pub async fn add_practices(
+pub async fn add_practices_for(
     pool: &SqlitePool,
+    profile_id: i64,
     id: i64,
     practices: Vec<NewPractice>,
 ) -> anyhow::Result<Fact> {
@@ -346,6 +380,7 @@ pub async fn add_practices(
     crate::db::write_transaction(pool, move |connection| {
         let practices = practices.clone();
         Box::pin(async move {
+            crate::profiles::require_fact(connection, profile_id, id).await?;
             ensure!(
                 load_id(connection, id).await?.is_some(),
                 "fact {id} does not exist"
@@ -454,18 +489,40 @@ pub fn validate_review(review: &NewReview, fact: &Fact) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Result<Review> {
+pub async fn record_review_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    review: NewReview,
+) -> anyhow::Result<Review> {
     crate::db::write_transaction(pool, move |connection| {
         let review = review.clone();
         Box::pin(async move {
+            crate::profiles::require_fact(connection, profile_id, review.fact_id).await?;
             let fact = load_id(connection, review.fact_id)
                 .await?
                 .context("fact does not exist")?;
-            validate_review(&review, &fact)?;
+            if let Some(practice_id) = review.practice_id {
+                let owned: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(
+                       SELECT 1 FROM practices p JOIN facts f ON f.id=p.fact_id
+                       WHERE p.id=? AND f.profile_id=?
+                     )",
+                )
+                .bind(practice_id)
+                .bind(profile_id)
+                .fetch_one(&mut *connection)
+                .await?;
+                if !owned {
+                    return Err(crate::scheduling::StudyError::Missing("Practice not found".into()).into());
+                }
+            }
+            validate_review(&review, &fact)
+                .map_err(|error| crate::scheduling::StudyError::Invalid(error.to_string()))?;
             let saved = sqlx::query!(
-                "INSERT INTO reviews (fact_id, practice_id, method, outcome, response_ms)
-                 VALUES (?, ?, ?, ?, ?)
+                "INSERT INTO reviews (profile_id, fact_id, practice_id, method, outcome, response_ms)
+                 VALUES (?, ?, ?, ?, ?, ?)
                  RETURNING id AS \"id!\", reviewed_at",
+                profile_id,
                 review.fact_id,
                 review.practice_id,
                 review.method.as_str(),
@@ -484,13 +541,56 @@ pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Resu
                 response_ms: review.response_ms,
                 reviewed_at: saved.reviewed_at,
             };
-            crate::scheduling::record_supplementary(connection, &review).await?;
+            crate::scheduling::record_supplementary(connection, profile_id, &review).await?;
             Ok(review)
         })
     })
     .await
 }
 
-pub async fn reviews(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<crate::paging::ReviewPage> {
-    crate::paging::reviews(pool, fact_id, &crate::paging::ReviewQuery::default()).await
+pub async fn reviews_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    fact_id: i64,
+) -> anyhow::Result<crate::paging::ReviewPage> {
+    crate::paging::reviews_for(
+        pool,
+        profile_id,
+        fact_id,
+        &crate::paging::ReviewQuery::default(),
+    )
+    .await
+}
+
+// Compatibility calls are deliberately limited to a one-profile household.
+pub async fn get(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Fact>> {
+    get_for(pool, crate::profiles::sole(pool).await?.id, id).await
+}
+
+pub async fn list(pool: &SqlitePool) -> anyhow::Result<crate::paging::FactPage> {
+    list_for(pool, crate::profiles::sole(pool).await?.id).await
+}
+
+pub async fn create(pool: &SqlitePool, fact: NewFact) -> anyhow::Result<Fact> {
+    create_for(pool, crate::profiles::sole(pool).await?.id, fact).await
+}
+
+pub async fn create_many(pool: &SqlitePool, facts: Vec<NewFact>) -> anyhow::Result<Vec<Fact>> {
+    create_many_for(pool, crate::profiles::sole(pool).await?.id, facts).await
+}
+
+pub async fn add_practices(
+    pool: &SqlitePool,
+    id: i64,
+    practices: Vec<NewPractice>,
+) -> anyhow::Result<Fact> {
+    add_practices_for(pool, crate::profiles::sole(pool).await?.id, id, practices).await
+}
+
+pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Result<Review> {
+    record_review_for(pool, crate::profiles::sole(pool).await?.id, review).await
+}
+
+pub async fn reviews(pool: &SqlitePool, id: i64) -> anyhow::Result<crate::paging::ReviewPage> {
+    reviews_for(pool, crate::profiles::sole(pool).await?.id, id).await
 }

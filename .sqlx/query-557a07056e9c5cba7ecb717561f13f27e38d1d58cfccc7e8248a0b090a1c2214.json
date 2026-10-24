@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT profile_id, request_json, result_json\n                 FROM share_submissions WHERE submission_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "profile_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "share_submissions",
+            "name": "profile_id"
+          }
+        }
+      },
+      {
+        "name": "request_json",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "share_submissions",
+            "name": "request_json"
+          }
+        }
+      },
+      {
+        "name": "result_json",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "share_submissions",
+            "name": "result_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "557a07056e9c5cba7ecb717561f13f27e38d1d58cfccc7e8248a0b090a1c2214"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO fact_shares(\n                           sender_id, recipient_id, source_fact_id,\n                           snapshot_json, fingerprint, question, status\n                         ) VALUES(?, ?, ?, ?, ?, ?, 'pending')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "4f3f2440188c520d9b762e07f096a58b48ff82a59a129d3b93740e0456f78b58"
+}

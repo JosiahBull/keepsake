@@ -10,6 +10,7 @@ fn command(directory: &Path) -> Command {
     command
         .current_dir(directory)
         .env_remove("DATABASE_URL")
+        .env_remove("KEEPSAKE_PROFILE")
         .args([
             "--database",
             &format!("sqlite:{}", directory.join("library.db").display()),

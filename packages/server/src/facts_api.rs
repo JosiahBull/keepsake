@@ -9,6 +9,7 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 use crate::facts::{self, Fact, NewFact, NewPractice, NewReview, Review};
+use crate::profile_context::{Actor, ItemPath};
 use keepsake_core::paging::{
     self, FactPage, FactQuery, FactSample, PracticeQuery, PracticeSession, ReviewPage, ReviewQuery,
     SampleQuery,
@@ -31,6 +32,25 @@ impl ApiError {
     }
 
     pub(crate) fn internal(error: anyhow::Error) -> Self {
+        use keepsake_core::profiles::ProfileError;
+        use keepsake_core::scheduling::StudyError;
+
+        if let Some(error) = error.downcast_ref::<ProfileError>() {
+            return match error {
+                ProfileError::Required | ProfileError::Invalid(_) => {
+                    Self(StatusCode::BAD_REQUEST, error.to_string())
+                }
+                ProfileError::Missing => Self(StatusCode::NOT_FOUND, error.to_string()),
+                ProfileError::Conflict(_) => Self(StatusCode::CONFLICT, error.to_string()),
+            };
+        }
+        if let Some(error) = error.downcast_ref::<StudyError>() {
+            return match error {
+                StudyError::Invalid(message) => Self(StatusCode::BAD_REQUEST, message.clone()),
+                StudyError::Missing(message) => Self(StatusCode::NOT_FOUND, message.clone()),
+                StudyError::Conflict(message) => Self(StatusCode::CONFLICT, message.clone()),
+            };
+        }
         if crate::db::is_overloaded(&error) {
             return Self(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -74,11 +94,12 @@ impl IntoResponse for ApiError {
 ))]
 pub async fn list(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Query(query): Query<FactQuery>,
 ) -> Result<Json<FactPage>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
     Ok(Json(
-        paging::facts(&pool, &query)
+        paging::facts_for(&pool, profile_id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))
@@ -89,11 +110,12 @@ pub async fn list(
 ))]
 pub async fn practice(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Query(query): Query<PracticeQuery>,
 ) -> Result<Json<PracticeSession>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
     Ok(Json(
-        paging::practice(&pool, &query)
+        paging::practice_for(&pool, profile_id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))
@@ -104,11 +126,12 @@ pub async fn practice(
 ))]
 pub async fn sample(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Query(query): Query<SampleQuery>,
 ) -> Result<Json<FactSample>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
     Ok(Json(
-        paging::sample(&pool, &query)
+        paging::sample_for(&pool, profile_id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))
@@ -119,10 +142,11 @@ pub async fn sample(
 ))]
 pub async fn create(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Json(fact): Json<NewFact>,
 ) -> Result<(StatusCode, Json<Fact>), ApiError> {
     facts::validate_new_fact(&fact).map_err(ApiError::bad)?;
-    let saved = facts::create(&pool, fact)
+    let saved = facts::create_for(&pool, profile_id, fact)
         .await
         .map_err(ApiError::internal)?;
 
@@ -134,10 +158,11 @@ pub async fn create(
 ))]
 pub async fn get(
     State(pool): State<SqlitePool>,
-    Path(id): Path<i64>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
 ) -> Result<Json<Fact>, ApiError> {
     Ok(Json(
-        facts::get(&pool, id)
+        facts::get_for(&pool, profile_id, id)
             .await
             .map_err(ApiError::internal)?
             .ok_or_else(ApiError::missing)?,
@@ -149,7 +174,8 @@ pub async fn get(
 ))]
 pub async fn add_practices(
     State(pool): State<SqlitePool>,
-    Path(id): Path<i64>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
     Json(practices): Json<Vec<NewPractice>>,
 ) -> Result<Json<Fact>, ApiError> {
     if practices.is_empty() || practices.len() > 32 {
@@ -161,12 +187,12 @@ pub async fn add_practices(
     for practice in &practices {
         facts::validate_practice(practice).map_err(ApiError::bad)?;
     }
-    facts::get(&pool, id)
+    facts::get_for(&pool, profile_id, id)
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(ApiError::missing)?;
     Ok(Json(
-        facts::add_practices(&pool, id, practices)
+        facts::add_practices_for(&pool, profile_id, id, practices)
             .await
             .map_err(ApiError::internal)?,
     ))
@@ -177,17 +203,13 @@ pub async fn add_practices(
 ))]
 pub async fn review(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Json(review): Json<NewReview>,
 ) -> Result<(StatusCode, Json<Review>), ApiError> {
-    let fact = facts::get(&pool, review.fact_id)
-        .await
-        .map_err(ApiError::internal)?
-        .ok_or_else(ApiError::missing)?;
-    facts::validate_review(&review, &fact).map_err(ApiError::bad)?;
     Ok((
         StatusCode::CREATED,
         Json(
-            facts::record_review(&pool, review)
+            facts::record_review_for(&pool, profile_id, review)
                 .await
                 .map_err(ApiError::internal)?,
         ),
@@ -199,18 +221,19 @@ pub async fn review(
 ))]
 pub async fn reviews(
     State(pool): State<SqlitePool>,
-    Path(id): Path<i64>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
     Query(query): Query<ReviewQuery>,
 ) -> Result<Json<ReviewPage>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
-    if !paging::fact_exists(&pool, id)
+    if !paging::fact_exists_for(&pool, profile_id, id)
         .await
         .map_err(ApiError::internal)?
     {
         return Err(ApiError::missing());
     }
     Ok(Json(
-        paging::reviews(&pool, id, &query)
+        paging::reviews_for(&pool, profile_id, id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))

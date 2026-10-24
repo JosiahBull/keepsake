@@ -70,8 +70,49 @@ The CLI is the `keepsake-cli` workspace package and builds independently with
 The standalone CLI defaults to `data/keepsake.db` in the current directory.
 Use `--database sqlite:/absolute/path/keepsake.db` or `DATABASE_URL` to select a
 SQLite file. The repository and skill launchers select this checkout's database
-from any directory. Point the CLI and server at the same file to share a library.
+from any directory. Point the CLI and server at the same file to access the same household profiles.
 There is no remote HTTP CLI mode.
+
+## Household profiles
+
+Profile support is on `main`; version 0.3.0 predates it. Build the current source to use it.
+
+Each profile has a separate fact library, recall history, timezone, and study budget.
+Choose a name on first use, then create your partner’s empty profile. The header
+switcher changes the active profile; each browser tab keeps its own selection.
+Profiles use no passwords: anyone who can access the app can switch between them.
+
+```sh
+keepsake profiles list
+keepsake profiles rename default 'Josiah'
+keepsake profiles create 'Partner' --handle partner
+keepsake --profile default add --prompt 'What does wai mean?' --answer 'Water'
+keepsake --profile partner due
+```
+
+Use `--profile ID_OR_HANDLE` or `KEEPSAKE_PROFILE` for all library and study commands.
+The sole profile is the compatibility default. With multiple profiles, capture stops
+before fetching a URL, invoking an agent, or saving facts unless an owner is selected.
+Keep that same profile when importing reviewed JSON or generating practice.
+
+Sharing sends an offer; it adds nothing to the recipient’s library until accepted:
+
+```sh
+keepsake --profile default share 1 2 --to partner
+keepsake --profile default shares list --sent
+keepsake --profile partner shares list
+keepsake --profile partner shares accept SHARE_ID
+keepsake --profile partner shares accept-batch SHARE_ID OTHER_SHARE_ID
+keepsake --profile partner shares decline SHARE_ID
+keepsake --profile default shares withdraw SHARE_ID
+```
+
+Accepted copies retain source, context, tags, and practice content, with fresh recall
+schedules. Reviews and approval status for generated recall prompts are not copied. Copies stay
+independent; later edits or offers never overwrite the recipient’s facts or progress.
+Reuse `share --submission-id UUID` when retrying the same offer. Accepting the same
+share again returns its existing copy. See [profiles](docs/profiles.md) for migration
+and backup behavior.
 
 ## Back up and restore
 
@@ -82,14 +123,15 @@ keepsake --database sqlite:/absolute/path/keepsake.db backup /backups/keepsake-2
 keepsake restore /backups/keepsake-2026-10-24.db --to /data/keepsake-restored.db
 ```
 
-`backup` captures a consistent SQLite snapshot while the server is running, including
-committed WAL data. Both commands check database integrity and foreign keys before
-publishing the file. They preserve IDs, reviews and migration history, run no migrations,
+`backup` captures a consistent whole-household SQLite snapshot while the server is running,
+including every profile, library, schedule, share state, and committed WAL data.
+`--profile` does not limit a backup or restore. Both commands check database integrity
+and foreign keys before publishing the file. They preserve IDs, reviews and migration history, run no migrations,
 and refuse existing destinations or SQLite sidecars. Snapshot files are private to the
 current user on Unix. Keep copies on another volume with retention appropriate to your library.
 
-Restore to a new path, inspect it with `keepsake --database sqlite:/data/keepsake-restored.db list`,
-then stop the server before switching `DATABASE_URL` to that file and restarting.
+Restore to a new path, inspect its profiles with `keepsake --database sqlite:/data/keepsake-restored.db profiles list`,
+and each library using `--profile ID_OR_HANDLE`. Stop the server before switching `DATABASE_URL` to that file and restarting.
 Keep the original until you have verified the restored library. Do not copy only the live
 database file: committed changes may still be in its WAL. Container users can run the CLI
 inside the container with a writable backup directory mounted alongside `/data`.
@@ -259,6 +301,7 @@ Node is only needed to build the frontend.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `DATABASE_URL` | `sqlite:data/keepsake.db` for the server | SQLite file location |
+| `KEEPSAKE_PROFILE` | Sole profile when unambiguous | CLI library owner; overridden by `--profile` |
 | `BIND_ADDR` | `127.0.0.1:8080` | HTTP listening address |
 | `WEB_DIR` | `packages/web/dist` | Built frontend directory |
 | `RUST_LOG` | `info` | Server log filter |

@@ -76,10 +76,12 @@ async fn retries_the_whole_body_only_after_confirmed_rollback() {
         .execute(&mut *blocked)
         .await
         .unwrap();
-    let busy = sqlx::query("INSERT INTO facts (prompt, answer) VALUES ('blocked', 'blocked')")
-        .execute(&mut *blocked)
-        .await
-        .unwrap_err();
+    let busy = sqlx::query(
+        "INSERT INTO facts (profile_id, prompt, answer) VALUES (1, 'blocked', 'blocked')",
+    )
+    .execute(&mut *blocked)
+    .await
+    .unwrap_err();
     writer.rollback().await.unwrap();
     drop(blocked);
     let busy = Arc::new(Mutex::new(Some(busy)));
@@ -89,9 +91,11 @@ async fn retries_the_whole_body_only_after_confirmed_rollback() {
         let attempts = attempts.clone();
         Box::pin(async move {
             attempts.fetch_add(1, Ordering::SeqCst);
-            sqlx::query("INSERT INTO facts (prompt, answer) VALUES ('once', 'once')")
-                .execute(&mut *connection)
-                .await?;
+            sqlx::query(
+                "INSERT INTO facts (profile_id, prompt, answer) VALUES (1, 'once', 'once')",
+            )
+            .execute(&mut *connection)
+            .await?;
             let error = busy.lock().unwrap().take();
             if let Some(error) = error {
                 return Err(error.into());

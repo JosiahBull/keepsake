@@ -11,6 +11,8 @@ use keepsake_core::{
 };
 use std::{io::Read, path::PathBuf};
 
+mod profiles;
+mod shares;
 mod study;
 
 const AFTER_HELP: &str = concat!(
@@ -40,6 +42,10 @@ struct Cli {
     #[arg(long, global = true)]
     database: Option<String>,
 
+    /// Library owner: stable profile ID or handle. Defaults to KEEPSAKE_PROFILE.
+    #[arg(long, global = true)]
+    profile: Option<String>,
+
     /// Emit JSON (dry-run always emits JSON).
     #[arg(long, global = true)]
     json: bool,
@@ -50,6 +56,30 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// Create, list, or rename household profiles.
+    Profiles {
+        #[command(subcommand)]
+        command: profiles::ProfileCommand,
+    },
+
+    /// Offer independent copies of facts to another profile.
+    Share {
+        #[arg(required = true, value_parser = clap::value_parser!(i64).range(1..))]
+        fact_ids: Vec<i64>,
+        /// Recipient's stable profile ID or handle.
+        #[arg(long)]
+        to: String,
+        /// Reuse a UUID to retry an identical offer safely.
+        #[arg(long)]
+        submission_id: Option<String>,
+    },
+
+    /// Inspect and respond to shared facts.
+    Shares {
+        #[command(subcommand)]
+        command: shares::ShareCommand,
+    },
+
     /// Save manual facts or extract them from a URL.
     Add(Add),
 
@@ -165,13 +195,17 @@ async fn main() {
 async fn run(cli: Cli) -> anyhow::Result<()> {
     let Cli {
         database: database_url,
+        profile,
         json,
         command,
     } = cli;
 
     match command {
         Commands::Methods => show_methods(json),
-        Commands::Add(add) => add_facts(add, database_url, json).await,
+        Commands::Add(add) => add_facts(add, database_url, profile, json).await,
+        Commands::Profiles { command } => {
+            profiles::run(&database(database_url), command, json).await
+        }
         Commands::Backup { destination } => output_snapshot(
             backup::create(&database(database_url), &destination).await?,
             json,
@@ -179,19 +213,31 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
         Commands::Restore { source, to } => {
             output_snapshot(backup::restore(&source, &to).await?, json)
         }
-        Commands::Due { limit } => study::due(&database(database_url), limit, json).await,
-        Commands::Study { command } => study::run(&database(database_url), command, json).await,
+        Commands::Due { limit } => study::due(&database(database_url), profile, limit, json).await,
+        Commands::Study { command } => {
+            study::run(&database(database_url), profile, command, json).await
+        }
         command => {
             let pool = db::connect(&database(database_url)).await?;
+            let actor = profiles::resolve(&pool, profile).await?;
 
             match command {
+                Commands::Share {
+                    fact_ids,
+                    to,
+                    submission_id,
+                } => {
+                    shares::send(&pool, actor, fact_ids, to, submission_id, json).await?;
+                }
+                Commands::Shares { command } => shares::run(&pool, actor, command, json).await?,
                 Commands::List {
                     limit,
                     before,
                     search,
                 } => {
-                    let saved = paging::facts(
+                    let saved = paging::facts_for(
                         &pool,
+                        actor,
                         &paging::FactQuery {
                             limit,
                             before_id: before,
@@ -213,7 +259,9 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     }
                 }
                 Commands::Show { id } => {
-                    let fact = facts::get(&pool, id).await?.context("fact not found")?;
+                    let fact = facts::get_for(&pool, actor, id)
+                        .await?
+                        .context("fact not found in this profile")?;
                     output_fact(fact, json)?;
                 }
                 Commands::Generate {
@@ -222,12 +270,15 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                     file,
                     dry_run,
                 } => {
-                    let fact = facts::get(&pool, id).await?.context("fact not found")?;
+                    let fact = facts::get_for(&pool, actor, id)
+                        .await?
+                        .context("fact not found in this profile")?;
                     let draft = draft_practices(fact, agent, file).await?;
                     if dry_run {
                         print_json(&draft)?;
                     } else {
-                        let saved = facts::add_practices(&pool, id, draft.practices).await?;
+                        let saved =
+                            facts::add_practices_for(&pool, actor, id, draft.practices).await?;
                         output_fact(saved, json)?;
                     }
                 }
@@ -236,6 +287,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                 | Commands::Backup { .. }
                 | Commands::Restore { .. }
                 | Commands::Due { .. }
+                | Commands::Profiles { .. }
                 | Commands::Study { .. } => unreachable!(),
             }
             Ok(())
@@ -303,8 +355,16 @@ fn show_methods(json: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn add_facts(add: Add, database_url: Option<String>, json: bool) -> anyhow::Result<()> {
-    // Complete fetching, generation and validation before touching the database.
+async fn add_facts(
+    add: Add,
+    database_url: Option<String>,
+    profile: Option<String>,
+    json: bool,
+) -> anyhow::Result<()> {
+    let database_url = database(database_url);
+    // Bind the owner before URL fetching or agent work. A preview of a new library
+    // does not create a database; existing libraries must resolve a profile now.
+    let actor = profiles::capture_profile(&database_url, profile).await?;
     let is_url = add.url.is_some();
     let (mut proposed, batch) = if let Some(url) = add.url {
         let instruction = add.prompt.as_deref().unwrap_or_default();
@@ -374,8 +434,8 @@ async fn add_facts(add: Add, database_url: Option<String>, json: bool) -> anyhow
         };
     }
 
-    let pool = db::connect(&database(database_url)).await?;
-    let mut saved = facts::create_many(&pool, proposed).await?;
+    let pool = db::connect(&database_url).await?;
+    let mut saved = facts::create_many_for(&pool, actor, proposed).await?;
     pool.close().await;
 
     if batch && json {

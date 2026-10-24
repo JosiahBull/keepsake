@@ -15,6 +15,8 @@ pub struct FactSummary {
     pub source: String,
     pub tags: Vec<String>,
     pub created_at: String,
+    #[serde(default)]
+    pub shared_by: Option<String>,
 }
 
 impl TryFrom<FactRow> for FactSummary {
@@ -22,6 +24,7 @@ impl TryFrom<FactRow> for FactSummary {
 
     fn try_from(row: FactRow) -> anyhow::Result<Self> {
         Ok(Self {
+            shared_by: None,
             id: row.id,
             prompt: row.prompt,
             answer: row.answer,
@@ -197,8 +200,13 @@ fn search_pattern(search: &str) -> String {
     )
 }
 
-pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactPage> {
+pub async fn facts_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &FactQuery,
+) -> anyhow::Result<FactPage> {
     query.validate()?;
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
 
     let pattern = search_pattern(&query.search);
     let fetch_limit = query.limit + 1;
@@ -208,12 +216,13 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     // without joining unrelated field boundaries into a possible substring match.
     let total = sqlx::query_scalar!(
         "SELECT count(*) AS \"count!: i64\" FROM facts
-         WHERE EXISTS (
+         WHERE profile_id = ? AND EXISTS (
            SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field
            WHERE lower(replace(replace(replace(replace(replace(
              field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))
              LIKE ? ESCAPE '#'
          )",
+        profile_id,
         pattern
     )
     .fetch_one(&mut *connection)
@@ -221,13 +230,14 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     let mut rows = sqlx::query_as!(
         FactRow,
         "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts
-         WHERE (? IS NULL OR id < ?) AND EXISTS (
+         WHERE profile_id = ? AND (? IS NULL OR id < ?) AND EXISTS (
            SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field
            WHERE lower(replace(replace(replace(replace(replace(
              field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))
              LIKE ? ESCAPE '#'
          )
          ORDER BY id DESC LIMIT ?",
+        profile_id,
         query.before_id,
         query.before_id,
         pattern,
@@ -240,11 +250,15 @@ pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactP
     rows.truncate(query.limit as usize);
     let next_cursor = has_more.then(|| rows.last().expect("nonempty page").id);
 
+    let mut items = rows
+        .into_iter()
+        .map(FactSummary::try_from)
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    for fact in &mut items {
+        enrich_summary(&mut connection, fact).await?;
+    }
     Ok(FactPage {
-        items: rows
-            .into_iter()
-            .map(FactSummary::try_from)
-            .collect::<anyhow::Result<_>>()?,
+        items,
         next_cursor,
         total,
     })
@@ -261,13 +275,16 @@ struct ReviewRow {
     reviewed_at: String,
 }
 
-pub async fn reviews(
+pub async fn reviews_for(
     pool: &SqlitePool,
+    profile_id: i64,
     fact_id: i64,
     query: &ReviewQuery,
 ) -> anyhow::Result<ReviewPage> {
     query.validate()?;
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
 
+    crate::profiles::require_fact(&mut *pool.acquire().await?, profile_id, fact_id).await?;
     let fetch_limit = query.limit + 1;
     let total = sqlx::query_scalar!(
         "SELECT count(*) AS \"count!: i64\" FROM reviews WHERE fact_id = ?",
@@ -313,16 +330,22 @@ pub async fn reviews(
     })
 }
 
-pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Result<PracticeSession> {
+pub async fn practice_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &PracticeQuery,
+) -> anyhow::Result<PracticeSession> {
     query.validate()?;
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
 
     let mut connection = pool.acquire().await?;
-    let total = sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM practices")
+    let total = sqlx::query_scalar!("SELECT count(*) AS \"count!: i64\" FROM practices WHERE fact_id IN (SELECT id FROM facts WHERE profile_id=?)", profile_id)
         .fetch_one(&mut *connection)
         .await?;
     let practices = sqlx::query_as!(
         PracticeRow,
-        "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation FROM practices ORDER BY random() LIMIT ?",
+        "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation FROM practices WHERE fact_id IN (SELECT id FROM facts WHERE profile_id=?) ORDER BY random() LIMIT ?",
+        profile_id,
         query.limit
     )
     .fetch_all(&mut *connection)
@@ -339,8 +362,10 @@ pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Resul
         .fetch_one(&mut *connection)
         .await?;
 
+        let mut summary = fact.try_into()?;
+        enrich_summary(&mut connection, &mut summary).await?;
         items.push(PracticeQuestion {
-            fact: fact.try_into()?,
+            fact: summary,
             practice: practice.try_into()?,
         });
     }
@@ -348,15 +373,60 @@ pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Resul
     Ok(PracticeSession { items, total })
 }
 
+pub async fn sample_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &SampleQuery,
+) -> anyhow::Result<FactSample> {
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
+    crate::matching::sample(pool, profile_id, query).await
+}
+
+pub async fn fact_exists_for(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<bool> {
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
+    Ok(
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM facts WHERE id=? AND profile_id=?)")
+            .bind(id)
+            .bind(profile_id)
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
+pub async fn facts(pool: &SqlitePool, query: &FactQuery) -> anyhow::Result<FactPage> {
+    facts_for(pool, crate::profiles::sole(pool).await?.id, query).await
+}
+
+pub async fn reviews(
+    pool: &SqlitePool,
+    fact_id: i64,
+    query: &ReviewQuery,
+) -> anyhow::Result<ReviewPage> {
+    reviews_for(pool, crate::profiles::sole(pool).await?.id, fact_id, query).await
+}
+
+pub async fn practice(pool: &SqlitePool, query: &PracticeQuery) -> anyhow::Result<PracticeSession> {
+    practice_for(pool, crate::profiles::sole(pool).await?.id, query).await
+}
+
 pub async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Result<FactSample> {
-    crate::matching::sample(pool, query).await
+    sample_for(pool, crate::profiles::sole(pool).await?.id, query).await
 }
 
 pub async fn fact_exists(pool: &SqlitePool, id: i64) -> anyhow::Result<bool> {
-    Ok(sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM facts WHERE id = ?) AS \"exists!: bool\"",
-        id
+    fact_exists_for(pool, crate::profiles::sole(pool).await?.id, id).await
+}
+
+pub(crate) async fn enrich_summary(
+    connection: &mut sqlx::SqliteConnection,
+    fact: &mut FactSummary,
+) -> anyhow::Result<()> {
+    fact.shared_by = sqlx::query_scalar(
+        "SELECT p.name FROM fact_shares s JOIN profiles p ON p.id=s.sender_id
+         WHERE s.accepted_fact_id=? AND s.status='accepted' LIMIT 1",
     )
-    .fetch_one(pool)
-    .await?)
+    .bind(fact.id)
+    .fetch_optional(connection)
+    .await?;
+    Ok(())
 }

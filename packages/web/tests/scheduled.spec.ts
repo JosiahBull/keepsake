@@ -13,26 +13,26 @@ type StudyEventPage = components["schemas"]["StudyEventPage"];
 type SchedulerSettings = components["schemas"]["SchedulerSettings"];
 
 async function schedule(app: TestApp, factId: number): Promise<Schedule> {
-  const response = await app.request.get(`/api/study/facts/${factId}`);
+  const response = await app.request.get(`/api/profiles/1/study/facts/${factId}`);
   expect(response.ok(), await response.text()).toBeTruthy();
   return response.json();
 }
 
 async function events(app: TestApp): Promise<StudyEventPage> {
-  const response = await app.request.get("/api/study/events?after=0&limit=100");
+  const response = await app.request.get("/api/profiles/1/study/events?after=0&limit=100");
   expect(response.ok(), await response.text()).toBeTruthy();
   return response.json();
 }
 
 async function dueQueue(app: TestApp): Promise<StudyQueue> {
-  const response = await app.request.get("/api/study/queue?limit=20");
+  const response = await app.request.get("/api/profiles/1/study/queue?limit=20");
   expect(response.ok(), await response.text()).toBeTruthy();
   return response.json();
 }
 
 async function startScheduled(page: Page): Promise<StudyQueue> {
   const loaded = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/study/queue");
+    new URL(response.url()).pathname === "/api/profiles/1/study/queue");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Practise", exact: true }).click();
   const response = await loaded;
@@ -50,7 +50,7 @@ async function attempt(page: Page, answer = "My unaided synthetic answer", waitF
 
 async function rateGood(page: Page): Promise<StudyResult> {
   const saved = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/study/events" &&
+    new URL(response.url()).pathname === "/api/profiles/1/study/events" &&
     response.request().method() === "POST" &&
     response.request().postDataJSON().kind === "attempt");
   await page.getByRole("button", { name: /^Good\b/ }).click();
@@ -109,7 +109,7 @@ test("scheduled recall selects canonical prompts, previews intervals and persist
   await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
   await expect(page.getByText(/^Next review:/)).toBeVisible();
   expect((await dueQueue(app)).items).toEqual([]);
-  const history = await app.request.get(`/api/facts/${fact.id}/reviews`);
+  const history = await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`);
   expect((await history.json()).items).toEqual([result.review]);
   await app.restart();
   expect(await schedule(app, fact.id)).toEqual(result.schedule);
@@ -146,7 +146,7 @@ test("revealing without an attempt records exposure and offers no recall rating"
   await page.goto("/");
   await startScheduled(page);
   const saved = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/study/events" && response.request().method() === "POST");
+    new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
   const result: StudyResult = await (await saved).json();
   expect(result.qualifying).toBe(false);
@@ -165,7 +165,7 @@ test("revealing without an attempt records exposure and offers no recall rating"
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Nothing due right now", exact: true })).toBeVisible();
   expect((await dueQueue(app)).items).toEqual([]);
-  expect((await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json()).total).toBe(0);
+  expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
   await app.restart();
   expect(await schedule(app, fact.id)).toEqual(result.schedule);
 });
@@ -184,13 +184,13 @@ test("feedback is recorded before rating so reloading cannot turn a viewed answe
   await startScheduled(page);
   await expect(page.getByRole("heading", { name: "Nothing due right now", exact: true })).toBeVisible();
   expect((await schedule(app, fact.id)).stability).toBeNull();
-  expect((await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json()).total).toBe(0);
+  expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
 });
 
 test("a lost feedback response blocks ratings until the same exposure is confirmed", async ({ app, page }, testInfo) => {
   const fact = await app.createFact();
   const requests: StudySubmission[] = [];
-  await page.route(/\/api\/study\/events$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/study\/events$/, async (route) => {
     const body = route.request().postDataJSON() as StudySubmission;
     if (body.kind !== "exposure") {
       await route.continue();
@@ -251,7 +251,7 @@ test("retrying after a committed but lost review response keeps one UUID and one
   const fact = await app.createFact();
   const requests: StudySubmission[] = [];
   let committed: StudyResult | undefined;
-  await page.route(/\/api\/study\/events$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/study\/events$/, async (route) => {
     const body = route.request().postDataJSON() as StudySubmission;
     if (body.kind !== "attempt") {
       await route.continue();
@@ -275,14 +275,14 @@ test("retrying after a committed but lost review response keeps one UUID and one
   await expect(page.getByRole("heading", { name: fact.prompt, exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Easy\b/ })).toBeDisabled();
   const retried = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/study/events" && response.request().method() === "POST");
+    new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Retry save", exact: true }).click();
   expect(await (await retried).json()).toEqual(committed);
   await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1]).toEqual(requests[0]);
   expect((await events(app)).items).toHaveLength(2);
-  expect((await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json()).total).toBe(1);
+  expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(1);
   await app.restart();
   expect((await events(app)).items).toHaveLength(2);
   expect(await schedule(app, fact.id)).toEqual(committed!.schedule);
@@ -299,7 +299,7 @@ test("a stale browser tab cannot overwrite a newer schedule and can refresh the 
   await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
 
   const rejected = other.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/study/events" && response.request().method() === "POST");
+    new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
   await attempt(other, "My unaided synthetic answer", false);
   expect((await rejected).status()).toBe(409);
   await expect(other.getByRole("alert")).toHaveText("This attempt is no longer current. Refresh practice.");
@@ -313,7 +313,7 @@ test("library exposure retries a lost committed response and survives restart wi
   const fact = await app.createFact();
   const before = await schedule(app, fact.id);
   const bodies: unknown[] = [];
-  await page.route(/\/api\/study\/exposures$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/study\/exposures$/, async (route) => {
     bodies.push(route.request().postDataJSON());
     if (bodies.length === 1) {
       const response = await route.fetch();
@@ -354,7 +354,7 @@ test("reopening a library fact hides its cached answer until the new exposure is
   await expect(page.getByText(fact.answer, { exact: true })).toHaveCount(0);
 
   const bodies: unknown[] = [];
-  await page.route(/\/api\/study\/exposures$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/study\/exposures$/, async (route) => {
     bodies.push(route.request().postDataJSON());
     if (bodies.length === 1) {
       await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Synthetic reopen failure" }) });
@@ -383,7 +383,7 @@ test("multiple-choice options record recognition exposure before any answer is c
     }],
   });
   await page.goto("/");
-  const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/practice");
+  const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/profiles/1/practice");
   await startExtraPractice(page);
   const extra: components["schemas"]["PracticeSession"] = await (await loaded).json();
   if (extra.items[0].practice.kind === "flashcard") {
@@ -413,7 +413,7 @@ test("matching exposure failure blocks play until its batch is saved and never a
     }));
   }
   const bodies: unknown[] = [];
-  await page.route(/\/api\/study\/exposures$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/study\/exposures$/, async (route) => {
     bodies.push(route.request().postDataJSON());
     if (bodies.length === 1) {
       await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Synthetic failure" }) });
@@ -449,15 +449,15 @@ test("matching exposure failure blocks play until its batch is saved and never a
 test("the daily study budget is a notice and does not hide available practice", async ({ app, page }) => {
   const first = await app.createFact({ prompt: "Synthetic first budget question?" });
   const second = await app.createFact({ prompt: "Synthetic second budget question?" });
-  const settingsResponse = await app.request.get("/api/study/settings");
+  const settingsResponse = await app.request.get("/api/profiles/1/study/settings");
   const settings: SchedulerSettings = await settingsResponse.json();
-  const update = await app.request.put("/api/study/settings", {
+  const update = await app.request.put("/api/profiles/1/study/settings", {
     data: { timezone: "Europe/London", new_limit: 5, daily_budget_seconds: 60, expected_version: settings.version },
   });
   expect(update.ok(), await update.text()).toBeTruthy();
   const queue = await dueQueue(app);
   const question = queue.items.find((item) => item.fact.id === first.id)!;
-  const saved = await app.request.post("/api/study/events", { data: submission(question, 60_000) });
+  const saved = await app.request.post("/api/profiles/1/study/events", { data: submission(question, 60_000) });
   expect(saved.ok(), await saved.text()).toBeTruthy();
   await page.goto("/");
   const remaining = await startScheduled(page);

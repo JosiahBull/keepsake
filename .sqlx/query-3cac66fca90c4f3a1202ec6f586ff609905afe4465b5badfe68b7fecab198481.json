@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO scheduler_settings(profile_id, value_json, legacy_review_cutoff)\n                 VALUES(?, ?, 0)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "3cac66fca90c4f3a1202ec6f586ff609905afe4465b5badfe68b7fecab198481"
+}

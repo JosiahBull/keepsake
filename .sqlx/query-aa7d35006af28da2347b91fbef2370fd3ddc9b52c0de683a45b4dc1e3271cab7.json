@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n           SELECT 1 FROM learning_targets t JOIN facts f ON f.id=t.fact_id\n           WHERE t.id=? AND f.profile_id=?\n         ) AS \"exists!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "exists!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "aa7d35006af28da2347b91fbef2370fd3ddc9b52c0de683a45b4dc1e3271cab7"
+}

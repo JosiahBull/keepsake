@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT snapshot_json FROM fact_shares WHERE id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "snapshot_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "snapshot_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a7b48b02e5953d97d17509d72fd63b3a79294eabf901dfee4e11d19f0f1bce70"
+}

@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT min(max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0))) AS \"due: i64\"\n         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id\n         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'",
+  "describe": {
+    "columns": [
+      {
+        "name": "due: i64",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "52d651c6b0e48baa82d6d65aa73cb74d9679741108431bb540f54e93d2d8f538"
+}

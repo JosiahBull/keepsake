@@ -28,13 +28,29 @@ recommending learning methods and `docs/learning-design.md` for the implementati
 boundary. Attribute learning recommendations to the saved research. Varied methods
 are product proposals; no particular mix is a proven optimum.
 
+## Select the owner
+
+Each profile has a separate library and study history. Before capture, use
+`profiles list` to identify stable IDs and CLI handles. Pass `--profile HANDLE`
+on every capture/import/generation command, or use the user’s explicit
+`KEEPSAKE_PROFILE` setting. With one profile the CLI can choose it; with several
+and no selected owner it stops before fetching URLs or calling an agent.
+Ask which profile should receive the facts when the user has not selected one.
+Never infer a profile from the source, an agent response, or another person's name
+in the material. Keep the same explicit owner when saving a reviewed draft.
+
+Sharing is a separate action: `--profile SENDER share FACT_ID --to RECIPIENT`
+creates an offer. Use it only when asked to share. The recipient accepts through
+`--profile RECIPIENT shares accept SHARE_ID`; this creates an independent copy
+with fresh progress. Capture does not automatically share with the household.
+
 ## Save and inspect
 
 Resolve `scripts/keepsake.mjs` relative to this skill file, then run its absolute path.
 For example, from the skill directory:
 
 ```sh
-node ./scripts/keepsake.mjs add \
+node ./scripts/keepsake.mjs --profile HANDLE add \
   --prompt 'What distinguishes spaced practice from massed practice?' \
   --answer 'Spaced practice distributes learning across separate occasions; massed practice groups it together.' \
   --context 'Meaningful gaps depend on the retention goal and the material.' \
@@ -72,7 +88,7 @@ For an uncertain result, inspect `list`/`show` before repeating the save.
 Pass the source URL and the user's learning focus directly:
 
 ```sh
-keepsake add --url 'https://example.com/article' \
+keepsake --profile HANDLE add --url 'https://example.com/article' \
   --prompt 'Remember the main definitions and their exceptions' --tag reading
 ```
 
@@ -87,7 +103,7 @@ signing in. It passes readable text to the selected provider. Preserve access er
 do not substitute invented content. PDFs and oversized sources require another input.
 
 `--dry-run` returns a JSON array. Check the proposed answers and supporting excerpts,
-then save that exact array with `add --file reviewed.json`. The source URL and supplied
+then save that exact array with `--profile HANDLE add --file reviewed.json`. The source URL and supplied
 tags are retained. Excerpt matching checks provenance, not whether an answer follows
 from the excerpt. A direct save is authorised when the user asks to add the material.
 
@@ -99,8 +115,8 @@ Use `--model` only when the user requests another supported model. These command
 send the fact, context, and source field (or fetched page text for URL capture) to the selected installed agent.
 
 Use `--dry-run` to capture generated JSON in a temporary file and inspect it.
-For a new fact, save the reviewed JSON with `add --file /absolute/path/reviewed.json`.
-For an existing fact, use `generate ID --file /absolute/path/reviewed.json` so the
+For a new fact, save the reviewed JSON with `--profile HANDLE add --file /absolute/path/reviewed.json`.
+For an existing fact, use `--profile HANDLE generate ID --file /absolute/path/reviewed.json` so the
 original fact is checked and only the reviewed practice is added. No second agent
 call is needed. Keep the JSON fields intact when importing. Relative file and
 database paths resolve from the calling directory.

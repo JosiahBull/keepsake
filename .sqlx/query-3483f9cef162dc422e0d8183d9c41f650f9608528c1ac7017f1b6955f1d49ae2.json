@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\" FROM fact_shares\n                     WHERE sender_id=? AND recipient_id=? AND source_fact_id=?\n                       AND fingerprint=? AND status='pending'",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3483f9cef162dc422e0d8183d9c41f650f9608528c1ac7017f1b6955f1d49ae2"
+}

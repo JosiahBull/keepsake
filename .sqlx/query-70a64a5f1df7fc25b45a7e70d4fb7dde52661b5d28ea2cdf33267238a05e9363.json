@@ -1,0 +1,146 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.id AS \"id!\", s.sender_id, s.recipient_id,\n           a.name AS sender_name, b.name AS recipient_name,\n           s.source_fact_id, s.question, s.status, s.accepted_fact_id,\n           s.created_at, s.resolved_at\n         FROM fact_shares s\n         JOIN profiles a ON a.id=s.sender_id\n         JOIN profiles b ON b.id=s.recipient_id\n         WHERE s.id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "sender_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "sender_id"
+          }
+        }
+      },
+      {
+        "name": "recipient_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "recipient_id"
+          }
+        }
+      },
+      {
+        "name": "sender_name",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "recipient_name",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "source_fact_id",
+        "ordinal": 5,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "source_fact_id"
+          }
+        }
+      },
+      {
+        "name": "question",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "question"
+          }
+        }
+      },
+      {
+        "name": "status",
+        "ordinal": 7,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "name": "accepted_fact_id",
+        "ordinal": 8,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "accepted_fact_id"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 9,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "resolved_at",
+        "ordinal": 10,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_shares",
+            "name": "resolved_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "70a64a5f1df7fc25b45a7e70d4fb7dde52661b5d28ea2cdf33267238a05e9363"
+}

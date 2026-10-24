@@ -25,7 +25,7 @@ async function expectNavigationDisabled(page: Page) {
     await expect(page.getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name, exact: true })).toBeDisabled();
   }
-  await expect(page.getByRole("button", { name: "Add a fact", exact: true })).toBeDisabled();
+  await expect(page.locator(".add-top")).toBeDisabled();
   await expect(page.locator(".ratings button")).toHaveCount(4);
   for (const rating of await page.locator(".ratings button").all()) {
     await expect(rating).toBeDisabled();
@@ -37,7 +37,7 @@ test("library retries a failed load and shows loading until the real response ar
   const retry = gate();
   let requests = 0;
 
-  await page.route(/\/api\/facts\?/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/facts\?/, async (route) => {
     requests += 1;
     if (requests === 1) {
       await unavailable(route);
@@ -75,7 +75,7 @@ test("practice recovers from a dropped request without showing an empty session"
   const retry = gate();
   let requests = 0;
 
-  await page.route(/\/api\/practice\?/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/practice\?/, async (route) => {
     requests += 1;
     if (requests === 1) {
       await route.abort("failed");
@@ -113,7 +113,7 @@ test("matching retries an unavailable sample against the real library", async ({
   const retry = gate();
   let requests = 0;
 
-  await page.route(/\/api\/facts\/sample\?/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/facts\/sample\?/, async (route) => {
     requests += 1;
     if (requests === 1) {
       await unavailable(route);
@@ -147,7 +147,7 @@ test("matching retries an unavailable sample against the real library", async ({
 test("a failed fact save preserves every draft field and retry inserts exactly once", async ({ app, page }) => {
   const retry = gate();
   let posts = 0;
-  await page.route(/\/api\/facts$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/facts$/, async (route) => {
     if (route.request().method() !== "POST") {
       await route.continue();
       return;
@@ -181,7 +181,7 @@ test("a failed fact save preserves every draft field and retry inserts exactly o
     await expect(form.getByLabel("Context", { exact: true })).toHaveValue("A retry must preserve this context.");
     await expect(form.getByLabel("Source", { exact: true })).toHaveValue("Household notebook");
     await expect(form.getByLabel("Tags")).toHaveValue("recovery, household");
-    expect((await (await app.request.get("/api/facts")).json()).total).toBe(0);
+    expect((await (await app.request.get("/api/profiles/1/facts")).json()).total).toBe(0);
 
     await form.getByRole("button", { name: "Save fact", exact: true }).click();
     await expect(form.getByRole("button", { name: "Saving…", exact: true })).toBeDisabled();
@@ -189,7 +189,7 @@ test("a failed fact save preserves every draft field and retry inserts exactly o
 
     await expect(page.getByRole("status").filter({ hasText: /^Fact saved\.$/ })).toBeVisible();
     await expect(form).toBeHidden();
-    const saved = await (await app.request.get("/api/facts")).json();
+    const saved = await (await app.request.get("/api/profiles/1/facts")).json();
     expect(saved.total).toBe(1);
     expect(saved.items[0]).toMatchObject({
       prompt: "What survives a failed save?",
@@ -213,7 +213,7 @@ test("review retry keeps the revealed question and blocks navigation until one r
   });
   const retry = gate();
   let posts = 0;
-  await page.route(/\/api\/reviews$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/reviews$/, async (route) => {
     posts += 1;
     if (posts === 1) {
       await unavailable(route);
@@ -234,7 +234,7 @@ test("review retry keeps the revealed question and blocks navigation until one r
     await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
     await expect(page.getByLabel("Your answer")).toHaveValue("My original attempt");
     await expect(page.getByLabel("Your answer")).toHaveAttribute("readonly", "");
-    expect((await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json()).total).toBe(0);
+    expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
 
     await page.getByRole("button", { name: "Good Correct", exact: true }).click();
     await expect(page.getByRole("status")).toHaveText("Saving review…");
@@ -244,7 +244,7 @@ test("review retry keeps the revealed question and blocks navigation until one r
 
     await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
     await expect(page.getByText("1 review saved.", { exact: true })).toBeVisible();
-    const reviews = await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json();
+    const reviews = await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json();
     expect(reviews.total).toBe(1);
     expect(reviews.items[0]).toMatchObject({
       fact_id: fact.id,
@@ -267,7 +267,7 @@ test("matching review retry preserves the pair and only counts a durable review"
   const fact = facts[0];
   const retry = gate();
   let posts = 0;
-  await page.route(/\/api\/reviews$/, async (route) => {
+  await page.route(/\/api\/profiles\/1\/reviews$/, async (route) => {
     posts += 1;
     if (posts === 1) {
       await unavailable(route);
@@ -288,7 +288,7 @@ test("matching review retry preserves the pair and only counts a durable review"
     await expect(page.getByRole("alert")).toContainText("Review was not saved.");
     await expect(game.getByText("0 of 3 matched", { exact: true })).toBeVisible();
     await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeVisible();
-    expect((await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json()).total).toBe(0);
+    expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
 
     await game.getByRole("button", { name: "Hard Correct, with difficulty", exact: true }).click();
     await expect(page.getByText("Saving review…", { exact: true })).toBeVisible();
@@ -298,7 +298,7 @@ test("matching review retry preserves the pair and only counts a durable review"
     await expect(game.getByText("1 of 3 matched", { exact: true })).toBeVisible();
     await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeHidden();
     await expect(game.getByRole("button", { name: new RegExp(fact.prompt) })).toBeDisabled();
-    const reviews = await (await app.request.get(`/api/facts/${fact.id}/reviews`)).json();
+    const reviews = await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json();
     expect(reviews.total).toBe(1);
     expect(reviews.items[0]).toMatchObject({
       fact_id: fact.id,
@@ -320,7 +320,7 @@ for (const staleResult of ["success", "failure"] as const) {
     const oldRelease = gate();
     const oldFinished = gate();
 
-    await page.route(/\/api\/facts\?/, async (route) => {
+    await page.route(/\/api\/profiles\/1\/facts\?/, async (route) => {
       const search = new URL(route.request().url()).searchParams.get("search");
       if (search !== "apricot") {
         await route.continue();
@@ -353,7 +353,7 @@ for (const staleResult of ["success", "failure"] as const) {
       await expect(page.getByRole("heading", { name: newFact.prompt, exact: true })).toBeVisible();
 
       const oldResponse = page.waitForResponse((response) =>
-        new URL(response.url()).pathname === "/api/facts" &&
+        new URL(response.url()).pathname === "/api/profiles/1/facts" &&
         new URL(response.url()).searchParams.get("search") === "apricot");
       oldRelease.release();
       await oldFinished.promise;

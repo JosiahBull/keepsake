@@ -7,25 +7,32 @@ use super::{
     *,
 };
 
-pub async fn queue(pool: &SqlitePool, query: &QueueQuery) -> anyhow::Result<StudyQueue> {
-    queue_at(pool, query, now()).await
+pub async fn queue_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &QueueQuery,
+) -> anyhow::Result<StudyQueue> {
+    queue_at_for(pool, profile_id, query, now()).await
 }
 
-pub async fn queue_at(
+pub async fn queue_at_for(
     pool: &SqlitePool,
+    profile_id: i64,
     query: &QueueQuery,
     now: i64,
 ) -> anyhow::Result<StudyQueue> {
     query.validate()?;
     invalid(now >= 0, "timestamp must be nonnegative")?;
     let mut transaction = pool.begin().await?;
-    let settings = load_settings(&mut transaction).await?;
+    crate::profiles::require(&mut transaction, profile_id).await?;
+    let settings = load_settings(&mut transaction, profile_id).await?;
     let (start, end) = day_bounds(now, &settings.timezone)?;
-    let introduced = introduced_today(&mut transaction, start, end).await?;
+    let introduced = introduced_today(&mut transaction, profile_id, start, end).await?;
     let spent_ms = sqlx::query_scalar!(
         "SELECT coalesce(sum(response_ms), 0) AS \"spent!: i64\" FROM study_events
-         WHERE occurred_at >= ? AND occurred_at < ?
+         WHERE profile_id=? AND occurred_at >= ? AND occurred_at < ?
            AND (kind <> 'attempt' OR json_extract(request_json, '$.feedback_event_id') IS NULL)",
+        profile_id,
         start,
         end
     )
@@ -33,16 +40,16 @@ pub async fn queue_at(
     .await?;
     let total_due = sqlx::query_scalar!(
         "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-         WHERE t.active=1 AND s.phase <> 'new'
-           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", now
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
+           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", profile_id, now
     ).fetch_one(&mut *transaction).await?;
     let mut ids = sqlx::query_scalar!(
         "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-         WHERE t.active=1 AND s.phase <> 'new'
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
            AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?
          ORDER BY CASE WHEN s.phase IN ('learning', 'relearning') THEN 0 ELSE 1 END,
            coalesce(s.due_at, s.blocked_until, 0) / 3600, random() LIMIT ?",
-        now,
+        profile_id, now,
         query.limit
     )
     .fetch_all(&mut *transaction)
@@ -59,8 +66,8 @@ pub async fn queue_at(
         ids.extend(
             sqlx::query_scalar!(
             "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-             WHERE t.active=1 AND s.phase='new' AND coalesce(s.blocked_until, 0) <= ?
-             ORDER BY s.target_id LIMIT ?", now, new_slots
+             WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase='new' AND coalesce(s.blocked_until, 0) <= ?
+             ORDER BY s.target_id LIMIT ?", profile_id, now, new_slots
         )
             .fetch_all(&mut *transaction)
             .await?,
@@ -89,6 +96,7 @@ pub async fn queue_at(
         let transitions = transitions(&schedule, &settings, now)?;
         items.push(StudyQuestion {
             fact: crate::paging::FactSummary {
+                shared_by: fact.shared_by,
                 id: fact.id,
                 prompt: fact.prompt,
                 answer: fact.answer,
@@ -112,13 +120,14 @@ pub async fn queue_at(
     let mut next_due_at = sqlx::query_scalar!(
         "SELECT min(max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0))) AS \"due: i64\"
          FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-         WHERE t.active=1 AND s.phase <> 'new'"
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'",
+        profile_id
     )
     .fetch_one(&mut *transaction)
     .await?;
     let next_new = sqlx::query_scalar!(
         "SELECT min(coalesce(s.blocked_until, 0)) AS \"due: i64\"
-         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id WHERE t.active=1 AND s.phase='new'"
+         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase='new'", profile_id
     ).fetch_one(&mut *transaction).await?;
     if let Some(next_new) = next_new {
         // A zero intake limit intentionally disables new items; do not promise tomorrow.
@@ -164,4 +173,16 @@ pub(super) async fn validate_content(
         target.prompt == fact.prompt && target.answer == fact.answer,
         "The fact's answer changed. Create a new target revision before studying it.",
     )
+}
+
+pub async fn queue(pool: &SqlitePool, query: &QueueQuery) -> anyhow::Result<StudyQueue> {
+    queue_for(pool, crate::profiles::sole(pool).await?.id, query).await
+}
+
+pub async fn queue_at(
+    pool: &SqlitePool,
+    query: &QueueQuery,
+    now: i64,
+) -> anyhow::Result<StudyQueue> {
+    queue_at_for(pool, crate::profiles::sole(pool).await?.id, query, now).await
 }

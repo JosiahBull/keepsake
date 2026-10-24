@@ -6,6 +6,7 @@ use std::{
 
 fn cli(database: &Path, arguments: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_keepsake"))
+        .env_remove("KEEPSAKE_PROFILE")
         .args([
             "--database",
             &format!("sqlite:{}", database.display()),
@@ -101,6 +102,7 @@ fn capture_from_any_directory_and_read_back() {
 fn standalone_default_database_is_relative_to_the_calling_directory() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_keepsake"))
+        .env_remove("KEEPSAKE_PROFILE")
         .current_dir(temp.path())
         .env_remove("DATABASE_URL")
         .args(["--json", "add", "--prompt", "Portable?", "--answer", "Yes"])

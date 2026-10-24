@@ -39,7 +39,7 @@ function practice(kind: PracticeKind): NonNullable<NewFact["practices"]>[number]
 }
 
 async function reviewHistory(app: RunningApp, factId: number): Promise<ReviewPage> {
-  const response = await app.request.get(`${app.url}/api/facts/${factId}/reviews`);
+  const response = await app.request.get(`${app.url}/api/profiles/1/facts/${factId}/reviews`);
   expect(response.ok()).toBeTruthy();
   return response.json();
 }
@@ -51,7 +51,7 @@ async function freezeClock(page: Page) {
 
 async function beginPractice(page: Page): Promise<PracticeSession> {
   const response = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/practice" && response.request().method() === "GET",
+    new URL(response.url()).pathname === "/api/profiles/1/practice" && response.request().method() === "GET",
   );
   await startExtraPractice(page);
   const loaded = await response;
@@ -112,7 +112,7 @@ async function revealQuestion(page: Page, question: PracticeQuestion, correctCho
 
 async function rate(page: Page, outcome: Outcome): Promise<Review> {
   const response = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/reviews" && response.request().method() === "POST",
+    new URL(response.url()).pathname === "/api/profiles/1/reviews" && response.request().method() === "POST",
   );
   await page.getByRole("button", { name: ratings[outcome] }).click();
   const saved = await response;
@@ -176,7 +176,7 @@ for (const scenario of cases) {
     // Review history uses ascending IDs so after_id can continue chronologically.
     expect(durable.items).toEqual(saved);
     expect(durable.next_cursor).toBeNull();
-    const target = await app.request.get(`/api/study/facts/${fact.id}`);
+    const target = await app.request.get(`/api/profiles/1/study/facts/${fact.id}`);
     expect(target.ok()).toBeTruthy();
     expect(await target.json()).toMatchObject({
       stability: null,
@@ -306,7 +306,7 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
     const durable = await reviewHistory(app, review.fact_id);
     expect(durable.total).toBe(1);
     expect(durable.items).toEqual([review]);
-    const target = await app.request.get(`/api/study/facts/${review.fact_id}`);
+    const target = await app.request.get(`/api/profiles/1/study/facts/${review.fact_id}`);
     expect(target.ok()).toBeTruthy();
     expect(await target.json()).toMatchObject({ stability: null, difficulty: null, due_at: null });
   }
@@ -358,7 +358,7 @@ test("matching keeps one topic bank across rounds despite library pagination and
     .getByRole("button", { name: "Match pairs", exact: true });
   for (let round = 0; round < 3; round += 1) {
     const loaded = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === "/api/facts/sample" &&
+      new URL(response.url()).pathname === "/api/profiles/1/facts/sample" &&
       response.request().method() === "GET");
     await start.click();
     const response = await loaded;

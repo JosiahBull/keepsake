@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO profiles(name, handle, setup_complete) VALUES(?, ?, 1)\n                 RETURNING id AS \"id!\", name, handle, setup_complete AS \"setup_complete!: bool\", created_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "name": "handle",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "handle"
+          }
+        }
+      },
+      {
+        "name": "setup_complete!: bool",
+        "ordinal": 3,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "setup_complete"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "161ae4e6c2033fb934fc80b22488bc4a704163dba739240e16f245360b43f136"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT value_json FROM scheduler_settings WHERE profile_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "value_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "scheduler_settings",
+            "name": "value_json"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "cec1c26ed88ba3d91950fd73ac44f68f26a5bbf4dc10f1513ea8402c67963c97"
+}

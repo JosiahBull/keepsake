@@ -12,19 +12,24 @@ use super::{
 };
 use crate::facts::{NewReview, Review, ReviewMethod, ReviewOutcome};
 
-pub async fn submit(pool: &SqlitePool, submission: StudySubmission) -> anyhow::Result<StudyResult> {
-    submit_at(pool, submission, now()).await
+pub async fn submit_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    submission: StudySubmission,
+) -> anyhow::Result<StudyResult> {
+    submit_at_for(pool, profile_id, submission, now()).await
 }
 
-pub async fn submit_at(
+pub async fn submit_at_for(
     pool: &SqlitePool,
+    profile_id: i64,
     submission: StudySubmission,
     now: i64,
 ) -> anyhow::Result<StudyResult> {
     validate_submission(&submission, now)?;
     crate::db::write_transaction(pool, move |connection| {
         let submission = submission.clone();
-        Box::pin(async move { apply(connection, submission, now, None).await })
+        Box::pin(async move { apply(connection, profile_id, submission, now, None).await })
     })
     .await
 }
@@ -64,18 +69,23 @@ fn validate_submission(input: &StudySubmission, now: i64) -> anyhow::Result<()> 
 
 async fn apply(
     connection: &mut SqliteConnection,
+    profile_id: i64,
     input: StudySubmission,
     now: i64,
     existing_review: Option<Review>,
 ) -> anyhow::Result<StudyResult> {
+    crate::profiles::require_target(connection, profile_id, input.target_id).await?;
     let request_json = serde_json::to_string(&input)?;
     if let Some(saved) = sqlx::query!(
-        "SELECT request_json, result_json FROM study_events WHERE submission_id=?",
+        "SELECT request_json, result_json, profile_id FROM study_events WHERE submission_id=?",
         input.submission_id
     )
     .fetch_optional(&mut *connection)
     .await?
     {
+        if saved.profile_id != Some(profile_id) {
+            return Err(StudyError::Missing("Study event not found".into()).into());
+        }
         conflict(
             saved.request_json == request_json,
             "Submission ID already used for a different event",
@@ -96,12 +106,15 @@ async fn apply(
         Some(id) => {
             let mapping = sqlx::query!(
                 "SELECT m.target_id, m.qualifying, p.kind, p.answer FROM target_practices m
-                 JOIN practices p ON p.id=m.practice_id WHERE m.practice_id=?",
-                id
+                 JOIN practices p ON p.id=m.practice_id
+                 JOIN facts f ON f.id=p.fact_id
+                 WHERE m.practice_id=? AND f.profile_id=?",
+                id,
+                profile_id
             )
             .fetch_optional(&mut *connection)
             .await?
-            .ok_or_else(|| StudyError::Invalid("Practice not found".into()))?;
+            .ok_or_else(|| StudyError::Missing("Practice not found".into()))?;
             invalid(
                 mapping.target_id == before.target_id && mapping.kind == input.method.as_str(),
                 "Practice does not assess this target or method",
@@ -135,7 +148,7 @@ async fn apply(
         && mapping
         && matches!(input.method, ReviewMethod::Flashcard | ReviewMethod::Cloze);
     let feedback_at = if input.feedback_event_id.is_some() {
-        own_feedback(connection, &input, &before, now).await?
+        own_feedback(connection, profile_id, &input, &before, now).await?
     } else {
         None
     };
@@ -152,18 +165,18 @@ async fn apply(
             )?;
         }
     }
-    let settings = load_settings(connection).await?;
+    let settings = load_settings(connection, profile_id).await?;
     if input.context == StudyContext::Scheduled && before.introduced_at.is_none() {
         let (start, end) = day_bounds(now, &settings.timezone)?;
-        let introduced = introduced_today(connection, start, end).await?;
+        let introduced = introduced_today(connection, profile_id, start, end).await?;
         conflict(
             introduced < settings.new_limit,
             "Today's new-item allowance is used. Refresh practice.",
         )?;
         let ready = sqlx::query_scalar!(
             "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-             WHERE t.active=1 AND s.phase <> 'new'
-               AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", now
+             WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
+               AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", profile_id, now
         ).fetch_one(&mut *connection).await?;
         conflict(
             ready == 0,
@@ -243,8 +256,8 @@ async fn apply(
             .context("timestamp out of range")?
             .to_rfc3339_opts(SecondsFormat::Millis, true);
         let result = sqlx::query!(
-                "INSERT INTO reviews(fact_id, practice_id, method, outcome, response_ms, reviewed_at) VALUES (?, ?, ?, ?, ?, ?)",
-                fact.id, input.practice_id, input.method.as_str(), outcome.as_str(), input.response_ms, reviewed_at
+                "INSERT INTO reviews(profile_id, fact_id, practice_id, method, outcome, response_ms, reviewed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                profile_id, fact.id, input.practice_id, input.method.as_str(), outcome.as_str(), input.response_ms, reviewed_at
             ).execute(&mut *connection).await?;
         Some(Review {
             id: result.last_insert_rowid(),
@@ -273,11 +286,11 @@ async fn apply(
     };
     let outcome = input.outcome.map(|outcome| outcome.as_str());
     let saved = sqlx::query!(
-        "INSERT INTO study_events(submission_id, target_id, content_revision, occurred_at, kind, context, method, outcome,
+        "INSERT INTO study_events(profile_id, submission_id, target_id, content_revision, occurred_at, kind, context, method, outcome,
            response_ms, qualifying, algorithm, parameter_version, elapsed_seconds, model_interval_days,
            policy_override_seconds, request_json, before_json, after_json, result_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')",
-        input.submission_id, input.target_id, input.content_revision, now, kind, context, input.method.as_str(), outcome,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')",
+        profile_id, input.submission_id, input.target_id, input.content_revision, now, kind, context, input.method.as_str(), outcome,
         input.response_ms, qualifying, settings.algorithm, settings.parameter_version, elapsed_seconds,
         model_interval_days, policy_override_seconds, request_json, before_json, after_json
     ).execute(&mut *connection).await?;
@@ -300,15 +313,17 @@ async fn apply(
     Ok(result)
 }
 
-pub async fn expose(
+pub async fn expose_for(
     pool: &SqlitePool,
+    profile_id: i64,
     submission: ExposureSubmission,
 ) -> anyhow::Result<ExposureResult> {
-    expose_at(pool, submission, now()).await
+    expose_at_for(pool, profile_id, submission, now()).await
 }
 
-pub async fn expose_at(
+pub async fn expose_at_for(
     pool: &SqlitePool,
+    profile_id: i64,
     submission: ExposureSubmission,
     now: i64,
 ) -> anyhow::Result<ExposureResult> {
@@ -328,9 +343,12 @@ pub async fn expose_at(
     crate::db::write_transaction(pool, move |connection| {
         let submission = submission.clone();
         Box::pin(async move {
+            crate::profiles::require(connection, profile_id).await?;
+            for fact_id in &submission.fact_ids { crate::profiles::require_fact(connection, profile_id, *fact_id).await?; }
             let request_json = serde_json::to_string(&submission)?;
-            if let Some(batch) = sqlx::query!("SELECT request_json, result_json FROM study_exposure_batches WHERE submission_id=?", submission.submission_id)
+            if let Some(batch) = sqlx::query!("SELECT request_json, result_json, profile_id FROM study_exposure_batches WHERE submission_id=?", submission.submission_id)
                 .fetch_optional(&mut *connection).await? {
+                if batch.profile_id != Some(profile_id) { return Err(StudyError::Missing("Exposure batch not found".into()).into()); }
                 conflict(batch.request_json == request_json, "Submission ID already used for different exposures")?;
                 return Ok(serde_json::from_str(&batch.result_json)?);
             }
@@ -343,12 +361,12 @@ pub async fn expose_at(
                     target_id, practice_id: None, content_revision: state.content_revision,
                     expected_version: state.version, feedback_event_id: None, kind: EventKind::Exposure, context: StudyContext::Supplementary,
                     method: submission.method, outcome: None, response_ms: 0, attempted: false, assisted: false, prior_exposure: true };
-                apply(connection, event, now, None).await?;
+                apply(connection, profile_id, event, now, None).await?;
             }
             let result = ExposureResult { recorded: submission.fact_ids.len() as i64 };
             let result_json = serde_json::to_string(&result)?;
-            sqlx::query!("INSERT INTO study_exposure_batches(submission_id, request_json, result_json) VALUES (?, ?, ?)",
-                submission.submission_id, request_json, result_json).execute(connection).await?;
+            sqlx::query!("INSERT INTO study_exposure_batches(profile_id, submission_id, request_json, result_json) VALUES (?, ?, ?, ?)",
+                profile_id, submission.submission_id, request_json, result_json).execute(connection).await?;
             Ok(result)
         })
     }).await
@@ -358,6 +376,7 @@ pub async fn expose_at(
 /// attempt may be rated during its cooldown; another exposure invalidates it.
 async fn own_feedback(
     connection: &mut SqliteConnection,
+    profile_id: i64,
     input: &StudySubmission,
     schedule: &Schedule,
     now: i64,
@@ -365,6 +384,14 @@ async fn own_feedback(
     let Some(feedback_id) = input.feedback_event_id else {
         return Ok(None);
     };
+    let owner: Option<i64> = sqlx::query_scalar("SELECT profile_id FROM study_events WHERE id=?")
+        .bind(feedback_id)
+        .fetch_optional(&mut *connection)
+        .await?
+        .flatten();
+    if owner != Some(profile_id) {
+        return Err(StudyError::Missing("Feedback not found".into()).into());
+    }
     let latest = sqlx::query!(
         "SELECT request_json, after_json, occurred_at FROM study_events WHERE id=? AND target_id=?",
         feedback_id,
@@ -399,6 +426,7 @@ async fn own_feedback(
 
 pub(crate) async fn record_supplementary(
     connection: &mut SqliteConnection,
+    profile_id: i64,
     review: &Review,
 ) -> anyhow::Result<()> {
     let target_id = sqlx::query_scalar!(
@@ -425,6 +453,33 @@ pub(crate) async fn record_supplementary(
         assisted: false,
         prior_exposure: true,
     };
-    apply(connection, input, now(), Some(review.clone())).await?;
+    apply(connection, profile_id, input, now(), Some(review.clone())).await?;
     Ok(())
+}
+
+pub async fn submit(pool: &SqlitePool, input: StudySubmission) -> anyhow::Result<StudyResult> {
+    submit_for(pool, crate::profiles::sole(pool).await?.id, input).await
+}
+
+pub async fn submit_at(
+    pool: &SqlitePool,
+    input: StudySubmission,
+    now: i64,
+) -> anyhow::Result<StudyResult> {
+    submit_at_for(pool, crate::profiles::sole(pool).await?.id, input, now).await
+}
+
+pub async fn expose(
+    pool: &SqlitePool,
+    input: ExposureSubmission,
+) -> anyhow::Result<ExposureResult> {
+    expose_for(pool, crate::profiles::sole(pool).await?.id, input).await
+}
+
+pub async fn expose_at(
+    pool: &SqlitePool,
+    input: ExposureSubmission,
+    now: i64,
+) -> anyhow::Result<ExposureResult> {
+    expose_at_for(pool, crate::profiles::sole(pool).await?.id, input, now).await
 }
