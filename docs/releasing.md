@@ -19,6 +19,20 @@ plus standalone CLI archives. A release is complete when both are available.
 
 Use the next version for later releases. Do not move an already published tag.
 
+Release runs share a publication lock. GitHub keeps one pending run; if another
+tag supersedes it, rerun the canceled tag when publication is idle.
+A completed release is skipped; its assets
+and version image are never replaced. An incomplete release stays as a draft bound
+to the tagged commit. Retry failed jobs to resume it. Existing draft uploads and
+the first version image are retained, checksums are uploaded after all archives,
+and the draft is published last. Rolling container tags advance only for the
+greatest published stable version in their series.
+
+If container tag promotion fails after the GitHub release publishes, retry failed
+jobs to finish promotion. Rerunning a completed workflow leaves the release alone.
+Protect `v*` tags against updates/deletions, and enable GitHub release immutability
+in repository settings to enforce these rules outside this workflow too.
+
 ## Verify
 
 Watch the Release workflow through completion. Check the GitHub release contains
