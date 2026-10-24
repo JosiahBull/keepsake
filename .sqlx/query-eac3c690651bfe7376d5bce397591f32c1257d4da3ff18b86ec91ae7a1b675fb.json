@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts\n         WHERE (? IS NULL OR id < ?) AND EXISTS (\n           SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field\n           WHERE lower(replace(replace(replace(replace(replace(\n             field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))\n             LIKE ? ESCAPE '#'\n         )\n         ORDER BY id DESC LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "prompt",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "context",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "context"
+          }
+        }
+      },
+      {
+        "name": "source",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "tags",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "tags"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "eac3c690651bfe7376d5bce397591f32c1257d4da3ff18b86ec91ae7a1b675fb"
+}

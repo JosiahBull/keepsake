@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/facts/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sample"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/facts/{id}": {
         parameters: {
             query?: never;
@@ -84,6 +100,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/practice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["practice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reviews": {
         parameters: {
             query?: never;
@@ -114,6 +146,26 @@ export interface components {
             /** Format: int64 */
             id: number;
             practices: components["schemas"]["Practice"][];
+            prompt: string;
+            source: string;
+            tags: string[];
+        };
+        FactPage: {
+            items: components["schemas"]["FactSummary"][];
+            /** Format: int64 */
+            next_cursor?: number | null;
+            /** Format: int64 */
+            total: number;
+        };
+        FactSample: {
+            items: components["schemas"]["FactSummary"][];
+        };
+        FactSummary: {
+            answer: string;
+            context: string;
+            created_at: string;
+            /** Format: int64 */
+            id: number;
             prompt: string;
             source: string;
             tags: string[];
@@ -159,6 +211,15 @@ export interface components {
         };
         /** @enum {string} */
         PracticeKind: "flashcard" | "multiple_choice" | "cloze" | "explain" | "apply";
+        PracticeQuestion: {
+            fact: components["schemas"]["FactSummary"];
+            practice: components["schemas"]["Practice"];
+        };
+        PracticeSession: {
+            items: components["schemas"]["PracticeQuestion"][];
+            /** Format: int64 */
+            total: number;
+        };
         Review: {
             /** Format: int64 */
             fact_id: number;
@@ -176,6 +237,13 @@ export interface components {
         ReviewMethod: "flashcard" | "multiple_choice" | "cloze" | "explain" | "apply" | "matching";
         /** @enum {string} */
         ReviewOutcome: "again" | "hard" | "good" | "easy";
+        ReviewPage: {
+            items: components["schemas"]["Review"][];
+            /** Format: int64 */
+            next_cursor?: number | null;
+            /** Format: int64 */
+            total: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -187,7 +255,14 @@ export type $defs = Record<string, never>;
 export interface operations {
     list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Page size, from 1 to 100 (default 25). */
+                limit?: number;
+                /** @description Return facts older than this ID; omit for the newest page. */
+                before_id?: number;
+                /** @description Literal substring search across question, answer, context, and tags. */
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -199,7 +274,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Fact"][];
+                    "application/json": components["schemas"]["FactPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             500: {
@@ -239,6 +322,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Fact"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    sample: {
+        parameters: {
+            query?: {
+                /** @description Number of distinct matching pairs, from 1 to 4 (default 4). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactSample"];
                 };
             };
             400: {
@@ -371,7 +500,12 @@ export interface operations {
     };
     reviews: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Page size, from 1 to 100 (default 50). */
+                limit?: number;
+                /** @description Return reviews newer than this ID. */
+                after_id?: number;
+            };
             header?: never;
             path: {
                 id: number;
@@ -385,7 +519,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Review"][];
+                    "application/json": components["schemas"]["ReviewPage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
@@ -438,6 +580,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    practice: {
+        parameters: {
+            query?: {
+                /** @description Number of random prompts, from 1 to 50 (default 20). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PracticeSession"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
             };
         };
     };

@@ -69,7 +69,7 @@ async fn persists_source_variants_and_separate_review_methods_across_reopen() {
     assert_eq!(loaded.source, fact().source);
     assert_eq!(loaded.answer, fact().answer);
     assert_eq!(loaded.tags, vec!["sqlite"]);
-    let history = facts::reviews(&reopened, saved.id).await.unwrap();
+    let history = facts::reviews(&reopened, saved.id).await.unwrap().items;
     assert_eq!(history.len(), 2);
     assert_eq!(history[0].method, ReviewMethod::MultipleChoice);
     assert_eq!(history[1].method, ReviewMethod::Matching);
@@ -90,7 +90,7 @@ async fn rejects_bad_drafts_without_partial_facts_and_checks_review_identity() {
     invalid.choices.push(" write-ahead LOGGING ".into());
     input.practices.push(invalid);
     assert!(facts::create(&pool, input).await.is_err());
-    assert!(facts::list(&pool).await.unwrap().is_empty());
+    assert!(facts::list(&pool).await.unwrap().items.is_empty());
     let first = facts::create(&pool, fact()).await.unwrap();
     let second = facts::create(&pool, fact()).await.unwrap();
     let invalid_review = NewReview {
@@ -109,7 +109,13 @@ async fn rejects_bad_drafts_without_partial_facts_and_checks_review_identity() {
         response_ms: 50,
     };
     assert!(facts::record_review(&pool, mismatched).await.is_err());
-    assert!(facts::reviews(&pool, first.id).await.unwrap().is_empty());
+    assert!(
+        facts::reviews(&pool, first.id)
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
     pool.close().await;
 }
 
@@ -192,6 +198,6 @@ async fn batch_import_rolls_back_on_database_failure() {
             .await
             .is_err()
     );
-    assert!(facts::list(&pool).await.unwrap().is_empty());
+    assert!(facts::list(&pool).await.unwrap().items.is_empty());
     pool.close().await;
 }

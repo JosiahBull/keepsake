@@ -4,8 +4,8 @@
 
   type Method = components["schemas"]["PracticeKind"];
   type Outcome = components["schemas"]["ReviewOutcome"];
-  type Fact = components["schemas"]["Fact"];
-  type Question = { fact: Fact; practice: Fact["practices"][number] };
+  type Fact = components["schemas"]["FactSummary"];
+  type Question = components["schemas"]["PracticeQuestion"];
 
   const modes: { id: Method; name: string; instruction: string }[] = [
     {
@@ -49,6 +49,14 @@
   let notice = $state("");
   let view = $state<"library" | "practice" | "matching">("library");
   let search = $state("");
+  let totalFacts = $state(0);
+  let nextCursor = $state<number | null>(null);
+  let beforeCursor = $state<number | null>(null);
+  let pageHistory = $state<(number | null)[]>([]);
+  let searchTimer: ReturnType<typeof setTimeout> | undefined;
+  let libraryRequest = 0;
+  let practiceRequest = 0;
+  let matchingRequest = 0;
 
   // Fact form
   let showAdd = $state(false);
@@ -61,6 +69,9 @@
 
   // Practice session
   let queue = $state<Question[]>([]);
+  let practiceLoading = $state(false);
+  let practiceError = $state("");
+  let practiceTotal = $state(0);
   let cursor = $state(0);
   let revealed = $state(false);
   let response = $state("");
@@ -73,6 +84,8 @@
 
   // Matching round
   let matchFacts = $state<Fact[]>([]);
+  let matchingLoading = $state(false);
+  let matchingError = $state("");
   let matchAnswers = $state<Fact[]>([]);
   let matched = $state<number[]>([]);
   let selectedPrompt = $state<number | null>(null);
@@ -84,50 +97,96 @@
   let matchMisses = $state<Record<number, number>>({});
 
   // Derived library and practice data
-  const filteredFacts = $derived(
-    facts.filter((fact) =>
-      `${fact.prompt} ${fact.answer} ${fact.context} ${fact.tags.join(" ")}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-    ),
-  );
   const current = $derived(queue[cursor]);
   const mode = $derived(current?.practice.kind);
   const choiceOptions = $derived(current ? shuffled(current.practice.choices) : []);
   const selectedMode = $derived(modes.find((item) => item.id === mode));
-  const matchingPool = $derived.by(() => {
-    const answers = new Set<string>();
-    const prompts = new Set<string>();
+  const pendingFact = $derived(matchFacts.find((fact) => fact.id === pendingMatch));
 
-    return facts.filter((fact) => {
-      const answer = fact.answer.trim().toLocaleLowerCase();
-      const prompt = fact.prompt.trim().toLocaleLowerCase();
-
-      if (answers.has(answer) || prompts.has(prompt)) {
-        return false;
-      }
-
-      answers.add(answer);
-      prompts.add(prompt);
-      return true;
-    });
+  onMount(() => {
+    void loadFacts();
+    return () => {
+      clearTimeout(searchTimer);
+      libraryRequest += 1;
+      practiceRequest += 1;
+      matchingRequest += 1;
+    };
   });
-  const pendingFact = $derived(facts.find((fact) => fact.id === pendingMatch));
-
-  onMount(loadFacts);
 
   // Library and fact form actions
-  async function loadFacts() {
+  async function loadFacts(cursor: number | null = beforeCursor, history = pageHistory) {
+    const request = ++libraryRequest;
     loading = true;
     error = "";
+    beforeCursor = cursor;
+    pageHistory = [...history];
+    facts = [];
+    nextCursor = null;
 
     try {
-      facts = unwrap(await api.GET("/api/facts"));
+      const page = unwrap(
+        await api.GET("/api/facts", {
+          params: {
+            query: {
+              limit: 25,
+              ...(cursor === null ? {} : { before_id: cursor }),
+              search,
+            },
+          },
+        }),
+      );
+
+      if (request !== libraryRequest) {
+        return;
+      }
+
+      facts = page.items;
+      totalFacts = page.total;
+      nextCursor = page.next_cursor ?? null;
     } catch (caught) {
-      error = `Could not load your library. ${message(caught)}`;
+      if (request === libraryRequest) {
+        error = `Could not load your library. ${message(caught)}`;
+      }
     } finally {
-      loading = false;
+      if (request === libraryRequest) {
+        loading = false;
+      }
     }
+  }
+
+  function searchLibrary(event: Event) {
+    search = (event.currentTarget as HTMLInputElement).value;
+    clearTimeout(searchTimer);
+
+    // Invalidate an earlier search immediately, before the debounce expires.
+    libraryRequest += 1;
+    searchTimer = setTimeout(() => {
+      void loadFacts(null, []);
+    }, 200);
+  }
+
+  function focusPageContent() {
+    if (!error) {
+      document.querySelector<HTMLElement>(".fact-details > summary")?.focus();
+    }
+  }
+
+  async function previousPage() {
+    if (pageHistory.length === 0 || loading) {
+      return;
+    }
+
+    await loadFacts(pageHistory.at(-1) ?? null, pageHistory.slice(0, -1));
+    focusPageContent();
+  }
+
+  async function nextPage() {
+    if (nextCursor === null || loading) {
+      return;
+    }
+
+    await loadFacts(nextCursor, [...pageHistory, beforeCursor]);
+    focusPageContent();
   }
 
   function showLibrary() {
@@ -161,7 +220,7 @@
         }
       }
 
-      const fact = unwrap(
+      unwrap(
         await api.POST("/api/facts", {
           body: {
             prompt: prompt.trim(),
@@ -177,7 +236,6 @@
         }),
       );
 
-      facts = [fact, ...facts];
       showAdd = false;
       prompt = "";
       answer = "";
@@ -185,6 +243,9 @@
       source = "";
       tags = "";
       notice = "Fact saved.";
+      search = "";
+      clearTimeout(searchTimer);
+      await loadFacts(null, []);
     } catch (caught) {
       error = `Could not save the fact. ${message(caught)}`;
     } finally {
@@ -202,18 +263,43 @@
     reviewError = "";
   }
 
-  function startPractice() {
+  async function startPractice() {
     if (recording) {
       return;
     }
 
+    const request = ++practiceRequest;
     view = "practice";
-    queue = shuffled(
-      facts.flatMap((fact) => fact.practices.map((practice) => ({ fact, practice }))),
-    );
+    practiceLoading = true;
+    practiceError = "";
+    queue = [];
     cursor = 0;
     sessionCount = 0;
     resetQuestion();
+
+    try {
+      const session = unwrap(
+        await api.GET("/api/practice", {
+          params: { query: { limit: 20 } },
+        }),
+      );
+
+      if (request !== practiceRequest) {
+        return;
+      }
+
+      queue = session.items;
+      practiceTotal = session.total;
+      resetQuestion();
+    } catch (caught) {
+      if (request === practiceRequest) {
+        practiceError = `Could not load practice. ${message(caught)}`;
+      }
+    } finally {
+      if (request === practiceRequest) {
+        practiceLoading = false;
+      }
+    }
   }
 
   function reveal() {
@@ -262,14 +348,17 @@
   }
 
   // Matching actions
-  function startMatching() {
+  async function startMatching() {
     if (recording) {
       return;
     }
 
+    const request = ++matchingRequest;
     view = "matching";
-    matchFacts = shuffled(matchingPool).slice(0, 4);
-    matchAnswers = shuffled(matchFacts);
+    matchingLoading = true;
+    matchingError = "";
+    matchFacts = [];
+    matchAnswers = [];
     matched = [];
     selectedPrompt = null;
     selectedAnswer = null;
@@ -278,6 +367,29 @@
     matchStarted = {};
     matchMisses = {};
     reviewError = "";
+
+    try {
+      const sample = unwrap(
+        await api.GET("/api/facts/sample", {
+          params: { query: { limit: 4 } },
+        }),
+      );
+
+      if (request !== matchingRequest) {
+        return;
+      }
+
+      matchFacts = sample.items;
+      matchAnswers = shuffled(matchFacts);
+    } catch (caught) {
+      if (request === matchingRequest) {
+        matchingError = `Could not load matching pairs. ${message(caught)}`;
+      }
+    } finally {
+      if (request === matchingRequest) {
+        matchingLoading = false;
+      }
+    }
   }
 
   function choosePrompt(id: number) {
@@ -397,12 +509,12 @@
   </header>
 
   <main>
-    {#if error}
+    {#if error && view === "library"}
       <div class="message error" role="alert">
         {error}
 
         {#if !showAdd}
-          <button class="text-button" onclick={loadFacts}>Try again</button>
+          <button class="text-button" onclick={() => loadFacts()}>Try again</button>
         {/if}
       </div>
     {/if}
@@ -411,17 +523,14 @@
       <p class="message success" role="status">{notice}</p>
     {/if}
 
-    {#if loading}
-      <h1 class="sr-only">Library</h1>
-      <p role="status">Loading library…</p>
-    {:else if view === "library"}
+    {#if view === "library"}
       <div class="page-heading">
         <h1>Library</h1>
 
-        {#if !error}
+        {#if !error && !loading}
           <span class="muted">
-            {facts.length}
-            {facts.length === 1 ? "fact" : "facts"}
+            {totalFacts}
+            {totalFacts === 1 ? "fact" : "facts"}
           </span>
         {/if}
       </div>
@@ -484,19 +593,23 @@
         </section>
       {/if}
 
-      {#if facts.length === 0}
+      {#if totalFacts > 0 || search || pageHistory.length > 0}
+        <div class="library-tools">
+          <label class="search">
+            <span class="sr-only">Search facts</span>
+            <input type="search" value={search} oninput={searchLibrary} placeholder="Search facts or tags" maxlength="1000" />
+          </label>
+        </div>
+      {/if}
+      {#if loading}
+        <p role="status">Loading library…</p>
+      {:else if totalFacts === 0 && !search}
         {#if !showAdd && !error}
           <p class="empty-state">No facts yet. Add a fact to start.</p>
         {/if}
       {:else}
-        <div class="library-tools">
-          <label class="search">
-            <span class="sr-only">Search facts</span>
-            <input type="search" bind:value={search} placeholder="Search facts or tags" />
-          </label>
-        </div>
         <section class="fact-list" aria-label="Saved facts">
-          {#each filteredFacts as fact (fact.id)}
+          {#each facts as fact (fact.id)}
             <article class="fact-row">
               <details class="fact-details">
                 <summary>
@@ -529,17 +642,29 @@
               </details>
             </article>
           {:else}
-            <p class="no-results">
-              No facts match “{search}”. Clear or change your search.
-            </p>
+            {#if !error}
+              <p class="no-results">No facts match “{search}”. Clear or change your search.</p>
+            {/if}
           {/each}
         </section>
+        {#if pageHistory.length > 0 || nextCursor !== null}
+          <nav class="pagination" aria-label="Library pages">
+            <button class="quiet" disabled={loading || pageHistory.length === 0} onclick={previousPage}>Previous</button>
+            <span class="muted">Page {pageHistory.length + 1}</span>
+            <button class="quiet" disabled={loading || nextCursor === null} onclick={nextPage}>Next</button>
+          </nav>
+        {/if}
       {/if}
     {:else if view === "practice"}
       <h1 class="sr-only">Practise</h1>
       <div class="practice-layout">
         <section class="practice-stage" aria-label={selectedMode?.name ?? "Practice session"}>
-          {#if current}
+          {#if practiceLoading}
+            <p role="status">Loading practice…</p>
+          {:else if practiceError}
+            <div class="message error" role="alert">{practiceError}</div>
+            <button class="quiet" onclick={startPractice}>Try again</button>
+          {:else if current}
             <p class="card-meta">{selectedMode?.name} · {cursor + 1} of {queue.length}</p>
             <h2 class="question">{current.practice.prompt}</h2>
 
@@ -623,7 +748,7 @@
                 <p class="verification-note">Check generated answers against their source.</p>
               </div>
               <div class="grade-panel">
-                <h3>Rate your attempt before revealing</h3>
+                <h3>Rate your attempt</h3>
                 <div class="ratings">
                   {#each ratings as rating}
                     <button class="rating" disabled={recording} onclick={() => grade(rating.id)}>
@@ -654,12 +779,10 @@
           {:else}
             <div class="session-done">
               <h2>
-                {facts.length
-                  ? "No practice prompts yet."
-                  : "No facts yet."}
+                {practiceTotal ? "No practice prompts yet." : "No facts yet."}
               </h2>
 
-              {#if facts.length}
+              {#if practiceTotal}
                 <p>Generate prompts with <code>keepsake generate ID --agent claude</code>.</p>
               {:else}
                 <button
@@ -679,7 +802,8 @@
           <details class="study-notes">
             <summary>Practice notes</summary>
             <p>
-              {selectedMode.instruction} Reviews are recorded by method. Choice and matching test recognition,
+              {selectedMode.instruction} Each session samples up to 20 prompts from the whole library.
+              Reviews are recorded by method. Choice and matching test recognition,
               which differs from unaided recall.
             </p>
           </details>
@@ -688,7 +812,12 @@
     {:else}
       <h1 class="sr-only">Match pairs</h1>
 
-      {#if matchingPool.length < 3}
+      {#if matchingLoading}
+        <p role="status">Loading matching pairs…</p>
+      {:else if matchingError}
+        <div class="message error" role="alert">{matchingError}</div>
+        <button class="quiet" onclick={startMatching}>Try again</button>
+      {:else if matchFacts.length < 3}
         <section class="empty-state">
           <h2>Add three distinct question–answer pairs to play.</h2>
           <button class="primary" onclick={startPractice}>
@@ -1161,6 +1290,14 @@
     color: inherit;
     text-decoration: underline;
     padding: 0.2rem 0.5rem;
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.5rem 0 0;
   }
 
   /* Practice session */

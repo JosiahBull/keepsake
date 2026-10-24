@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", fact_id, practice_id, method, outcome, response_ms, reviewed_at\n         FROM reviews\n         WHERE fact_id = ?\n         ORDER BY id",
+  "query": "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation FROM practices ORDER BY random() LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "reviews",
+            "table": "practices",
             "name": "id"
           }
         }
@@ -20,63 +20,63 @@
         "type_info": "Integer",
         "origin": {
           "Table": {
-            "table": "reviews",
+            "table": "practices",
             "name": "fact_id"
           }
         }
       },
       {
-        "name": "practice_id",
+        "name": "kind",
         "ordinal": 2,
-        "type_info": "Integer",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "reviews",
-            "name": "practice_id"
+            "table": "practices",
+            "name": "kind"
           }
         }
       },
       {
-        "name": "method",
+        "name": "prompt",
         "ordinal": 3,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "reviews",
-            "name": "method"
+            "table": "practices",
+            "name": "prompt"
           }
         }
       },
       {
-        "name": "outcome",
+        "name": "answer",
         "ordinal": 4,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "reviews",
-            "name": "outcome"
+            "table": "practices",
+            "name": "answer"
           }
         }
       },
       {
-        "name": "response_ms",
+        "name": "choices",
         "ordinal": 5,
-        "type_info": "Integer",
+        "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "reviews",
-            "name": "response_ms"
+            "table": "practices",
+            "name": "choices"
           }
         }
       },
       {
-        "name": "reviewed_at",
+        "name": "explanation",
         "ordinal": 6,
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "reviews",
-            "name": "reviewed_at"
+            "table": "practices",
+            "name": "explanation"
           }
         }
       }
@@ -87,12 +87,12 @@
     "nullable": [
       false,
       false,
-      true,
+      false,
       false,
       false,
       false,
       false
     ]
   },
-  "hash": "aa8d55487208c5f0a02ecb0b56716c06e3aeeef0e11f6597615a87c679023d96"
+  "hash": "e0e0b32f05ab3b28e0a1301f9d028fd94ab0dc5a8450dbb272b8315500aa8dc9"
 }

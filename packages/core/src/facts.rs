@@ -163,25 +163,25 @@ fn validate_practices(practices: &[NewPractice]) -> anyhow::Result<()> {
 }
 
 #[derive(FromRow)]
-struct FactRow {
-    id: i64,
-    prompt: String,
-    answer: String,
-    context: String,
-    source: String,
-    tags: String,
-    created_at: String,
+pub(crate) struct FactRow {
+    pub(crate) id: i64,
+    pub(crate) prompt: String,
+    pub(crate) answer: String,
+    pub(crate) context: String,
+    pub(crate) source: String,
+    pub(crate) tags: String,
+    pub(crate) created_at: String,
 }
 
 #[derive(FromRow)]
-struct PracticeRow {
-    id: i64,
-    fact_id: i64,
-    kind: String,
-    prompt: String,
-    answer: String,
-    choices: String,
-    explanation: String,
+pub(crate) struct PracticeRow {
+    pub(crate) id: i64,
+    pub(crate) fact_id: i64,
+    pub(crate) kind: String,
+    pub(crate) prompt: String,
+    pub(crate) answer: String,
+    pub(crate) choices: String,
+    pub(crate) explanation: String,
 }
 
 impl TryFrom<PracticeRow> for Practice {
@@ -245,19 +245,8 @@ pub async fn get(pool: &SqlitePool, id: i64) -> anyhow::Result<Option<Fact>> {
     load_id(&mut connection, id).await
 }
 
-pub async fn list(pool: &SqlitePool) -> anyhow::Result<Vec<Fact>> {
-    let mut connection = pool.acquire().await?;
-    let rows = sqlx::query_as!(
-        FactRow,
-        "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts ORDER BY id DESC"
-    )
-    .fetch_all(&mut *connection)
-    .await?;
-    let mut facts = Vec::with_capacity(rows.len());
-    for row in rows {
-        facts.push(load(&mut connection, row).await?);
-    }
-    Ok(facts)
+pub async fn list(pool: &SqlitePool) -> anyhow::Result<crate::paging::FactPage> {
+    crate::paging::facts(pool, &crate::paging::FactQuery::default()).await
 }
 
 async fn insert_practice(
@@ -495,40 +484,6 @@ pub async fn record_review(pool: &SqlitePool, review: NewReview) -> anyhow::Resu
     .await
 }
 
-#[derive(FromRow)]
-struct ReviewRow {
-    id: i64,
-    fact_id: i64,
-    practice_id: Option<i64>,
-    method: String,
-    outcome: String,
-    response_ms: i64,
-    reviewed_at: String,
-}
-
-pub async fn reviews(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<Vec<Review>> {
-    let rows = sqlx::query_as!(
-        ReviewRow,
-        "SELECT id AS \"id!\", fact_id, practice_id, method, outcome, response_ms, reviewed_at
-         FROM reviews
-         WHERE fact_id = ?
-         ORDER BY id",
-        fact_id
-    )
-    .fetch_all(pool)
-    .await?;
-
-    rows.into_iter()
-        .map(|row| {
-            Ok(Review {
-                id: row.id,
-                fact_id: row.fact_id,
-                practice_id: row.practice_id,
-                method: serde_json::from_value(serde_json::Value::String(row.method))?,
-                outcome: serde_json::from_value(serde_json::Value::String(row.outcome))?,
-                response_ms: row.response_ms,
-                reviewed_at: row.reviewed_at,
-            })
-        })
-        .collect()
+pub async fn reviews(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<crate::paging::ReviewPage> {
+    crate::paging::reviews(pool, fact_id, &crate::paging::ReviewQuery::default()).await
 }

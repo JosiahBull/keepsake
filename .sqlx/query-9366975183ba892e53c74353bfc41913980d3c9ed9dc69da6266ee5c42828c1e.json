@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at FROM facts ORDER BY id DESC",
+  "query": "WITH eligible AS (\n           SELECT f.* FROM facts f WHERE NOT EXISTS (\n             SELECT 1 FROM facts other\n             WHERE lower(trim(other.prompt)) = lower(trim(f.prompt))\n               AND lower(trim(other.answer)) <> lower(trim(f.answer))\n           )\n         ), representatives AS (\n           SELECT min(id) AS id FROM eligible GROUP BY lower(trim(answer))\n         )\n         SELECT id AS \"id!\", prompt, answer, context, source, tags, created_at\n         FROM facts WHERE id IN (SELECT id FROM representatives) ORDER BY random() LIMIT 100",
   "describe": {
     "columns": [
       {
@@ -85,7 +85,7 @@
       "Right": 0
     },
     "nullable": [
-      false,
+      null,
       false,
       false,
       false,
@@ -94,5 +94,5 @@
       false
     ]
   },
-  "hash": "9667a4fe6e1bf7b0e03fdd4d382c7425147f6a88352e046c648c956f1aabd864"
+  "hash": "9366975183ba892e53c74353bfc41913980d3c9ed9dc69da6266ee5c42828c1e"
 }

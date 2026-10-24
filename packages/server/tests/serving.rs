@@ -22,7 +22,7 @@ async fn serves_spa_and_keeps_unknown_api_routes_out_of_it() {
     for (path, status, expected) in [
         ("/api/health", StatusCode::OK, Some("\"status\":\"ok\"")),
         ("/api/openapi.json", StatusCode::OK, Some("/api/health")),
-        ("/api/facts", StatusCode::OK, Some("[]")),
+        ("/api/facts", StatusCode::OK, Some("\"items\":[]")),
         ("/api/missing", StatusCode::NOT_FOUND, None),
         ("/api", StatusCode::NOT_FOUND, None),
         ("/", StatusCode::OK, Some("<h1>Keepsake</h1>")),

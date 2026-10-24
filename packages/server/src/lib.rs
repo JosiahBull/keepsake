@@ -51,6 +51,8 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
     paths(
         health,
         facts_api::list,
+        facts_api::practice,
+        facts_api::sample,
         facts_api::create,
         facts_api::get,
         facts_api::add_practices,
@@ -68,6 +70,12 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts::Review,
         facts::ReviewMethod,
         facts::ReviewOutcome,
+        keepsake_core::paging::FactSummary,
+        keepsake_core::paging::FactPage,
+        keepsake_core::paging::ReviewPage,
+        keepsake_core::paging::PracticeQuestion,
+        keepsake_core::paging::PracticeSession,
+        keepsake_core::paging::FactSample,
         facts_api::ErrorBody
     ))
 )]
@@ -81,6 +89,8 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
     let api = Router::new()
         .route("/health", get(health))
         .route("/facts", get(facts_api::list).post(facts_api::create))
+        .route("/practice", get(facts_api::practice))
+        .route("/facts/sample", get(facts_api::sample))
         .route("/facts/{id}", get(facts_api::get))
         .route("/facts/{id}/practices", post(facts_api::add_practices))
         .route("/facts/{id}/reviews", get(facts_api::reviews))

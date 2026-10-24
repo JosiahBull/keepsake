@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{StatusCode, header::RETRY_AFTER},
     response::{IntoResponse, Response},
 };
@@ -9,6 +9,10 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 use crate::facts::{self, Fact, NewFact, NewPractice, NewReview, Review};
+use keepsake_core::paging::{
+    self, FactPage, FactQuery, FactSample, PracticeQuery, PracticeSession, ReviewPage, ReviewQuery,
+    SampleQuery,
+};
 
 #[derive(Serialize, ToSchema)]
 pub struct ErrorBody {
@@ -54,14 +58,53 @@ impl IntoResponse for ApiError {
     }
 }
 
-#[utoipa::path(get, path = "/api/facts", responses((status = 200, body = [Fact]), (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)))]
-pub async fn list(State(pool): State<SqlitePool>) -> Result<Json<Vec<Fact>>, ApiError> {
-    Ok(Json(facts::list(&pool).await.map_err(ApiError::internal)?))
+#[utoipa::path(get, path = "/api/facts", params(FactQuery), responses(
+    (status = 200, body = FactPage), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn list(
+    State(pool): State<SqlitePool>,
+    Query(query): Query<FactQuery>,
+) -> Result<Json<FactPage>, ApiError> {
+    query.validate().map_err(ApiError::bad)?;
+    Ok(Json(
+        paging::facts(&pool, &query)
+            .await
+            .map_err(ApiError::internal)?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/practice", params(PracticeQuery), responses(
+    (status = 200, body = PracticeSession), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn practice(
+    State(pool): State<SqlitePool>,
+    Query(query): Query<PracticeQuery>,
+) -> Result<Json<PracticeSession>, ApiError> {
+    query.validate().map_err(ApiError::bad)?;
+    Ok(Json(
+        paging::practice(&pool, &query)
+            .await
+            .map_err(ApiError::internal)?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/facts/sample", params(SampleQuery), responses(
+    (status = 200, body = FactSample), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn sample(
+    State(pool): State<SqlitePool>,
+    Query(query): Query<SampleQuery>,
+) -> Result<Json<FactSample>, ApiError> {
+    query.validate().map_err(ApiError::bad)?;
+    Ok(Json(
+        paging::sample(&pool, &query)
+            .await
+            .map_err(ApiError::internal)?,
+    ))
 }
 
 #[utoipa::path(post, path = "/api/facts", request_body = NewFact, responses(
-    (status = 201, body = Fact), (status = 400, body = ErrorBody),
-    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
+    (status = 201, body = Fact), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn create(
     State(pool): State<SqlitePool>,
@@ -76,8 +119,7 @@ pub async fn create(
 }
 
 #[utoipa::path(get, path = "/api/facts/{id}", params(("id" = i64, Path)), responses(
-    (status = 200, body = Fact), (status = 404, body = ErrorBody),
-    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
+    (status = 200, body = Fact), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn get(
     State(pool): State<SqlitePool>,
@@ -92,8 +134,7 @@ pub async fn get(
 }
 
 #[utoipa::path(post, path = "/api/facts/{id}/practices", params(("id" = i64, Path)), request_body = [NewPractice], responses(
-    (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
-    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
+    (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn add_practices(
     State(pool): State<SqlitePool>,
@@ -121,8 +162,7 @@ pub async fn add_practices(
 }
 
 #[utoipa::path(post, path = "/api/reviews", request_body = NewReview, responses(
-    (status = 201, body = Review), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
-    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
+    (status = 201, body = Review), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn review(
     State(pool): State<SqlitePool>,
@@ -143,20 +183,23 @@ pub async fn review(
     ))
 }
 
-#[utoipa::path(get, path = "/api/facts/{id}/reviews", params(("id" = i64, Path)), responses(
-    (status = 200, body = [Review]), (status = 404, body = ErrorBody),
-    (status = 503, body = ErrorBody), (status = 500, body = ErrorBody)
+#[utoipa::path(get, path = "/api/facts/{id}/reviews", params(("id" = i64, Path), ReviewQuery), responses(
+    (status = 200, body = ReviewPage), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn reviews(
     State(pool): State<SqlitePool>,
     Path(id): Path<i64>,
-) -> Result<Json<Vec<Review>>, ApiError> {
-    facts::get(&pool, id)
+    Query(query): Query<ReviewQuery>,
+) -> Result<Json<ReviewPage>, ApiError> {
+    query.validate().map_err(ApiError::bad)?;
+    if !paging::fact_exists(&pool, id)
         .await
         .map_err(ApiError::internal)?
-        .ok_or_else(ApiError::missing)?;
+    {
+        return Err(ApiError::missing());
+    }
     Ok(Json(
-        facts::reviews(&pool, id)
+        paging::reviews(&pool, id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))

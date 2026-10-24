@@ -32,7 +32,7 @@ fn sigterm_drains_http_closes_database_and_preserves_committed_facts() {
         .await
         .unwrap();
         assert_eq!(
-            keepsake_server::facts::list(&pool).await.unwrap()[0].answer,
+            keepsake_server::facts::list(&pool).await.unwrap().items[0].answer,
             "Yes"
         );
         pool.close().await;
