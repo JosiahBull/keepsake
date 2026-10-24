@@ -689,7 +689,7 @@
                 <p class="verification-note">Check generated answers against their source.</p>
               </div>
               <div class="grade-panel">
-                <h3>Rate your attempt before revealing</h3>
+                <h3>Rate your attempt</h3>
                 <div class="ratings">
                   {#each ratings as rating}
                     <button class="rating" disabled={recording} onclick={() => grade(rating.id)}>
