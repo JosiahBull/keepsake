@@ -1,6 +1,6 @@
 {
   "name": "keepsake",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "packageManager": "pnpm@11.25.0",
   "engines": {
@@ -14,7 +14,9 @@
     "build": "pnpm gen:client && cargo build --release -p keepsake-server -p keepsake-cli --bins && pnpm --filter @keepsake/web build",
     "build:cli": "cargo build --release -p keepsake-cli --bin keepsake",
     "check": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && pnpm --filter @keepsake/web check",
-    "test": "cargo test --workspace",
+    "test": "pnpm test:rust && pnpm test:e2e",
+    "test:rust": "cargo test --workspace",
+    "test:e2e": "pnpm --filter @keepsake/web test:e2e",
     "keepsake": "./scripts/keepsake",
     "skills:install": "node scripts/install-skills.mjs",
     "sqlx:prepare": "node scripts/sqlx-prepare.mjs",

@@ -85,6 +85,49 @@ jobs:
       - run: pnpm --filter @keepsake/web check
       - run: pnpm --filter @keepsake/web build
 
+  browser:
+    name: Browser e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential pkg-config curl
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require Playwright package and image versions to match
+        run: |
+          node --input-type=module - <<'JS'
+          import { readFileSync } from "node:fs";
+          const version = JSON.parse(readFileSync("packages/web/package.json")).devDependencies["@playwright/test"];
+          const workflow = readFileSync(".github/workflows/checks.yml", "utf8");
+          if (!workflow.includes(`image: mcr.microsoft.com/playwright:v${version}-noble`)) {
+            throw new Error("The Playwright package and CI image must use the same exact version.");
+          }
+          JS
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-test-results
+          path: |
+            packages/web/playwright-report
+            packages/web/test-results
+            packages/web/tests/*-snapshots
+          if-no-files-found: ignore
+          retention-days: 7
+
   image-platform:
     name: Container (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}

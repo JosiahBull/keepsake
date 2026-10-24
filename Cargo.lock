@@ -1244,7 +1244,7 @@ dependencies = [
 
 [[package]]
 name = "keepsake-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1259,7 +1259,7 @@ dependencies = [
 
 [[package]]
 name = "keepsake-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -1272,7 +1272,7 @@ dependencies = [
 
 [[package]]
 name = "keepsake-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
