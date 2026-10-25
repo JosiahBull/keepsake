@@ -1,3 +1,7 @@
+#[path = "../../core/tests/support/mod.rs"]
+mod test_db;
+use test_db as db;
+
 use axum::{
     Router,
     body::Body,
@@ -5,7 +9,7 @@ use axum::{
 };
 use http_body_util::BodyExt;
 use keepsake_core::facts::{self, NewFact, NewPractice, PracticeKind};
-use keepsake_server::{db, router};
+use keepsake_server::router;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 

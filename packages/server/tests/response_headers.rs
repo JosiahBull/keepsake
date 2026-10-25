@@ -1,8 +1,12 @@
+#[path = "../../core/tests/support/mod.rs"]
+mod test_db;
+use test_db as db;
+
 use axum::{
     body::Body,
     http::{Request, StatusCode, header},
 };
-use keepsake_server::{db, router};
+use keepsake_server::router;
 use tower::ServiceExt;
 
 #[tokio::test]

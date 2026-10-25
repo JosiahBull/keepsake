@@ -71,11 +71,21 @@ curl "${curl_args[@]}" --dump-header "$scratch/asset.headers" "$base$asset" > "$
 test -s "$scratch/app.js"
 grep -Eiq '^content-type: (application|text)/javascript' "$scratch/asset.headers"
 
-docker exec "$container" keepsake --json add \
+# A fresh deployment creates both household libraries and pending vocabulary offers.
+curl "${curl_args[@]}" "$base/api/profiles" | jq -e '
+  length == 2 and .[0].id == 1 and .[0].name == "Josiah"
+  and .[0].handle == "default" and .[1].name == "Ansam" and .[1].handle == "ansam"
+' >/dev/null
+curl "${curl_args[@]}" "$base/api/profiles/1/facts" | jq -e '.total == 40' >/dev/null
+curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e '.total == 60' >/dev/null
+curl "${curl_args[@]}" "$base/api/profiles/1/shares?direction=inbox&status=pending" | \
+  jq -e '.total == 60 and all(.items[]; .sender_id == 2 and .recipient_id == 1 and (has("answer") | not))' >/dev/null
+
+docker exec "$container" keepsake --json --profile default add \
   --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' \
   --source 'container-smoke' --tag ci > "$scratch/fact.json"
 fact_id=$(jq -er '.id | select(type == "number" and . > 0)' "$scratch/fact.json")
-curl "${curl_args[@]}" "$base/api/facts/$fact_id" | jq -e --argjson id "$fact_id" '
+curl "${curl_args[@]}" "$base/api/profiles/1/facts/$fact_id" | jq -e --argjson id "$fact_id" '
   .id == $id and .answer == "Write-ahead logging" and .source == "container-smoke"
   and .tags == ["ci"] and any(.practices[]; .kind == "flashcard" and .answer == "Write-ahead logging")
 ' >/dev/null
@@ -98,11 +108,17 @@ copy_id=$(jq -er '.[0].accepted_fact_id' "$scratch/accepted.json")
 curl "${curl_args[@]}" "$base/api/profiles/$partner_id/facts/$copy_id" | \
   jq -e '.answer == "Write-ahead logging" and .source == "container-smoke" and .shared_by != null' >/dev/null
 for profile_id in 1 "$partner_id"; do
-  expected_id="$fact_id"
-  if [[ "$profile_id" == "$partner_id" ]]; then expected_id="$copy_id"; fi
+  expected_total=41
+  expected_queue=5
+  if [[ "$profile_id" == "$partner_id" ]]; then expected_total=1; expected_queue=1; fi
+  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/facts?limit=100" > "$scratch/library-$profile_id.json"
+  jq -e --argjson total "$expected_total" '.total == $total' "$scratch/library-$profile_id.json" >/dev/null
   curl "${curl_args[@]}" "$base/api/profiles/$profile_id/study/queue" | \
-    jq -e --argjson id "$expected_id" '.items | length == 1 and .[0].fact.id == $id' >/dev/null
+    jq -e --argjson count "$expected_queue" --slurpfile library "$scratch/library-$profile_id.json" '
+      (.items | length) == $count and all(.items[]; .fact.id as $id | any($library[0].items[]; .id == $id))
+    ' >/dev/null
 done
+curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e '.total == 60' >/dev/null
 curl "${curl_args[@]}" "$base/api/profiles/$partner_id/study/facts/$copy_id" | \
   jq -e '.phase == "new" and .stability == null and .difficulty == null' >/dev/null
 printf 'Container confinement, health, built SPA, profile isolation and copied recall passed: %s\n' "$KEEPSAKE_IMAGE"

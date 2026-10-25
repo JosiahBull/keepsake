@@ -1,4 +1,7 @@
-use keepsake_core::{db, facts};
+mod support;
+use support as db;
+
+use keepsake_core::facts;
 
 #[tokio::test]
 async fn creates_missing_database_and_nested_directories_then_reopens_existing_data() {

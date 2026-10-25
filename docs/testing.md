@@ -21,7 +21,10 @@ search, pagination and keyboard focus, every practice format and rating, mixed
 sessions, matching, loading states, retries and stale search responses.
 Success paths use the real API. Recovery tests intercept only the deliberate
 failure or delayed response. Unexpected browser exceptions and requests outside
-the test server fail the test. Tests use synthetic data and never call an AI agent.
+the test server fail the test. Most cases reset the migrated database to an empty
+library and add synthetic facts. Household-default cases retain the bundled facts
+and offers to check first startup, acceptance, and separate progress. Tests never
+call an AI agent.
 
 ## Visual comparisons
 

@@ -76,17 +76,20 @@ pub(crate) async fn capture_profile(
 ) -> anyhow::Result<i64> {
     let options = SqliteConnectOptions::from_str(database)?;
     if !options.get_filename().try_exists()? {
-        // Migrations create the initial owner with ID 1. Do not materialise an
-        // empty database merely to preview or reject a captured fact.
-        if let Some(selector) = selector(explicit)
-            && selector != "1"
-            && selector != "default"
-        {
-            bail!(
-                "profile {selector:?} does not exist: create the library with keepsake profiles list first"
-            );
-        }
-        return Ok(1);
+        // Bind the fresh household owner before fetching a URL or calling an
+        // agent, without creating files for previews or rejected captures.
+        return match selector(explicit).as_deref() {
+            Some("1") => Ok(1),
+            Some("2") => Ok(2),
+            Some(handle) if handle.eq_ignore_ascii_case("default") => Ok(1),
+            Some(handle) if handle.eq_ignore_ascii_case("ansam") => Ok(2),
+            Some(selector) => bail!(
+                "profile {selector:?} does not exist: run keepsake profiles list to see available libraries"
+            ),
+            None => bail!(
+                "profile_required: choose --profile default (Josiah) or --profile ansam before adding facts"
+            ),
+        };
     }
     let pool = db::connect(database).await?;
     let actor = resolve(&pool, explicit).await?;

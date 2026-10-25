@@ -1,7 +1,7 @@
-use keepsake_core::{
-    db,
-    facts::{self, NewFact},
-};
+mod support;
+use support as db;
+
+use keepsake_core::facts::{self, NewFact};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},

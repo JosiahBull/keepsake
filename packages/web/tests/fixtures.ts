@@ -1,8 +1,9 @@
 import { execFile, spawn, type ChildProcess } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { DatabaseSync } from "node:sqlite";
 import { test as base, expect, request, type APIRequestContext } from "@playwright/test";
 import type { components } from "@keepsake/client";
 import { repoRoot } from "./global-setup";
@@ -38,8 +39,12 @@ export class TestApp {
   readonly databasePath: string;
   private server: ChildProcess | undefined;
   private readonly binaries: string;
+  private initialized = false;
 
-  constructor(private readonly directory: string) {
+  constructor(
+    private readonly directory: string,
+    private readonly householdDefaults = false,
+  ) {
     this.databasePath = path.join(directory, "library.sqlite3");
     const binaries = process.env.KEEPSAKE_E2E_BIN_DIR;
     if (!binaries) {
@@ -101,6 +106,22 @@ export class TestApp {
       this.request = await request.newContext({ baseURL: this.url, timeout: 8_000 });
       const health = await this.request.get("/api/health");
       expect(health.ok(), "the test server must have a healthy migrated database").toBe(true);
+      if (!this.initialized) {
+        if (!this.householdDefaults) {
+          const reset = await readFile(
+            path.join(repoRoot, "packages/core/tests/support/reset.sql"),
+            "utf8",
+          );
+          const database = new DatabaseSync(this.databasePath);
+          try {
+            database.exec("PRAGMA busy_timeout = 8000;");
+            database.exec(reset);
+          } finally {
+            database.close();
+          }
+        }
+        this.initialized = true;
+      }
     } catch (error) {
       await this.stop();
       throw error;
@@ -162,10 +183,12 @@ export class TestApp {
   }
 }
 
-export const test = base.extend<{ app: TestApp; profileSetup: boolean }>({
+export const test = base.extend<{ app: TestApp; profileSetup: boolean; householdDefaults: boolean }>({
   profileSetup: [true, { option: true }],
-  app: async ({ profileSetup }, use, testInfo) => {
-    const app = new TestApp(await mkdtemp(path.join(os.tmpdir(), "keepsake-browser-")));
+  householdDefaults: [false, { option: true }],
+  app: async ({ profileSetup, householdDefaults }, use, testInfo) => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "keepsake-browser-"));
+    const app = new TestApp(directory, householdDefaults);
     try {
       await app.start();
       if (profileSetup) {
