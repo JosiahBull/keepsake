@@ -108,7 +108,7 @@ export class TestApp {
   }
 
   async createFact(input: Partial<NewFact> = {}): Promise<Fact> {
-    const response = await this.request.post("/api/facts", {
+    const response = await this.request.post("/api/profiles/1/facts", {
       data: {
         prompt: "What is the synthetic test fact?",
         answer: "A fact created only for this browser test.",
@@ -162,11 +162,16 @@ export class TestApp {
   }
 }
 
-export const test = base.extend<{ app: TestApp }>({
-  app: async ({}, use, testInfo) => {
+export const test = base.extend<{ app: TestApp; profileSetup: boolean }>({
+  profileSetup: [true, { option: true }],
+  app: async ({ profileSetup }, use, testInfo) => {
     const app = new TestApp(await mkdtemp(path.join(os.tmpdir(), "keepsake-browser-")));
     try {
       await app.start();
+      if (profileSetup) {
+        const profile = await app.request.patch("/api/profiles/1", { data: { name: "Josiah" } });
+        expect(profile.ok(), await profile.text()).toBe(true);
+      }
       await use(app);
     } finally {
       if (testInfo.status !== testInfo.expectedStatus) {
@@ -178,7 +183,16 @@ export const test = base.extend<{ app: TestApp }>({
   baseURL: async ({ app }, use) => {
     await use(app.url);
   },
-  context: async ({ context, app }, use) => {
+  context: async ({ context, app, profileSetup }, use) => {
+    if (profileSetup) {
+      await context.addInitScript(() => {
+        try {
+          localStorage.setItem("keepsake.profile", "1");
+        } catch {
+          // about:blank has no storage origin.
+        }
+      });
+    }
     const errors: string[] = [];
     context.on("page", (page) => page.on("pageerror", (error) => errors.push(error.message)));
     await context.route("**/*", async (route) => {

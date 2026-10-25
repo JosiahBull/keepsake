@@ -40,7 +40,7 @@ test("required fields and cancellation leave an empty library unchanged", async 
   await expect(page.getByRole("heading", { name: "Add a fact", exact: true })).toHaveCount(0);
   await expect(page.getByText("No facts yet. Add a fact to start.")).toBeVisible();
 
-  const response = await app.request.get("/api/facts");
+  const response = await app.request.get("/api/profiles/1/facts");
   expect(response.ok()).toBe(true);
   expect(await response.json()).toMatchObject({ total: 0, items: [] });
 });
@@ -51,7 +51,7 @@ test("UTF-8 byte validation preserves the draft and allows a corrected save", as
   const answerText = "Garden";
   const factPosts: string[] = [];
   page.on("request", (request) => {
-    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/facts") {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/profiles/1/facts") {
       factPosts.push(request.url());
     }
   });
@@ -70,7 +70,7 @@ test("UTF-8 byte validation preserves the draft and allows a corrected save", as
   await expect(question).toHaveValue(oversizedQuestion);
   await expect(answer).toHaveValue(answerText);
   expect(factPosts).toHaveLength(0);
-  const emptyLibrary = await app.request.get("/api/facts");
+  const emptyLibrary = await app.request.get("/api/profiles/1/facts");
   expect(emptyLibrary.ok()).toBe(true);
   expect(await emptyLibrary.json()).toMatchObject({ total: 0, items: [] });
 
@@ -84,7 +84,7 @@ test("UTF-8 byte validation preserves the draft and allows a corrected save", as
   await page.getByRole("heading", { name: correctedQuestion, exact: true }).click();
   await expect(page.getByText(answerText, { exact: true })).toBeVisible();
 
-  const savedLibrary = await app.request.get("/api/facts");
+  const savedLibrary = await app.request.get("/api/profiles/1/facts");
   expect(savedLibrary.ok()).toBe(true);
   expect(await savedLibrary.json()).toMatchObject({
     total: 1,

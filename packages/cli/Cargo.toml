@@ -16,5 +16,7 @@ reqwest.workspace = true
 scraper.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sqlx.workspace = true
 tempfile = "3"
 tokio.workspace = true
+uuid.workspace = true

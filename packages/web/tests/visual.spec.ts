@@ -56,3 +56,38 @@ test("scheduled recall feedback shows its interval previews", async ({ app, page
   await page.screenshot({ path: testInfo.outputPath("scheduled-feedback-review.png"), fullPage: true });
   await expect(page).toHaveScreenshot("scheduled-feedback.png", { fullPage: true });
 });
+
+test.describe("profile screenshots", () => {
+  test.use({ profileSetup: false });
+  test("household chooser, share confirmation and recipient inbox", async ({ app, page }, testInfo) => {
+    const renamed = await app.request.patch("/api/profiles/1", { data: { name: "Josiah" } });
+    expect(renamed.ok()).toBe(true);
+    const created = await app.request.post("/api/profiles", { data: { name: "Partner", handle: "partner" } });
+    expect(created.status()).toBe(201);
+    const partner = await created.json();
+    const fact = await app.createFact({ prompt: "What does wai mean?", answer: "Water", tags: ["te reo", "household"] });
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Who’s practising?", exact: true })).toBeVisible();
+    // First-entry screenshots must include the decoded raster logo, especially in WebKit.
+    await page.getByRole("img", { name: "Keepsake", exact: true }).evaluate(async (logo: HTMLImageElement) => {
+      await logo.decode();
+      if (!logo.complete || logo.naturalWidth === 0) throw new Error("The Keepsake logo did not load.");
+    });
+    await page.screenshot({ path: testInfo.outputPath("profile-chooser-review.png"), fullPage: true });
+    await expect.soft(page).toHaveScreenshot("profile-chooser.png", { fullPage: true });
+    await page.getByRole("button", { name: "Josiah", exact: true }).click();
+    await page.getByRole("checkbox", { name: `Select ${fact.prompt}`, exact: true }).check();
+    await page.getByRole("button", { name: "Share selected", exact: true }).click();
+    await page.getByLabel("Share with", { exact: true }).selectOption(String(partner.id));
+    await page.screenshot({ path: testInfo.outputPath("share-facts-review.png"), fullPage: true });
+    await expect.soft(page).toHaveScreenshot("share-facts.png", { fullPage: true });
+    await page.getByRole("button", { name: "Send facts", exact: true }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Facts shared." })).toHaveText("Facts shared.");
+    await page.getByLabel("Profile: Josiah", { exact: true }).click();
+    await page.getByRole("button", { name: "Partner", exact: true }).click();
+    await page.getByRole("button", { name: "Shared with me", exact: true }).click();
+    await expect(page.getByRole("heading", { name: fact.prompt, exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath("shared-inbox-review.png"), fullPage: true });
+    await expect.soft(page).toHaveScreenshot("shared-inbox.png", { fullPage: true });
+  });
+});

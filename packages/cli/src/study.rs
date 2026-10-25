@@ -49,9 +49,15 @@ pub(crate) struct SettingsOptions {
     daily_budget_seconds: Option<i64>,
 }
 
-pub(crate) async fn due(database: &str, limit: i64, json: bool) -> anyhow::Result<()> {
+pub(crate) async fn due(
+    database: &str,
+    profile: Option<String>,
+    limit: i64,
+    json: bool,
+) -> anyhow::Result<()> {
     let pool = db::connect(database).await?;
-    let queue = scheduling::queue(&pool, &QueueQuery { limit }).await?;
+    let actor = crate::profiles::resolve(&pool, profile).await?;
+    let queue = scheduling::queue_for(&pool, actor, &QueueQuery { limit }).await?;
     pool.close().await;
 
     if json {
@@ -81,17 +87,25 @@ pub(crate) async fn due(database: &str, limit: i64, json: bool) -> anyhow::Resul
     Ok(())
 }
 
-pub(crate) async fn run(database: &str, command: StudyCommand, json: bool) -> anyhow::Result<()> {
+pub(crate) async fn run(
+    database: &str,
+    profile: Option<String>,
+    command: StudyCommand,
+    json: bool,
+) -> anyhow::Result<()> {
     // Parse input before opening SQLite so malformed files cannot create a library.
     let submission = match &command {
         StudyCommand::Submit { file } => Some(read_submission(file)?),
         _ => None,
     };
     let pool = db::connect(database).await?;
+    let actor = crate::profiles::resolve(&pool, profile).await?;
 
     match command {
         StudyCommand::Submit { .. } => {
-            let result = scheduling::submit(&pool, submission.expect("parsed submission")).await?;
+            let result =
+                scheduling::submit_for(&pool, actor, submission.expect("parsed submission"))
+                    .await?;
             if json {
                 crate::print_json(&result)?;
             } else {
@@ -109,13 +123,14 @@ pub(crate) async fn run(database: &str, command: StudyCommand, json: bool) -> an
             }
         }
         StudyCommand::Settings(options) => {
-            let current = scheduling::settings(&pool).await?;
+            let current = scheduling::settings_for(&pool, actor).await?;
             let updated = if options.timezone.is_some()
                 || options.new_limit.is_some()
                 || options.daily_budget_seconds.is_some()
             {
-                scheduling::update_settings(
+                scheduling::update_settings_for(
                     &pool,
+                    actor,
                     SettingsUpdate {
                         timezone: options.timezone.unwrap_or(current.timezone),
                         new_limit: options.new_limit.unwrap_or(current.new_limit),
@@ -140,7 +155,7 @@ pub(crate) async fn run(database: &str, command: StudyCommand, json: bool) -> an
             }
         }
         StudyCommand::Approve { practice_id } => {
-            scheduling::approve_practice(&pool, practice_id).await?;
+            scheduling::approve_practice_for(&pool, actor, practice_id).await?;
             if json {
                 crate::print_json(
                     &serde_json::json!({ "practice_id": practice_id, "approved": true }),
@@ -150,7 +165,7 @@ pub(crate) async fn run(database: &str, command: StudyCommand, json: bool) -> an
             }
         }
         StudyCommand::Events { after, limit } => {
-            crate::print_json(&scheduling::export_events(&pool, after, limit).await?)?;
+            crate::print_json(&scheduling::export_events_for(&pool, actor, after, limit).await?)?;
         }
     }
 

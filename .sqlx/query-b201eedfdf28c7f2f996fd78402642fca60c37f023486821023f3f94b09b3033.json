@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE scheduler_settings SET value_json = ? WHERE profile_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "b201eedfdf28c7f2f996fd78402642fca60c37f023486821023f3f94b09b3033"
+}

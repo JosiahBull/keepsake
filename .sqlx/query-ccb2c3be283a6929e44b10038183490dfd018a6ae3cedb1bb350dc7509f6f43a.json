@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT m.target_id, m.qualifying, p.kind, p.answer FROM target_practices m\n                 JOIN practices p ON p.id=m.practice_id\n                 JOIN facts f ON f.id=p.fact_id\n                 WHERE m.practice_id=? AND f.profile_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "target_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "target_practices",
+            "name": "target_id"
+          }
+        }
+      },
+      {
+        "name": "qualifying",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "target_practices",
+            "name": "qualifying"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "answer"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "ccb2c3be283a6929e44b10038183490dfd018a6ae3cedb1bb350dc7509f6f43a"
+}

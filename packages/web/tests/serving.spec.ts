@@ -34,7 +34,7 @@ test("empty practice offers a working path to the fact form", async ({ app, page
   await expect(form.getByRole("textbox", { name: "Question", exact: true })).toBeVisible();
   await expect(form.getByRole("textbox", { name: "Answer", exact: true })).toBeVisible();
   await expect(form.getByRole("button", { name: "Save fact", exact: true })).toBeEnabled();
-  const facts = await app.request.get("/api/facts");
+  const facts = await app.request.get("/api/profiles/1/facts");
   expect(facts.ok()).toBe(true);
   expect(await facts.json()).toMatchObject({ total: 0, items: [] });
 });
@@ -58,12 +58,12 @@ test("matching requires three distinct pairs within a topic bank even when dupli
   ]) {
     await app.createFact({ ...fact, tags: ["synthetic-household-bank"] });
   }
-  const listed = await app.request.get("/api/facts");
+  const listed = await app.request.get("/api/profiles/1/facts");
   expect(listed.ok()).toBe(true);
   expect((await listed.json()).total).toBe(3);
 
   const sample = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/facts/sample");
+    new URL(response.url()).pathname === "/api/profiles/1/facts/sample");
   await start.click();
   const response = await sample;
   expect(response.ok()).toBe(true);
@@ -87,7 +87,7 @@ test("untagged facts from different topics do not form a matching bank", async (
   }
   await page.goto("/");
   const sample = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/facts/sample");
+    new URL(response.url()).pathname === "/api/profiles/1/facts/sample");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true }).click();
   const response = await sample;
@@ -104,7 +104,7 @@ test("the production document, browser-loaded assets and API enforce their respo
   const scriptLoaded = page.waitForResponse((response) =>
     /^\/assets\/[^/]+\.js$/.test(new URL(response.url()).pathname));
   const libraryLoaded = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/facts");
+    new URL(response.url()).pathname === "/api/profiles/1/facts");
   const document = await page.goto("/");
   expect(document).not.toBeNull();
   expect(document!.status()).toBe(200);

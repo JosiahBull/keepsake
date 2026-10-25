@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation FROM practices WHERE fact_id IN (SELECT id FROM facts WHERE profile_id=?) ORDER BY random() LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "fact_id",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "fact_id"
+          }
+        }
+      },
+      {
+        "name": "kind",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "name": "prompt",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "choices",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "choices"
+          }
+        }
+      },
+      {
+        "name": "explanation",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "practices",
+            "name": "explanation"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "e75958d70e098a3428c2ce1fa40d37bf4ac023a444cb009ba2d0e18458c30d6c"
+}

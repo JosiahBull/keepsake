@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE target_practices SET qualifying=0\n         WHERE target_id IN (SELECT id FROM learning_targets WHERE fact_id=?)\n           AND practice_id <> (\n             SELECT min(id) FROM practices\n             WHERE fact_id=? AND kind='flashcard' AND prompt=? AND answer=?\n           )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "d9a5c5e0d27407bf916020c2ddbbac14f0fc694fd00ba446d7aad9477d86d33d"
+}

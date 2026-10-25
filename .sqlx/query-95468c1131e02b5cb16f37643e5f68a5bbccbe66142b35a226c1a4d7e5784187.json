@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT request_json, result_json, profile_id FROM study_events WHERE submission_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "request_json",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "request_json"
+          }
+        }
+      },
+      {
+        "name": "result_json",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "result_json"
+          }
+        }
+      },
+      {
+        "name": "profile_id",
+        "ordinal": 2,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "profile_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "95468c1131e02b5cb16f37643e5f68a5bbccbe66142b35a226c1a4d7e5784187"
+}

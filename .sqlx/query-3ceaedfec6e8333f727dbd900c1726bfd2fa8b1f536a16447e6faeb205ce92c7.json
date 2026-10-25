@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT count(*) AS \"count!: i64\" FROM fact_shares\n         WHERE (sender_id=? OR recipient_id=?)\n           AND (? IS NULL OR (?='inbox' AND recipient_id=?) OR (?='sent' AND sender_id=?))\n           AND (? IS NULL OR status=?)",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3ceaedfec6e8333f727dbd900c1726bfd2fa8b1f536a16447e6faeb205ce92c7"
+}

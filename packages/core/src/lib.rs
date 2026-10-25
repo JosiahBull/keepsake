@@ -4,4 +4,6 @@ pub mod db;
 pub mod facts;
 mod matching;
 pub mod paging;
+pub mod profiles;
 pub mod scheduling;
+pub mod sharing;

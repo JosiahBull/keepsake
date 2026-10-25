@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE fact_shares\n         SET status='accepted', accepted_fact_id=?, resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')\n         WHERE id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "78aa893679a4dbf77a53629a7e95389834b0d71fb5bf642adc1cb0e0d778cca3"
+}

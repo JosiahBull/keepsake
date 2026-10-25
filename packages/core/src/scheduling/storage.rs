@@ -10,10 +10,15 @@ use super::{
 
 pub(super) async fn load_settings(
     connection: &mut SqliteConnection,
+    profile_id: i64,
 ) -> anyhow::Result<SchedulerSettings> {
-    let json = sqlx::query_scalar!("SELECT value_json FROM scheduler_settings WHERE id = 1")
-        .fetch_one(connection)
-        .await?;
+    crate::profiles::require(connection, profile_id).await?;
+    let json = sqlx::query_scalar!(
+        "SELECT value_json FROM scheduler_settings WHERE profile_id = ?",
+        profile_id
+    )
+    .fetch_one(connection)
+    .await?;
     let settings: SchedulerSettings = serde_json::from_str(&json)?;
     anyhow::ensure!(
         settings.algorithm == adapter::ALGORITHM
@@ -23,12 +28,13 @@ pub(super) async fn load_settings(
     Ok(settings)
 }
 
-pub async fn settings(pool: &SqlitePool) -> anyhow::Result<SchedulerSettings> {
-    load_settings(&mut *pool.acquire().await?).await
+pub async fn settings_for(pool: &SqlitePool, profile_id: i64) -> anyhow::Result<SchedulerSettings> {
+    load_settings(&mut *pool.acquire().await?, profile_id).await
 }
 
-pub async fn update_settings(
+pub async fn update_settings_for(
     pool: &SqlitePool,
+    profile_id: i64,
     update: SettingsUpdate,
 ) -> anyhow::Result<SchedulerSettings> {
     invalid(
@@ -46,7 +52,7 @@ pub async fn update_settings(
     crate::db::write_transaction(pool, move |connection| {
         let update = update.clone();
         Box::pin(async move {
-            let mut saved = load_settings(connection).await?;
+            let mut saved = load_settings(connection, profile_id).await?;
             conflict(
                 saved.version == update.expected_version,
                 "Settings changed. Refresh and try again.",
@@ -57,8 +63,9 @@ pub async fn update_settings(
             saved.version += 1;
             let json = serde_json::to_string(&saved)?;
             sqlx::query!(
-                "UPDATE scheduler_settings SET value_json = ? WHERE id = 1",
-                json
+                "UPDATE scheduler_settings SET value_json = ? WHERE profile_id = ?",
+                json,
+                profile_id
             )
             .execute(connection)
             .await?;
@@ -82,8 +89,13 @@ pub(super) async fn load_schedule(
     Ok(serde_json::from_str(&json)?)
 }
 
-pub async fn target(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<Option<Schedule>> {
+pub async fn target_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    fact_id: i64,
+) -> anyhow::Result<Option<Schedule>> {
     let mut connection = pool.acquire().await?;
+    crate::profiles::require_fact(&mut connection, profile_id, fact_id).await?;
     let id = sqlx::query_scalar!(
         "SELECT id FROM learning_targets WHERE fact_id = ? AND active = 1",
         fact_id
@@ -155,14 +167,18 @@ pub(crate) async fn map_practices(
     Ok(())
 }
 
-pub async fn approve_practice(pool: &SqlitePool, practice_id: i64) -> anyhow::Result<()> {
+pub async fn approve_practice_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    practice_id: i64,
+) -> anyhow::Result<()> {
     crate::db::write_transaction(pool, move |connection| {
         Box::pin(async move {
             let mapping = sqlx::query!(
                 "SELECT p.kind, p.answer, t.answer AS target_answer FROM target_practices m
              JOIN practices p ON p.id=m.practice_id JOIN learning_targets t ON t.id=m.target_id
-             WHERE m.practice_id = ? AND t.active=1",
-                practice_id
+             WHERE m.practice_id = ? AND t.active=1 AND t.fact_id IN (SELECT id FROM facts WHERE profile_id=?)",
+                practice_id, profile_id
             )
             .fetch_optional(&mut *connection)
             .await?
@@ -187,8 +203,9 @@ pub async fn approve_practice(pool: &SqlitePool, practice_id: i64) -> anyhow::Re
     .await
 }
 
-pub async fn export_events(
+pub async fn export_events_for(
     pool: &SqlitePool,
+    profile_id: i64,
     after: i64,
     limit: i64,
 ) -> anyhow::Result<StudyEventPage> {
@@ -196,13 +213,14 @@ pub async fn export_events(
         after >= 0 && (1..=1000).contains(&limit),
         "after must be nonnegative and limit between 1 and 1000",
     )?;
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
     let fetch_limit = limit + 1;
     let mut items = sqlx::query_as!(StudyEvent,
         "SELECT id AS \"id!\", submission_id, target_id, content_revision, occurred_at, kind, context,
          method, outcome, response_ms, qualifying AS \"qualifying: bool\", algorithm, parameter_version,
          elapsed_seconds, model_interval_days AS \"model_interval_days: f32\", policy_override_seconds,
          request_json, before_json, after_json, result_json
-         FROM study_events WHERE id > ? ORDER BY id LIMIT ?", after, fetch_limit
+         FROM study_events WHERE profile_id=? AND id > ? ORDER BY id LIMIT ?", profile_id, after, fetch_limit
     ).fetch_all(pool).await?;
     let next_cursor = if items.len() > limit as usize {
         items.truncate(limit as usize);
@@ -242,14 +260,42 @@ pub(super) fn day_bounds(now: i64, timezone: &str) -> anyhow::Result<(i64, i64)>
 
 pub(super) async fn introduced_today(
     connection: &mut SqliteConnection,
+    profile_id: i64,
     start: i64,
     end: i64,
 ) -> anyhow::Result<i64> {
     Ok(sqlx::query_scalar!(
-        "SELECT count(*) FROM schedule_states WHERE introduced_at >= ? AND introduced_at < ?",
-        start,
+        "SELECT count(*) FROM schedule_states WHERE target_id IN (SELECT t.id FROM learning_targets t JOIN facts f ON f.id=t.fact_id WHERE f.profile_id=?) AND introduced_at >= ? AND introduced_at < ?",
+        profile_id, start,
         end
     )
     .fetch_one(connection)
     .await? as i64)
+}
+
+pub async fn settings(pool: &SqlitePool) -> anyhow::Result<SchedulerSettings> {
+    settings_for(pool, crate::profiles::sole(pool).await?.id).await
+}
+
+pub async fn update_settings(
+    pool: &SqlitePool,
+    update: SettingsUpdate,
+) -> anyhow::Result<SchedulerSettings> {
+    update_settings_for(pool, crate::profiles::sole(pool).await?.id, update).await
+}
+
+pub async fn target(pool: &SqlitePool, fact_id: i64) -> anyhow::Result<Option<Schedule>> {
+    target_for(pool, crate::profiles::sole(pool).await?.id, fact_id).await
+}
+
+pub async fn approve_practice(pool: &SqlitePool, practice_id: i64) -> anyhow::Result<()> {
+    approve_practice_for(pool, crate::profiles::sole(pool).await?.id, practice_id).await
+}
+
+pub async fn export_events(
+    pool: &SqlitePool,
+    after: i64,
+    limit: i64,
+) -> anyhow::Result<StudyEventPage> {
+    export_events_for(pool, crate::profiles::sole(pool).await?.id, after, limit).await
 }

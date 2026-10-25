@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT count(*) AS \"count!: i64\" FROM facts\n         WHERE profile_id = ? AND EXISTS (\n           SELECT 1 FROM json_each(json_array(prompt, answer, context, tags)) AS field\n           WHERE lower(replace(replace(replace(replace(replace(\n             field.value, 'Ā', 'ā'), 'Ē', 'ē'), 'Ī', 'ī'), 'Ō', 'ō'), 'Ū', 'ū'))\n             LIKE ? ESCAPE '#'\n         )",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9826fb3e6837daabd50b4afe0a0e736b1cee48bab4a116634f3791c570f849b5"
+}

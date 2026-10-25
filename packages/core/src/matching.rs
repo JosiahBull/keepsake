@@ -9,7 +9,11 @@ use crate::{
     paging::{FactSample, FactSummary, SampleQuery},
 };
 
-pub(crate) async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Result<FactSample> {
+pub(crate) async fn sample(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &SampleQuery,
+) -> anyhow::Result<FactSample> {
     query.validate()?;
 
     // Count distinct, unambiguous pairs inside each bank before choosing a seed.
@@ -18,7 +22,7 @@ pub(crate) async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Re
     let rows = sqlx::query!(
         "WITH normalized AS (
            SELECT id, prompt COLLATE NOCASE AS prompt_key, answer COLLATE NOCASE AS answer_key
-           FROM facts
+           FROM facts WHERE profile_id = ?
          ), tagged AS (
            SELECT DISTINCT n.id, n.prompt_key, n.answer_key,
              tag.value COLLATE NOCASE AS bank
@@ -54,7 +58,8 @@ pub(crate) async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Re
            r.shared_tags AS \"shared_tags!: i64\"
          FROM ranked r JOIN facts f ON f.id = r.id
          ORDER BY (f.id = (SELECT id FROM seed)) DESC, r.shared_tags DESC, random()
-         LIMIT 100"
+         LIMIT 100",
+        profile_id
     )
     .fetch_all(pool)
     .await?;
@@ -80,7 +85,12 @@ pub(crate) async fn sample(pool: &SqlitePool, query: &SampleQuery) -> anyhow::Re
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    Ok(select_pairs(candidates, query.limit as usize))
+    let mut sample = select_pairs(candidates, query.limit as usize);
+    let mut connection = pool.acquire().await?;
+    for fact in &mut sample.items {
+        crate::paging::enrich_summary(&mut connection, fact).await?;
+    }
+    Ok(sample)
 }
 
 fn select_pairs(mut candidates: Vec<Candidate>, limit: usize) -> FactSample {
@@ -164,6 +174,7 @@ mod tests {
         .map(|(id, prompt)| Candidate {
             fact: FactSummary {
                 id,
+                shared_by: None,
                 prompt: prompt.into(),
                 answer: format!("Answer {id}"),
                 context: String::new(),

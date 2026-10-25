@@ -234,7 +234,7 @@ async fn unsupported_feedback_links_cannot_hide_study_time_or_change_history() {
         call(&app, "POST", "/api/study/events", forged.clone())
             .await
             .0,
-        StatusCode::CONFLICT
+        StatusCode::NOT_FOUND
     );
     let (_, _, untouched) = call(&app, "GET", "/api/study/queue", Value::Null).await;
     assert_eq!(untouched["spent_seconds"], 0);

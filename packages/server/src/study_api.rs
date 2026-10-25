@@ -11,6 +11,7 @@ use serde::Deserialize;
 use sqlx::SqlitePool;
 
 use crate::facts_api::{ApiError, ErrorBody};
+use crate::profile_context::{Actor, ItemPath};
 
 #[utoipa::path(get, path = "/api/study/queue", params(
     ("limit" = Option<i64>, Query, description = "Maximum questions, from 1 to 20 (default 20)")
@@ -20,10 +21,11 @@ use crate::facts_api::{ApiError, ErrorBody};
 ))]
 pub async fn queue(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Query(query): Query<QueueQuery>,
 ) -> Result<Json<StudyQueue>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
-    scheduling::queue(&pool, &query)
+    scheduling::queue_for(&pool, profile_id, &query)
         .await
         .map(Json)
         .map_err(ApiError::study)
@@ -36,9 +38,10 @@ pub async fn queue(
 ))]
 pub async fn submit(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Json(submission): Json<StudySubmission>,
 ) -> Result<(StatusCode, Json<StudyResult>), ApiError> {
-    let saved = scheduling::submit(&pool, submission)
+    let saved = scheduling::submit_for(&pool, profile_id, submission)
         .await
         .map_err(ApiError::study)?;
     Ok((StatusCode::CREATED, Json(saved)))
@@ -51,9 +54,10 @@ pub async fn submit(
 ))]
 pub async fn expose(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Json(submission): Json<ExposureSubmission>,
 ) -> Result<Json<ExposureResult>, ApiError> {
-    scheduling::expose(&pool, submission)
+    scheduling::expose_for(&pool, profile_id, submission)
         .await
         .map(Json)
         .map_err(ApiError::study)
@@ -63,8 +67,11 @@ pub async fn expose(
     (status = 200, body = SchedulerSettings), (status = 500, body = ErrorBody),
     (status = 503, body = ErrorBody)
 ))]
-pub async fn settings(State(pool): State<SqlitePool>) -> Result<Json<SchedulerSettings>, ApiError> {
-    scheduling::settings(&pool)
+pub async fn settings(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+) -> Result<Json<SchedulerSettings>, ApiError> {
+    scheduling::settings_for(&pool, profile_id)
         .await
         .map(Json)
         .map_err(ApiError::study)
@@ -77,9 +84,10 @@ pub async fn settings(State(pool): State<SqlitePool>) -> Result<Json<SchedulerSe
 ))]
 pub async fn update_settings(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Json(update): Json<SettingsUpdate>,
 ) -> Result<Json<SchedulerSettings>, ApiError> {
-    scheduling::update_settings(&pool, update)
+    scheduling::update_settings_for(&pool, profile_id, update)
         .await
         .map(Json)
         .map_err(ApiError::study)
@@ -94,9 +102,10 @@ pub async fn update_settings(
 ))]
 pub async fn approve(
     State(pool): State<SqlitePool>,
-    Path(id): Path<i64>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
 ) -> Result<StatusCode, ApiError> {
-    scheduling::approve_practice(&pool, id)
+    scheduling::approve_practice_for(&pool, profile_id, id)
         .await
         .map_err(ApiError::study)?;
     Ok(StatusCode::NO_CONTENT)
@@ -108,9 +117,10 @@ pub async fn approve(
 ))]
 pub async fn target(
     State(pool): State<SqlitePool>,
-    Path(id): Path<i64>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
 ) -> Result<Json<Schedule>, ApiError> {
-    scheduling::target(&pool, id)
+    scheduling::target_for(&pool, profile_id, id)
         .await
         .map_err(ApiError::study)?
         .map(Json)
@@ -146,9 +156,10 @@ impl Default for EventQuery {
 ))]
 pub async fn events(
     State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
     Query(query): Query<EventQuery>,
 ) -> Result<Json<StudyEventPage>, ApiError> {
-    scheduling::export_events(&pool, query.after, query.limit)
+    scheduling::export_events_for(&pool, profile_id, query.after, query.limit)
         .await
         .map(Json)
         .map_err(ApiError::study)

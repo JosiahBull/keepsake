@@ -110,3 +110,15 @@ history exists. Richer revision editing, suspension, undo, repair flags, separat
 targets and delayed audits also remain future work. If canonical content changes outside
 the application, scheduling rejects the mismatch instead of treating old performance as
 evidence about the replacement.
+
+## Profiles and shared facts
+
+All queue selection, intake counts, study time, settings, exposure cooldowns, reviews,
+and event exports belong to the selected profile. CLI study commands accept the global
+`--profile ID_OR_HANDLE` flag or `KEEPSAKE_PROFILE`. Another profile’s fact, practice,
+target, feedback ID, or submission UUID cannot replay or change your schedule.
+
+Sharing offers a frozen snapshot. Accepting creates an owned copy with a new recall
+target and no inherited reviews, memory state, or generated-prompt approvals. Each
+copy then follows its owner’s settings independently. Existing schedules are preserved
+during the profile migration; it does not recalculate FSRS state.

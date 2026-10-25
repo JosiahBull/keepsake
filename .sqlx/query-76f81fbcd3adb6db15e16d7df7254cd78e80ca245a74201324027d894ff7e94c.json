@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO reviews (profile_id, fact_id, practice_id, method, outcome, response_ms)\n                 VALUES (?, ?, ?, ?, ?, ?)\n                 RETURNING id AS \"id!\", reviewed_at",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "reviewed_at",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reviews",
+            "name": "reviewed_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "76f81fbcd3adb6db15e16d7df7254cd78e80ca245a74201324027d894ff7e94c"
+}
