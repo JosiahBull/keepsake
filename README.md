@@ -42,14 +42,14 @@ cargo install --git https://github.com/JosiahBull/keepsake --tag v0.3.0 keepsake
 From this repository:
 
 ```sh
-pnpm keepsake add \
+pnpm keepsake --profile default add \
   --prompt 'What distinguishes spaced practice from massed practice?' \
   --answer 'Spaced practice distributes learning across separate occasions; massed practice groups it together.' \
   --context 'Choose meaningful gaps based on the material and retention goal.' \
   --source 'docs/research/learning-and-retention-2026-10-24.md' \
   --tag learning
-pnpm keepsake list
-pnpm keepsake show 1
+pnpm keepsake --profile default list
+pnpm keepsake --profile default show FACT_ID
 ```
 
 Capture works without a running server. Every fact gets a flashcard, retains its source
@@ -60,7 +60,7 @@ Install the standalone command to use it from any directory:
 
 ```sh
 cargo install --path packages/cli --bin keepsake --locked
-keepsake add --prompt 'Your question' --answer 'Your answer'
+keepsake --profile default add --prompt 'Your question' --answer 'Your answer'
 ```
 
 The CLI is the `keepsake-cli` workspace package and builds independently with
@@ -78,16 +78,18 @@ There is no remote HTTP CLI mode.
 Profile support is on `main`; version 0.3.0 predates it. Build the current source to use it.
 
 Each profile has a separate fact library, recall history, timezone, and study budget.
-Choose a name on first use, then create your partner’s empty profile. The header
-switcher changes the active profile; each browser tab keeps its own selection.
+Josiah and Ansam are created automatically. On a fresh database, Josiah starts with
+40 Rust/Linux facts and Ansam with 60 household te reo Māori facts. Ansam’s vocabulary
+also appears as 60 pending offers in Josiah’s inbox; accepting creates independent copies.
+The header switcher changes the active profile; each browser tab keeps its own selection.
 Profiles use no passwords: anyone who can access the app can switch between them.
 
 ```sh
 keepsake profiles list
-keepsake profiles rename default 'Josiah'
-keepsake profiles create 'Partner' --handle partner
-keepsake --profile default add --prompt 'What does wai mean?' --answer 'Water'
-keepsake --profile partner due
+keepsake --profile ansam list
+keepsake profiles create 'Guest' --handle guest
+keepsake --profile ansam add --prompt 'What does wai mean?' --answer 'Water'
+keepsake --profile ansam due
 ```
 
 Use `--profile ID_OR_HANDLE` or `KEEPSAKE_PROFILE` for all library and study commands.
@@ -98,13 +100,13 @@ Keep that same profile when importing reviewed JSON or generating practice.
 Sharing sends an offer; it adds nothing to the recipient’s library until accepted:
 
 ```sh
-keepsake --profile default share 1 2 --to partner
-keepsake --profile default shares list --sent
-keepsake --profile partner shares list
-keepsake --profile partner shares accept SHARE_ID
-keepsake --profile partner shares accept-batch SHARE_ID OTHER_SHARE_ID
-keepsake --profile partner shares decline SHARE_ID
-keepsake --profile default shares withdraw SHARE_ID
+keepsake --profile ansam share FACT_ID OTHER_FACT_ID --to default
+keepsake --profile ansam shares list --sent
+keepsake --profile default shares list
+keepsake --profile default shares accept SHARE_ID
+keepsake --profile default shares accept-batch SHARE_ID OTHER_SHARE_ID
+keepsake --profile default shares decline SHARE_ID
+keepsake --profile ansam shares withdraw SHARE_ID
 ```
 
 Accepted copies retain source, context, tags, and practice content, with fresh recall
@@ -139,7 +141,7 @@ inside the container with a writable backup directory mounted alongside `/data`.
 ## Add from a URL
 
 ```sh
-keepsake add --url 'https://example.com/article' \
+keepsake --profile default add --url 'https://example.com/article' \
   --prompt 'Remember the main ideas, definitions, and important exceptions' \
   --tag reading
 ```
@@ -151,9 +153,9 @@ what to remember; no `--answer` is needed. `--limit 5` sets the maximum number o
 To inspect before saving:
 
 ```sh
-keepsake add --url 'https://example.com/article' \
+keepsake --profile default add --url 'https://example.com/article' \
   --prompt 'Focus on the key mechanisms' --agent codex --dry-run > facts.json
-keepsake add --file facts.json
+keepsake --profile default add --file facts.json
 ```
 
 Keepsake fetches readable page text and sends it with your prompt to the selected agent.
@@ -171,15 +173,15 @@ Both integrations use the installed CLI's existing login. Claude uses the `haiku
 Codex uses `gpt-6-luna`. Manual capture calls a model only when `--agent` is supplied.
 
 ```sh
-keepsake add --prompt 'Your question' --answer 'Your answer' \
+keepsake --profile default add --prompt 'Your question' --answer 'Your answer' \
   --context 'The source material and qualifications' --source 'A citation' \
   --agent claude --dry-run > draft.json
 # Inspect and correct draft.json against your source, then save that exact content:
-keepsake add --file draft.json
+keepsake --profile default add --file draft.json
 
 # Draft variants for an existing fact with Codex Luna:
-keepsake generate 1 --agent codex --dry-run > practice.json
-keepsake generate 1 --file practice.json
+keepsake --profile default generate FACT_ID --agent codex --dry-run > practice.json
+keepsake --profile default generate FACT_ID --file practice.json
 ```
 
 Without `--dry-run`, `add --agent ...` saves the fact and generated variants together,
@@ -223,12 +225,12 @@ exposure and temporarily defer assessment of that fact for ten minutes, without 
 its model due date. Review history retains each activity's method and conditions.
 
 ```sh
-keepsake due
-keepsake --json due --limit 5
-keepsake study settings --timezone Europe/London --new-limit 5 --daily-budget-seconds 900
-keepsake study approve PRACTICE_ID
-keepsake study submit --file attempt.json
-keepsake study events --after 0 --limit 100
+keepsake --profile default due
+keepsake --profile default --json due --limit 5
+keepsake --profile default study settings --timezone Europe/London --new-limit 5 --daily-budget-seconds 900
+keepsake --profile default study approve PRACTICE_ID
+keepsake --profile default study submit --file attempt.json
+keepsake --profile default study events --after 0 --limit 100
 ```
 
 Only the canonical flashcard starts as scheduled evidence. After checking an equivalent
@@ -240,7 +242,7 @@ submission JSON, including its UUID, when retrying `study submit`.
 the [saved research](docs/research/learning-and-retention-2026-10-24.md). The research supports
 retrieval, feedback, and spacing; the particular mix of formats is a product proposal.
 
-Library reads use bounded pages. `keepsake list --search 'sqlite' --limit 25` searches
+Library reads use bounded pages. `keepsake --profile default list --search 'sqlite' --limit 25` searches
 questions, answers, context, and tags. Search treats `%` and `_` literally and matches
 ASCII and Māori macron vowels regardless of case. Other non-ASCII letters
 are case-sensitive. JSON output is `{items, next_cursor, total}`;

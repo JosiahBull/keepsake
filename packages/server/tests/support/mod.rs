@@ -8,6 +8,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[path = "../../../core/tests/support/mod.rs"]
+mod test_db;
+
 pub struct Server {
     child: Child,
     output: Arc<Mutex<String>>,
@@ -19,6 +22,9 @@ pub struct Server {
 impl Server {
     pub fn spawn(settings: &[(&str, &str)]) -> Self {
         let directory = tempfile::tempdir().unwrap();
+        if !settings.iter().any(|(key, _)| *key == "DATABASE_URL") {
+            test_db::prepare(&directory.path().join("library.db"));
+        }
         let web = directory.path().join("web");
         std::fs::create_dir(&web).unwrap();
         std::fs::write(web.join("index.html"), "<h1>Keepsake</h1>").unwrap();

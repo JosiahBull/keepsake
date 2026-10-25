@@ -1,3 +1,6 @@
+#[path = "../../core/tests/support/mod.rs"]
+mod support;
+
 use serde_json::{Value, json};
 use std::{
     io::Write,
@@ -15,6 +18,8 @@ fn command(directory: &Path) -> Command {
             "--database",
             &format!("sqlite:{}", directory.join("library.db").display()),
             "--json",
+            "--profile",
+            "default",
         ]);
     command
 }
@@ -33,6 +38,7 @@ fn output_json(output: Output) -> Value {
 }
 
 fn add_fact(directory: &Path) -> Value {
+    support::prepare(&directory.join("library.db"));
     output_json(cli(
         directory,
         &[
@@ -187,6 +193,7 @@ fn settings_updates_preserve_model_parameters_and_pause_new_intake() {
 #[test]
 fn approval_accepts_source_checked_recall_but_not_recognition() {
     let directory = tempfile::tempdir().unwrap();
+    support::prepare(&directory.path().join("library.db"));
     let file = directory.path().join("fact.json");
     let request = json!({
         "prompt": "Synthetic approval question?",

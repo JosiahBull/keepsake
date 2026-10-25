@@ -10,20 +10,31 @@ restrict access to other household members.
 
 ![Question-only incoming shares with explicit acceptance](screenshots/shared-inbox.png)
 
-## Upgrade an existing library
+## Default libraries and upgrades
+
+A fresh database creates Josiah (handle `default`) with 40 Rust/Linux facts and
+Ansam (handle `ansam`) with 60 household te reo Māori facts. Ansam’s vocabulary is
+offered to Josiah as 60 pending shares. Accepting adds independent copies to
+Josiah’s library; the offers do not add review obligations before acceptance.
 
 Before upgrading, create a whole-household backup with `keepsake backup PATH`.
-Startup migrations assign existing facts, practice, schedules, settings, reviews,
-and evidence to the initial profile (`default`). IDs and existing progress remain
-intact. Name this profile in the browser or use:
+The untouched placeholder is named Josiah; existing named members are reused.
+Original te reo facts in Josiah’s library move to Ansam with their IDs, schedules,
+reviews, and exposure history intact. Accepted copies stay with their recipients.
+Other profiles and existing study settings are preserved.
+
+Missing default facts and pending offers are added once. Existing wording and
+practice variants are retained; reopening does not duplicate facts or offers.
+
+Each newly created additional profile starts empty with default study settings:
 
 ```sh
-keepsake profiles rename default 'Josiah'
-keepsake profiles create 'Partner' --handle partner
+keepsake profiles list
+keepsake profiles create 'Guest' --handle guest
 ```
 
-The new profile starts empty with default study settings. Handles and numeric IDs
-stay stable when display names change. Profile deletion is not supported.
+Handles and numeric IDs stay stable when display names change. Profile deletion
+is not supported.
 
 ## Select a library
 
@@ -34,9 +45,10 @@ failed retries remain tied to their original profile.
 
 The Rust CLI accepts `--profile ID_OR_HANDLE` globally. `KEEPSAKE_PROFILE` supplies
 the default; an explicit flag takes precedence. Run `keepsake profiles list` to see
-IDs and handles. A sole profile can be selected automatically. If several exist,
-an unscoped content or study command fails with a profile-selection error. This
-happens before URL fetching or external agent work. Binding the owner before such
+IDs and handles. A sole profile can be selected automatically for compatibility.
+The default household has two profiles, so an unscoped content or study command
+fails with a profile-selection error. Capture requires a selection before the
+first database is created, URL fetching, or external agent work. Binding the owner before such
 work also keeps capture in the intended library if another profile is later created.
 
 ## Share facts
@@ -55,12 +67,12 @@ unchanged. There is no live synchronization or automatic merging of duplicate fa
 CLI equivalents:
 
 ```sh
-keepsake --profile default share 12 13 --to partner --submission-id UUID
-keepsake --profile partner shares list
-keepsake --profile partner shares accept-batch SHARE_ID OTHER_SHARE_ID
-keepsake --profile partner shares decline SHARE_ID
-keepsake --profile default shares list --sent
-keepsake --profile default shares withdraw SHARE_ID
+keepsake --profile ansam share 12 13 --to default --submission-id UUID
+keepsake --profile default shares list
+keepsake --profile default shares accept-batch SHARE_ID OTHER_SHARE_ID
+keepsake --profile default shares decline SHARE_ID
+keepsake --profile ansam shares list --sent
+keepsake --profile ansam shares withdraw SHARE_ID
 ```
 
 Keep the same UUID and fact IDs to retry an offer. Each accepted share is idempotent,

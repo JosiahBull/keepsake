@@ -95,7 +95,7 @@ exact elapsed time, model interval, policy override and before/after state. They
 the canonical request and recorded result. Export uses bounded cursors:
 
 ```sh
-keepsake study events --after 0 --limit 100
+keepsake --profile default study events --after 0 --limit 100
 ```
 
 Continue with `next_cursor` until it is null. A single event's `request_json` can be

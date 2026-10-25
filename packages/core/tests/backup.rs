@@ -1,5 +1,8 @@
+mod support;
+use support as db;
+
 use keepsake_core::{
-    backup, db,
+    backup,
     facts::{self, NewFact, NewReview, ReviewMethod, ReviewOutcome},
 };
 

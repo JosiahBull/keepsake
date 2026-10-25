@@ -1,3 +1,6 @@
+#[path = "../../core/tests/support/mod.rs"]
+mod support;
+
 use serde_json::{Value, json};
 use std::{
     path::Path,
@@ -28,6 +31,9 @@ fn value(output: Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 fn household(database: &Path) {
+    if !database.exists() {
+        support::prepare(database);
+    }
     value(cli(database, &["profiles", "rename", "default", "Josiah"]));
     value(cli(
         database,
@@ -53,6 +59,7 @@ fn add(database: &Path, actor: &str, question: &str) -> Value {
 fn profiles_scope_capture_search_settings_and_environment_selection() {
     let temp = tempfile::tempdir().unwrap();
     let db = temp.path().join("profiles.db");
+    support::prepare(&db);
     let original = value(cli(
         &db,
         &["add", "--prompt", "Original?", "--answer", "Preserved"],
@@ -338,6 +345,7 @@ fn capture_keeps_the_resolved_owner_when_a_profile_is_created_during_generation(
     use std::os::unix::fs::PermissionsExt;
     let temp = tempfile::tempdir().unwrap();
     let db = temp.path().join("profiles.db");
+    support::prepare(&db);
     value(cli(&db, &["profiles", "list"]));
     let executable = temp.path().join("agent");
     std::fs::write(&executable, format!(
@@ -368,4 +376,83 @@ fn capture_keeps_the_resolved_owner_when_a_profile_is_created_during_generation(
     );
     assert_eq!(value(cli(&db, &["--profile", "late", "list"]))["total"], 0);
     assert!(!cli(&db, &["list"]).status.success());
+}
+
+#[test]
+fn fresh_household_requires_an_owner_and_seeds_separate_libraries_with_pending_offers() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("fresh.db");
+    let rejected = cli(
+        &db,
+        &[
+            "add",
+            "--prompt",
+            "Preview?",
+            "--answer",
+            "Yes",
+            "--dry-run",
+        ],
+    );
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("--profile"));
+    assert!(!db.exists());
+    let profiles = value(cli(&db, &["profiles", "list"]));
+    assert_eq!(profiles.as_array().unwrap().len(), 2);
+    assert_eq!(profiles[0]["name"], "Josiah");
+    assert_eq!(profiles[0]["handle"], "default");
+    assert_eq!(profiles[1]["name"], "Ansam");
+    assert_eq!(profiles[1]["handle"], "ansam");
+    assert_eq!(
+        value(cli(&db, &["--profile", "default", "list"]))["total"],
+        40
+    );
+    assert_eq!(
+        value(cli(&db, &["--profile", "ansam", "list"]))["total"],
+        60
+    );
+    let inbox = value(cli(
+        &db,
+        &[
+            "--profile",
+            "default",
+            "shares",
+            "list",
+            "--status",
+            "pending",
+        ],
+    ));
+    assert_eq!(inbox["total"], 60);
+    assert!(
+        inbox["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|offer| offer["sender_id"] == 2
+                && offer["recipient_id"] == 1
+                && offer.get("answer").is_none())
+    );
+}
+
+#[test]
+fn first_capture_can_explicitly_choose_ansam_before_database_creation() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("fresh.db");
+    let saved = add(&db, "ansam", "Fresh Ansam capture?");
+    assert_eq!(saved["prompt"], "Fresh Ansam capture?");
+    assert_eq!(
+        value(cli(&db, &["--profile", "default", "list"]))["total"],
+        40
+    );
+    assert_eq!(
+        value(cli(&db, &["--profile", "ansam", "list"]))["total"],
+        61
+    );
+    assert!(
+        !cli(
+            &db,
+            &["--profile", "default", "show", &saved["id"].to_string()]
+        )
+        .status
+        .success()
+    );
 }

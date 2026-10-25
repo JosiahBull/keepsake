@@ -1,6 +1,8 @@
-use keepsake_core::{
-    db,
-    facts::{self, NewFact, NewPractice, NewReview, PracticeKind, ReviewMethod, ReviewOutcome},
+mod support;
+use support as db;
+
+use keepsake_core::facts::{
+    self, NewFact, NewPractice, NewReview, PracticeKind, ReviewMethod, ReviewOutcome,
 };
 
 fn fact() -> NewFact {

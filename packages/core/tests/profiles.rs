@@ -1,5 +1,8 @@
+mod support;
+use support as db;
+
 use keepsake_core::{
-    backup, db,
+    backup,
     facts::{self, NewFact, NewPractice, PracticeKind, ReviewMethod, ReviewOutcome},
     paging,
     profiles::{self, NewProfile, UpdateProfile},
@@ -809,8 +812,19 @@ async fn migration_preserves_all_v030_content_and_evidence_bytes() {
     let pool = db::connect(&format!("sqlite:{}", path.display()))
         .await
         .unwrap();
-    assert_eq!(before, rows(&pool, &queries).await);
-    assert_eq!(profiles::sole(&pool).await.unwrap().id, 1);
+    let after = rows(&pool, &queries).await;
+    for (original_rows, migrated_rows) in before.iter().zip(&after) {
+        for original in original_rows {
+            assert!(
+                migrated_rows.contains(original),
+                "historical row changed: {original}"
+            );
+        }
+    }
+    assert_eq!(
+        profiles::get(&pool, 1).await.unwrap().unwrap().handle,
+        "default"
+    );
     let owner: i64 = sqlx::query_scalar("SELECT profile_id FROM facts WHERE id=41")
         .fetch_one(&pool)
         .await

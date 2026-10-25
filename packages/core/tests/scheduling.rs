@@ -1,6 +1,8 @@
+mod support;
+use support as db;
+
 use chrono::DateTime;
 use keepsake_core::{
-    db,
     facts::{self, NewFact, NewPractice, NewReview, PracticeKind, ReviewMethod, ReviewOutcome},
     scheduling::{
         self, EventKind, ExposureSubmission, QueueQuery, SettingsUpdate, StudyContext, StudyError,
@@ -142,12 +144,31 @@ async fn upgrading_preserves_legacy_reviews_without_inventing_recall_evidence() 
         sqlx::query_as("SELECT id,fact_id,practice_id,method,outcome,response_ms,reviewed_at FROM reviews ORDER BY id")
             .fetch_all(&pool).await.unwrap();
     assert_eq!(restored_reviews, original_reviews);
-    assert_eq!(counts(&pool).await, (2, 3, 2, 2));
-    let saved = facts::get(&pool, 1).await.unwrap().unwrap();
+    let historical: (i64, i64, i64, i64) = sqlx::query_as(
+        "SELECT
+           (SELECT count(*) FROM facts WHERE id IN (1, 2)),
+           (SELECT count(*) FROM practices WHERE fact_id IN (1, 2)),
+           (SELECT count(*) FROM reviews WHERE fact_id IN (1, 2)),
+           (SELECT count(*) FROM learning_targets WHERE fact_id IN (1, 2))",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(historical, (2, 3, 2, 2));
+    // Household migration assigns tagged te reo to Ansam without rewriting
+    // the fact, its practices, or the historical learning evidence.
+    let first_owner = keepsake_core::profiles::resolve(&pool, "ansam")
+        .await
+        .unwrap()
+        .id;
+    let saved = facts::get_for(&pool, first_owner, 1)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(saved.context, "A legacy note");
     assert_eq!(saved.source, "A phrasebook");
     assert_eq!(saved.tags, ["te reo"]);
-    let generated = facts::get(&pool, 2).await.unwrap().unwrap();
+    let generated = facts::get_for(&pool, 1, 2).await.unwrap().unwrap();
     let untouched_variant = generated
         .practices
         .iter()
@@ -155,7 +176,7 @@ async fn upgrading_preserves_legacy_reviews_without_inventing_recall_evidence() 
         .unwrap();
     assert_eq!(untouched_variant.prompt, "An unchecked generated question?");
     assert_eq!(untouched_variant.answer, "An incorrect generated answer");
-    let queue = scheduling::queue_at(&pool, &QueueQuery::default(), now())
+    let queue = scheduling::queue_at_for(&pool, 1, &QueueQuery::default(), now())
         .await
         .unwrap();
     let migrated_question = queue
@@ -165,14 +186,17 @@ async fn upgrading_preserves_legacy_reviews_without_inventing_recall_evidence() 
         .unwrap();
     assert_eq!(migrated_question.practice.prompt, "What does kai mean?");
     assert_eq!(migrated_question.practice.answer, "Food");
-    let schedule = scheduling::target(&pool, 1).await.unwrap().unwrap();
+    let schedule = scheduling::target_for(&pool, first_owner, 1)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(schedule.phase, "new");
     assert_eq!(schedule.stability, None);
     assert_eq!(schedule.difficulty, None);
     assert_eq!(schedule.last_review_at, None);
     assert_eq!(schedule.introduced_at, None);
     assert!(
-        scheduling::export_events(&pool, 0, 100)
+        scheduling::export_events_for(&pool, first_owner, 0, 100)
             .await
             .unwrap()
             .items

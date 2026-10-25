@@ -1,5 +1,7 @@
+mod support;
+use support as db;
+
 use keepsake_core::{
-    db,
     facts::{self, NewFact, NewReview, ReviewMethod, ReviewOutcome},
     paging::{self, FactQuery, PracticeQuery, ReviewQuery, SampleQuery},
 };

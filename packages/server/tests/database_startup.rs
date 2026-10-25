@@ -22,7 +22,7 @@ fn starts_with_missing_database_and_nested_parent_directory() {
         server
             .request(
                 "POST",
-                "/api/facts",
+                "/api/profiles/1/facts",
                 r#"{"prompt":"Wai?","answer":"Water"}"#
             )
             .starts_with("HTTP/1.1 201")
