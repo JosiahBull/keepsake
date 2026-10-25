@@ -68,6 +68,11 @@ test.describe("profile screenshots", () => {
     const fact = await app.createFact({ prompt: "What does wai mean?", answer: "Water", tags: ["te reo", "household"] });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Who’s practising?", exact: true })).toBeVisible();
+    // First-entry screenshots must include the decoded raster logo, especially in WebKit.
+    await page.getByRole("img", { name: "Keepsake", exact: true }).evaluate(async (logo: HTMLImageElement) => {
+      await logo.decode();
+      if (!logo.complete || logo.naturalWidth === 0) throw new Error("The Keepsake logo did not load.");
+    });
     await page.screenshot({ path: testInfo.outputPath("profile-chooser-review.png"), fullPage: true });
     await expect.soft(page).toHaveScreenshot("profile-chooser.png", { fullPage: true });
     await page.getByRole("button", { name: "Josiah", exact: true }).click();
