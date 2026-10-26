@@ -19,7 +19,8 @@ The suite runs desktop Chromium, mobile Chromium and mobile WebKit. It covers
 the web app manifest, Home Screen shortcuts, shared pages, reminder settings,
 fact forms, CLI/browser persistence across restarts, literal and Māori macron
 search, pagination and keyboard focus, every practice format and rating, mixed
-sessions, matching, loading states, retries and stale search responses.
+sessions, matching, loading states, retries, background saves and their order, preloaded
+rounds and stale search responses.
 Success paths use the real API. Recovery tests intercept only the deliberate
 failure or delayed response. Reminder settings tests replace only the browser's push
 subscription, which needs a vendor push service; every request still reaches the real

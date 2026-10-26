@@ -210,7 +210,10 @@ automatically. See [scheduling](docs/scheduling.md) for policy and history detai
 Type an answer or confirm a spoken attempt before revealing feedback. Viewing an answer
 without attempting it records exposure, with no successful recall rating. Hard means
 correct recall with difficulty; an incorrect answer means Again. Feedback is saved before
-the answer is shown, so reloading before grading preserves that exposure.
+the answer is shown, so reloading before grading preserves that exposure. Ratings save in
+the background, in the order you made them, so the next question appears straight away.
+A failed save holds back later saves until you retry it, and Keepsake warns before you
+leave with ratings unsaved.
 
 Extra practice offers flashcards, multiple choice, fill-the-gap, explanation, and application
 without advancing the recall schedule. Matching draws three or four related facts from one topic tag,
