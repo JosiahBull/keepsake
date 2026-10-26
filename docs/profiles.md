@@ -43,6 +43,10 @@ change another. It clears loaded facts, practice, matching, and answer state whe
 switching. Unsaved answers need confirmation before being discarded. Writes and
 failed retries remain tied to their original profile.
 
+Reminders also belong to a profile. Turning them on adds the current browser for the
+selected profile only. Profiles sharing a phone each receive their own reminder, and
+turning one off leaves the others on.
+
 The Rust CLI accepts `--profile ID_OR_HANDLE` globally. `KEEPSAKE_PROFILE` supplies
 the default; an explicit flag takes precedence. Run `keepsake profiles list` to see
 IDs and handles. A sole profile can be selected automatically for compatibility.

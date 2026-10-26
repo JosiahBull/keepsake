@@ -102,6 +102,34 @@ Continue with `next_cursor` until it is null. A single event's `request_json` ca
 submitted with `study submit --file`; its original UUID returns its recorded result.
 This is idempotent replay, not a command to reapply historical transitions.
 
+## Reminders
+
+A profile can receive one Web Push reminder per local day on each browser where it
+turned reminders on. The server checks each minute. It sends a reminder once the
+profile's chosen time has passed, practice is ready and the daily budget is unspent.
+Ready practice means due reviews or new targets within that day's intake allowance.
+The window closes at local midnight in the study timezone. The day is claimed before
+delivery, so a crash or push-service failure can skip a reminder but never repeat one.
+A push service's 404 or 410 removes that subscription from every profile.
+
+The [saved research](research/learning-and-retention-2026-10-24.md) does not study
+notifications. The policy follows from it only indirectly:
+
+- Spaced retrieval across separate sessions has strong support, so a reminder marks
+  each day's practice and never pursues repeated sessions within one day.
+- The research measures useful knowledge within a sustainable study budget. Reminders
+  therefore stop once the soft budget is spent and never hide or reschedule due work.
+- Its warning that app "retention" can mean engagement rather than remembered knowledge
+  is why reminders carry no streaks or escalation. Opened notifications are not
+  evidence of learning.
+- A small study supports sleep between learning and relearning without establishing
+  an ideal time of day, so the learner chooses the time.
+
+The 08:00 default, the midnight cutoff and reminding about new intake are product
+choices to evaluate, not findings. Any effect of reminders on long-term recall should
+be judged with the delayed measures the research recommends, kept separate from how
+often reminders are opened.
+
 ## Deferred work
 
 Retention and model parameters cannot yet be changed through settings. Optimisation,

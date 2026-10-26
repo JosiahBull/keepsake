@@ -7,9 +7,12 @@
     json,
     RequestError,
     errorMessage,
+    sharedDraft,
+    type FactDraft,
     type Profile,
     type Screen,
   } from "./profiles";
+  import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
 
   let profiles = $state<Profile[]>([]);
   let active = $state<Profile | null>(null);
@@ -36,6 +39,16 @@
   let notice = $state("");
   let chooser = $state(false);
   let mountId = $state(0);
+  // Where a Home Screen shortcut or share asked to go once a profile is chosen.
+  let pendingScreen = $state<Screen | null>(null);
+  let draft = $state<FactDraft | null>(null);
+  const activeId = $derived(active?.setup_complete ? active.id : null);
+
+  $effect(() => {
+    if (activeId === null) return;
+    void remindersOn(activeId).catch(() => undefined);
+    void refreshBadge(activeId);
+  });
 
   function openDialog(element: HTMLDialogElement) {
     const previous = document.activeElement;
@@ -81,7 +94,8 @@
     }
     setup = null;
     remember(profile.id);
-    navigate("library", replace);
+    navigate(pendingScreen ?? "library", replace);
+    pendingScreen = null;
   }
 
   function navigate(next: Screen, replace = false) {
@@ -110,14 +124,27 @@
       active = profile;
       setup = profile.setup_complete ? null : profile;
       screen = match[2] as Screen;
+      pendingScreen = null;
+      draft = null;
       remember(profile.id);
       chooser = false;
       return;
     }
-    if (location.pathname !== "/") {
+    if (location.pathname !== "/" && location.pathname !== "/share") {
       active = null;
       error = "This page does not exist. Choose a household profile.";
       return;
+    }
+    const params = new URLSearchParams(location.search);
+    const open = params.get("open");
+    if (location.pathname === "/share") {
+      draft = sharedDraft(params);
+      pendingScreen = "library";
+    } else if (open === "add") {
+      draft = { context: "", source: "" };
+      pendingScreen = "library";
+    } else if (open === "practice" || open === "matching") {
+      pendingScreen = open;
     }
     let remembered: string | null = null;
     try {
@@ -137,6 +164,7 @@
 
   onMount(() => {
     let disposed = false;
+    void serviceWorker();
     void json<Profile[]>("/api/profiles")
       .then((result) => {
         if (disposed) return;
@@ -182,12 +210,46 @@
         event.returnValue = "";
       }
     };
+    // A notification tapped while Keepsake is open routes here instead of reloading.
+    const notificationClick = (event: MessageEvent) => {
+      const data: unknown = event.data;
+      if (
+        typeof data !== "object" ||
+        data === null ||
+        !("type" in data) ||
+        data.type !== "keepsake:navigate" ||
+        !("path" in data) ||
+        typeof data.path !== "string" ||
+        !data.path.startsWith("/")
+      )
+        return;
+      const path = data.path;
+      if (location.pathname + location.search === path) return;
+      requestNavigation(() => {
+        history.pushState(null, "", path);
+        dirty = false;
+        shareIds = [];
+        readLocation();
+      });
+    };
+    const visibility = () => {
+      if (activeId !== null) void refreshBadge(activeId);
+    };
     window.addEventListener("popstate", pop);
     window.addEventListener("beforeunload", leave);
+    document.addEventListener("visibilitychange", visibility);
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker.addEventListener("message", notificationClick);
     return () => {
       disposed = true;
       window.removeEventListener("popstate", pop);
       window.removeEventListener("beforeunload", leave);
+      document.removeEventListener("visibilitychange", visibility);
+      if ("serviceWorker" in navigator)
+        navigator.serviceWorker.removeEventListener(
+          "message",
+          notificationClick,
+        );
     };
   });
 
@@ -429,6 +491,8 @@
         else navigate(next);
       }}
       {profileMenu}
+      {draft}
+      onDraftOpened={() => (draft = null)}
       onShare={openShare}
       bind:blocked
       bind:dirty

@@ -11,6 +11,8 @@ DELETE FROM learning_targets;
 DELETE FROM practices;
 DELETE FROM facts;
 DELETE FROM scheduler_settings;
+DELETE FROM push_devices;
+DELETE FROM reminder_settings;
 DELETE FROM profiles;
 INSERT INTO profiles(id, name, handle, setup_complete)
 VALUES (1, 'Existing profile', 'default', 0);

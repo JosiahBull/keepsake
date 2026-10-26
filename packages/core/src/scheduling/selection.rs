@@ -28,21 +28,8 @@ pub async fn queue_at_for(
     let settings = load_settings(&mut transaction, profile_id).await?;
     let (start, end) = day_bounds(now, &settings.timezone)?;
     let introduced = introduced_today(&mut transaction, profile_id, start, end).await?;
-    let spent_ms = sqlx::query_scalar!(
-        "SELECT coalesce(sum(response_ms), 0) AS \"spent!: i64\" FROM study_events
-         WHERE profile_id=? AND occurred_at >= ? AND occurred_at < ?
-           AND (kind <> 'attempt' OR json_extract(request_json, '$.feedback_event_id') IS NULL)",
-        profile_id,
-        start,
-        end
-    )
-    .fetch_one(&mut *transaction)
-    .await?;
-    let total_due = sqlx::query_scalar!(
-        "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
-         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
-           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", profile_id, now
-    ).fetch_one(&mut *transaction).await?;
+    let spent_ms = spent_ms(&mut transaction, profile_id, start, end).await?;
+    let total_due = due_count(&mut transaction, profile_id, now).await?;
     let mut ids = sqlx::query_scalar!(
         "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
          WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
@@ -152,6 +139,66 @@ pub async fn queue_at_for(
         spent_seconds,
         budget_reached: spent_seconds >= settings.daily_budget_seconds,
     })
+}
+
+pub async fn summary_for(pool: &SqlitePool, profile_id: i64) -> anyhow::Result<StudySummary> {
+    summary_at_for(pool, profile_id, now()).await
+}
+
+/// Counts the queue's ready work without loading questions or model transitions.
+pub async fn summary_at_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    now: i64,
+) -> anyhow::Result<StudySummary> {
+    invalid(now >= 0, "timestamp must be nonnegative")?;
+    let mut transaction = pool.begin().await?;
+    let settings = load_settings(&mut transaction, profile_id).await?;
+    let (start, end) = day_bounds(now, &settings.timezone)?;
+    let introduced = introduced_today(&mut transaction, profile_id, start, end).await?;
+    let spent_ms = spent_ms(&mut transaction, profile_id, start, end).await?;
+    let due = due_count(&mut transaction, profile_id, now).await?;
+    let waiting = sqlx::query_scalar!(
+        "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase='new'
+           AND coalesce(s.blocked_until, 0) <= ?", profile_id, now
+    ).fetch_one(&mut *transaction).await?;
+    transaction.commit().await?;
+    Ok(StudySummary {
+        due,
+        new_available: (settings.new_limit - introduced).max(0).min(waiting),
+        budget_reached: spent_ms / 1000 >= settings.daily_budget_seconds,
+    })
+}
+
+async fn spent_ms(
+    connection: &mut sqlx::SqliteConnection,
+    profile_id: i64,
+    start: i64,
+    end: i64,
+) -> anyhow::Result<i64> {
+    Ok(sqlx::query_scalar!(
+        "SELECT coalesce(sum(response_ms), 0) AS \"spent!: i64\" FROM study_events
+         WHERE profile_id=? AND occurred_at >= ? AND occurred_at < ?
+           AND (kind <> 'attempt' OR json_extract(request_json, '$.feedback_event_id') IS NULL)",
+        profile_id,
+        start,
+        end
+    )
+    .fetch_one(connection)
+    .await?)
+}
+
+async fn due_count(
+    connection: &mut sqlx::SqliteConnection,
+    profile_id: i64,
+    now: i64,
+) -> anyhow::Result<i64> {
+    Ok(sqlx::query_scalar!(
+        "SELECT count(*) AS \"count!: i64\" FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
+           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", profile_id, now
+    ).fetch_one(connection).await?)
 }
 
 pub(super) async fn validate_content(

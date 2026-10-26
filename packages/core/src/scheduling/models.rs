@@ -72,6 +72,15 @@ pub struct StudyQueue {
     pub budget_reached: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct StudySummary {
+    /// Learning, relearning and review targets ready now.
+    pub due: i64,
+    /// New targets waiting within today's remaining intake. The queue offers them after due work.
+    pub new_available: i64,
+    pub budget_reached: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum EventKind {

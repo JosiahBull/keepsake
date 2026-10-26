@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT profile_id FROM push_devices ORDER BY profile_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "profile_id",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "push_devices",
+            "name": "profile_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5caf5ac3f3fe4117aa46e96b0f87fdaf6fd0a8e82095b506e1ae7e4f5fce4c7b"
+}

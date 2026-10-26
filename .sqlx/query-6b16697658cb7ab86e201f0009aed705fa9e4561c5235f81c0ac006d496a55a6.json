@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT minute_of_day, last_sent_on FROM reminder_settings WHERE profile_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "minute_of_day",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reminder_settings",
+            "name": "minute_of_day"
+          }
+        }
+      },
+      {
+        "name": "last_sent_on",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "reminder_settings",
+            "name": "last_sent_on"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "6b16697658cb7ab86e201f0009aed705fa9e4561c5235f81c0ac006d496a55a6"
+}

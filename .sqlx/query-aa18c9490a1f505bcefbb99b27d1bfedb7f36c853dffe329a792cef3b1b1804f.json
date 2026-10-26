@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO push_devices(profile_id, endpoint, origin, p256dh, auth)\n                 VALUES (?, ?, ?, ?, ?) ON CONFLICT(profile_id, endpoint) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "aa18c9490a1f505bcefbb99b27d1bfedb7f36c853dffe329a792cef3b1b1804f"
+}
