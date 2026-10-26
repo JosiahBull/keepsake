@@ -7,6 +7,7 @@
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
   import { Rejected, SaveQueue } from "./saves.svelte";
+  import { play } from "./sounds";
 
   let {
     profile,
@@ -214,6 +215,11 @@
     );
   });
 
+  $effect(() => {
+    // A background save can fail after the learner has moved on, out of view.
+    if (saves.failure) play("alert");
+  });
+
   onMount(() => {
     if (initialDraft) onDraftOpened?.();
     if (initialView === "practice") void startPractice();
@@ -363,11 +369,13 @@
       source = "";
       tags = "";
       notice = "Fact saved.";
+      play("keep");
       search = "";
       clearTimeout(searchTimer);
       void loadFacts(null, []);
     } catch (caught) {
       error = `Could not save the fact. ${message(caught)}`;
+      play("alert");
     } finally {
       saving = false;
     }
@@ -393,6 +401,7 @@
       () => true,
       (caught: unknown) => {
         saveWarning = `A review was not saved. ${message(caught)}`;
+        play("alert");
         return false;
       },
     );
@@ -424,6 +433,7 @@
       return true;
     } catch (caught) {
       saveWarning = `Could not save this activity. ${message(caught)}`;
+      play("alert");
       return false;
     }
   }
@@ -588,7 +598,7 @@
         );
         if (question === shown) {
           feedback = { body, result };
-          revealed = true;
+          showAnswer();
         }
       } catch (caught) {
         if (question === shown) {
@@ -597,6 +607,7 @@
             caught instanceof Rejected && caught.status === 409
               ? "This attempt is no longer current. Refresh practice."
               : `Could not save this activity. ${message(caught)}`;
+          play("alert");
         }
       }
       return;
@@ -608,8 +619,20 @@
       (await recordExposure([current.fact.id], current.practice.kind)) &&
       question === shown
     ) {
-      revealed = true;
+      showAnswer();
     }
+  }
+
+  // Only multiple choice has an answer Keepsake can mark, so only it sounds right or wrong.
+  function showAnswer() {
+    revealed = true;
+    play(
+      mode !== "multiple_choice"
+        ? "flip"
+        : choice === current?.practice.answer
+          ? "right"
+          : "miss",
+    );
   }
 
   function feedbackSubmission(question: StudyQuestion): StudySubmission {
@@ -635,9 +658,19 @@
   function nextQuestion() {
     cursor += 1;
     resetQuestion();
-    if (practiceMode === "scheduled" && cursor >= queue.length) {
+    if (cursor < queue.length) {
+      return;
+    }
+    void completeSession(practiceRequest);
+    if (practiceMode === "scheduled") {
       void refreshStudyOverview();
     }
+  }
+
+  /** Like the summary's review count, the completion sound waits for every rating to save. */
+  async function completeSession(request: number) {
+    await saves.idle();
+    if (request === practiceRequest && sessionCount > 0) play("done");
   }
 
   async function refreshStudyOverview() {
@@ -650,6 +683,9 @@
         await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }),
       );
       if (request === practiceRequest) {
+        if (overview.budget_reached && !studyQueue?.budget_reached) {
+          play("rest");
+        }
         studyQueue = overview;
         void refreshBadge(profileId);
       }
@@ -723,6 +759,7 @@
     void saved.then((ok) => {
       if (ok && session === practiceRequest) savedCount += 1;
     });
+    play("file");
     sessionCount += 1;
     nextQuestion();
   }
@@ -792,6 +829,7 @@
     selectedPrompt = id;
     selectedAnswer = null;
     matchFeedback = "";
+    play("tick");
     if (!matchStarted[id]) {
       matchStarted = { ...matchStarted, [id]: Date.now() };
     }
@@ -807,6 +845,7 @@
       pendingMatch = id;
       matchMs = Math.max(0, Date.now() - matchStarted[id]);
       matchFeedback = "Matched. Rate your attempt.";
+      play("right");
       // Matching ignores schedules, so the next round can load during the last rating.
       if (matched.length === matchFacts.length - 1) {
         nextSample ??= prefetch(matchingSample());
@@ -817,6 +856,7 @@
         [selectedPrompt]: (matchMisses[selectedPrompt] || 0) + 1,
       };
       matchFeedback = "Not a match. Try another answer.";
+      play("miss");
     }
   }
 
@@ -837,10 +877,9 @@
     pendingMatch = null;
     selectedPrompt = null;
     selectedAnswer = null;
-    matchFeedback =
-      matched.length === matchFacts.length
-        ? "Round complete."
-        : "Choose another question.";
+    const complete = matched.length === matchFacts.length;
+    matchFeedback = complete ? "Round complete." : "Choose another question.";
+    play(complete ? "done" : "file");
   }
 
   // Shared helpers
@@ -1345,7 +1384,10 @@
                   <button
                     class="primary"
                     disabled={studyConflict}
-                    onclick={nextQuestion}>Continue</button
+                    onclick={() => {
+                      play("file");
+                      nextQuestion();
+                    }}>Continue</button
                   >
                 {:else}
                   <h3>Rate your attempt</h3>

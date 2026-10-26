@@ -215,6 +215,10 @@ the background, in the order you made them, so the next question appears straigh
 A failed save holds back later saves until you retry it, and Keepsake warns before you
 leave with ratings unsaved.
 
+Short sounds mark an answer appearing, a rating, the end of a session and a failed save.
+Every rating sounds the same; only multiple choice and matching sound right or wrong.
+Turn sounds off for a device in Profile settings. On iPhone, the silent switch mutes them.
+
 Extra practice offers flashcards, multiple choice, fill-the-gap, explanation, and application
 without advancing the recall schedule. Matching draws three or four related facts from one topic tag,
 preferring the smallest topic with enough distinct question–answer pairs and similar question

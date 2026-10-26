@@ -216,6 +216,13 @@ export const test = base.extend<{ app: TestApp; profileSetup: boolean; household
         }
       });
     }
+    // Tests record the sounds the app asks for. WebKit cannot be muted, so none plays.
+    await context.addInitScript(() => {
+      delete (window as { AudioContext?: unknown }).AudioContext;
+      const played: string[] = [];
+      Object.assign(window, { keepsakeSounds: played });
+      addEventListener("keepsake:sound", (event) => played.push((event as CustomEvent<string>).detail));
+    });
     const errors: string[] = [];
     context.on("page", (page) => page.on("pageerror", (error) => errors.push(error.message)));
     await context.route("**/*", async (route) => {

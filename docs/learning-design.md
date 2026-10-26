@@ -46,6 +46,18 @@ points, speed, or random paraphrasing improve long-term retention. An enjoyable
 activity can support engagement while leaving delayed recall unchanged. Measure
 engagement, unaided recall, and application separately.
 
+## Keep sounds neutral about ratings
+
+Every rating makes the same sound. A rewarding sound for Good or Easy would reward the
+button rather than the recall, and the scheduler depends on honest ratings. Only multiple choice and matching sound right or wrong, because only
+they have an answer Keepsake can mark; the learner judges recall formats. There are no
+timers, streaks or combos: response time feeds the study budget, and the research
+favours spacing and a sustainable budget over longer unbroken sessions.
+
+The saved research does not study sound. These rules are inferences from its advice to
+grade honestly, its evidence for corrective feedback, and its separation of engagement
+from remembered knowledge.
+
 ## Keep AI output inspectable
 
 The CLI can ask Claude Haiku or Codex Luna to draft alternative questions and

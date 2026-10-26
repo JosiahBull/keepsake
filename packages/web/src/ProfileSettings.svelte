@@ -3,6 +3,7 @@
   import type { components } from "@keepsake/client";
   import { json, errorMessage, type Profile } from "./profiles";
   import Reminders from "./Reminders.svelte";
+  import { play, setSoundsOn, soundsOn } from "./sounds";
 
   let {
     profile,
@@ -31,6 +32,7 @@
   let unresolved = $state(false);
   let error = $state("");
   let notice = $state("");
+  let sounds = $state(soundsOn());
   const controller = new AbortController();
   $effect(() => {
     blocked = saving || unresolved;
@@ -182,6 +184,20 @@
     </form>
     <!-- Reminder windows follow the saved study timezone. -->
     {#key settings.timezone}<Reminders {profile} />{/key}
+    <section class="sounds" aria-labelledby="sounds-heading">
+      <h2 id="sounds-heading">Sounds</h2>
+      <label class="toggle"
+        ><input
+          type="checkbox"
+          checked={sounds}
+          onchange={(event) => {
+            sounds = event.currentTarget.checked;
+            setSoundsOn(sounds);
+            if (sounds) play("file");
+          }}
+        />Play sounds on this device</label
+      >
+    </section>
   {:else}<button class="quiet" onclick={load}>Try again</button>{/if}
 </section>
 
@@ -245,6 +261,31 @@
   .error {
     background: #f9e9e3;
     color: #833d2b;
+  }
+  .sounds {
+    display: grid;
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid #cedbd5;
+  }
+  h2 {
+    font:
+      500 1.5rem/1.3 "Iowan Old Style",
+      Palatino,
+      serif;
+    margin: 0;
+  }
+  .toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 400;
+  }
+  .toggle input {
+    width: auto;
+    margin: 0;
+    accent-color: #244c44;
   }
   @media (max-width: 580px) {
     .settings-grid {
