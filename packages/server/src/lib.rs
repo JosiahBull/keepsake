@@ -7,6 +7,8 @@ pub mod health;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;
+pub mod notifications;
+mod notifications_api;
 mod profile_context;
 mod profile_schema;
 mod profiles_api;
@@ -14,16 +16,17 @@ mod shares_api;
 mod study_api;
 
 use axum::{
-    Json, Router,
+    Extension, Json, Router,
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
     middleware::{from_fn, from_fn_with_state},
-    routing::{get, post},
+    routing::{get, post, put},
 };
+use notifications::Notifier;
 use profile_schema::ProfilePaths;
 use serde::Serialize;
 use sqlx::SqlitePool;
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 use tower_http::{
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
@@ -65,6 +68,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts_api::review,
         facts_api::reviews,
         study_api::queue,
+        study_api::summary,
         study_api::submit,
         study_api::expose,
         study_api::settings,
@@ -81,7 +85,13 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         shares_api::accept_batch,
         shares_api::accept,
         shares_api::decline,
-        shares_api::withdraw
+        shares_api::withdraw,
+        notifications_api::key,
+        notifications_api::settings,
+        notifications_api::update,
+        notifications_api::register,
+        notifications_api::remove,
+        notifications_api::test
     ),
     components(schemas(
         Health,
@@ -102,6 +112,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::paging::FactSample,
         facts_api::ErrorBody,
         keepsake_core::scheduling::StudyQueue,
+        keepsake_core::scheduling::StudySummary,
         keepsake_core::scheduling::StudyQuestion,
         keepsake_core::scheduling::RatingIntervals,
         keepsake_core::scheduling::Schedule,
@@ -121,7 +132,13 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::sharing::Share,
         keepsake_core::sharing::SharePage,
         keepsake_core::sharing::ShareRequest,
-        keepsake_core::sharing::ShareBatch
+        keepsake_core::sharing::ShareBatch,
+        notifications_api::PushKey,
+        keepsake_core::reminders::ReminderSettings,
+        keepsake_core::reminders::ReminderUpdate,
+        keepsake_core::reminders::NewDevice,
+        keepsake_core::reminders::DeviceKeys,
+        keepsake_core::reminders::DeviceEndpoint
     )),
     modifiers(&ProfilePaths)
 )]
@@ -132,14 +149,35 @@ pub fn router(pool: SqlitePool, web_dir: &Path) -> Router {
 }
 
 pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limits) -> Router {
+    let notifier = Notifier::new(pool.clone(), config::PushConfig::default())
+        .expect("default push client configuration is valid");
+    router_with(pool, web_dir, limits, Arc::new(notifier))
+}
+
+pub fn router_with(
+    pool: SqlitePool,
+    web_dir: &Path,
+    limits: limits::Limits,
+    notifier: Arc<Notifier>,
+) -> Router {
     let scoped = content_routes()
         .route("/shares", get(shares_api::list).post(shares_api::send))
         .route("/shares/accept-batch", post(shares_api::accept_batch))
         .route("/shares/{id}/accept", post(shares_api::accept))
         .route("/shares/{id}/decline", post(shares_api::decline))
-        .route("/shares/{id}/withdraw", post(shares_api::withdraw));
+        .route("/shares/{id}/withdraw", post(shares_api::withdraw))
+        .route(
+            "/reminders",
+            get(notifications_api::settings).put(notifications_api::update),
+        )
+        .route(
+            "/reminders/devices",
+            put(notifications_api::register).delete(notifications_api::remove),
+        )
+        .route("/reminders/test", post(notifications_api::test));
     let api = content_routes()
         .route("/health", get(health))
+        .route("/push/key", get(notifications_api::key))
         .route(
             "/profiles",
             get(profiles_api::list).post(profiles_api::create),
@@ -158,6 +196,7 @@ pub fn router_with_limits(pool: SqlitePool, web_dir: &Path, limits: limits::Limi
             ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
         )
         .with_state(pool)
+        .layer(Extension(notifier))
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))
         .layer(CompressionLayer::new())
         .layer(from_fn_with_state(
@@ -177,6 +216,7 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/facts/{id}/reviews", get(facts_api::reviews))
         .route("/reviews", post(facts_api::review))
         .route("/study/queue", get(study_api::queue))
+        .route("/study/summary", get(study_api::summary))
         .route(
             "/study/events",
             get(study_api::events).post(study_api::submit),

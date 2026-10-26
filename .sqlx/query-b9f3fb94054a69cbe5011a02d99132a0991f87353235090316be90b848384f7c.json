@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM push_devices WHERE profile_id = ? AND id NOT IN (\n                   SELECT id FROM push_devices WHERE profile_id = ? ORDER BY id DESC LIMIT ?\n                 )",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "b9f3fb94054a69cbe5011a02d99132a0991f87353235090316be90b848384f7c"
+}

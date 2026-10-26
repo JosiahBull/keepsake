@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE push_devices SET origin = ?, p256dh = ?, auth = ? WHERE endpoint = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "26be130468b9a0ba801af7b71055a848a20e8a8d536d7857c4ff7d787a18876e"
+}

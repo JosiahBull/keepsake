@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT minute_of_day FROM reminder_settings WHERE profile_id = ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "minute_of_day",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "reminder_settings",
+            "name": "minute_of_day"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "30ea41387f02da7ed7489e120f88a3883497929229f3d3850d816989347d54d5"
+}

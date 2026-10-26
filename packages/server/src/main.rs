@@ -1,5 +1,5 @@
-use keepsake_server::{config::Config, db, health, http, lifecycle, router_with_limits};
-use std::time::Duration;
+use keepsake_server::{config::Config, db, health, http, lifecycle, notifications, router_with};
+use std::{sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::EnvFilter;
 
@@ -32,9 +32,17 @@ async fn serve(config: Config, shutdown: CancellationToken) -> anyhow::Result<()
         }
         let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;
         tracing::info!(address = %listener.local_addr()?, "keepsake is listening");
-        let app = router_with_limits(pool.clone(), &config.web_dir, config.limits);
-        http::serve(listener, app, config.http, shutdown).await?;
-        Ok(())
+        let notifier = Arc::new(notifications::Notifier::new(pool.clone(), config.push)?);
+        // A child token also stops reminders if serving fails before a shutdown signal.
+        let reminders_stop = shutdown.child_token();
+        let reminders = tokio::spawn(notifications::run(notifier.clone(), reminders_stop.clone()));
+        let app = router_with(pool.clone(), &config.web_dir, config.limits, notifier);
+        let served = http::serve(listener, app, config.http, shutdown).await;
+        reminders_stop.cancel();
+        if let Err(error) = reminders.await {
+            tracing::warn!(%error, "reminder task failed");
+        }
+        served
     }
     .await;
     pool.close().await;

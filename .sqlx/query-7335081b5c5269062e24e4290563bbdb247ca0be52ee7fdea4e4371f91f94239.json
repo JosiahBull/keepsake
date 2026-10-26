@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO push_keys(id, private_key) VALUES (1, ?) ON CONFLICT(id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "7335081b5c5269062e24e4290563bbdb247ca0be52ee7fdea4e4371f91f94239"
+}

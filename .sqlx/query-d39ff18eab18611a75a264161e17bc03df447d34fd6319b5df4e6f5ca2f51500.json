@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO reminder_settings(profile_id, minute_of_day) VALUES (?, ?)\n                 ON CONFLICT(profile_id) DO UPDATE SET minute_of_day = excluded.minute_of_day",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "d39ff18eab18611a75a264161e17bc03df447d34fd6319b5df4e6f5ca2f51500"
+}

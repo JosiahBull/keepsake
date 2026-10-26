@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE reminder_settings SET last_sent_on = ?\n         WHERE profile_id = ? AND last_sent_on IS NOT ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "db9c5039884ac828f789cc879cbe295f21773efe3cbe64c45c65ca2f8ba34b96"
+}

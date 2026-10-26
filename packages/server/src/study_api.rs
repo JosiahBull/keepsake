@@ -5,7 +5,7 @@ use axum::{
 };
 use keepsake_core::scheduling::{
     self, ExposureResult, ExposureSubmission, QueueQuery, Schedule, SchedulerSettings,
-    SettingsUpdate, StudyEventPage, StudyQueue, StudyResult, StudySubmission,
+    SettingsUpdate, StudyEventPage, StudyQueue, StudyResult, StudySubmission, StudySummary,
 };
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -26,6 +26,20 @@ pub async fn queue(
 ) -> Result<Json<StudyQueue>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
     scheduling::queue_for(&pool, profile_id, &query)
+        .await
+        .map(Json)
+        .map_err(ApiError::study)
+}
+
+#[utoipa::path(get, path = "/api/study/summary", responses(
+    (status = 200, description = "Counts of ready practice, for reminders and app badges", body = StudySummary),
+    (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn summary(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+) -> Result<Json<StudySummary>, ApiError> {
+    scheduling::summary_for(&pool, profile_id)
         .await
         .map(Json)
         .map_err(ApiError::study)

@@ -666,6 +666,7 @@ async fn openapi_scoped_paths_declare_every_path_parameter_and_unique_operations
         "practice",
         "facts/sample",
         "study/queue",
+        "study/summary",
         "study/settings",
         "study/events",
         "study/exposures",
@@ -673,6 +674,9 @@ async fn openapi_scoped_paths_declare_every_path_parameter_and_unique_operations
         "shares",
         "shares/accept-batch",
         "shares/{id}/accept",
+        "reminders",
+        "reminders/devices",
+        "reminders/test",
     ] {
         assert!(
             paths.contains_key(&format!("/api/profiles/{{profile_id}}/{path}")),

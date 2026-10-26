@@ -23,6 +23,10 @@ pub struct ErrorBody {
 pub struct ApiError(StatusCode, String);
 
 impl ApiError {
+    pub(crate) fn new(status: StatusCode, message: impl Into<String>) -> Self {
+        Self(status, message.into())
+    }
+
     pub(crate) fn bad(error: anyhow::Error) -> Self {
         Self(StatusCode::BAD_REQUEST, error.to_string())
     }

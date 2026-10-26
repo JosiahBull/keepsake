@@ -252,6 +252,35 @@ targets; Extra practice samples up to 20 prompts across formats. Library pages a
 searches do not restrict either queue. Review-history
 requests return up to 50 reviews by default (maximum 100), with `after_id` for the next page.
 
+## Install on a phone
+
+Keepsake installs from the browser as a Home Screen app. The server must be reachable
+over HTTPS; browsers allow service workers and notifications only on secure origins.
+
+- **iPhone and iPad:** open Keepsake in Safari, tap Share, then Add to Home Screen.
+- **Android:** open Keepsake in Chrome, open the menu, then choose Add to Home screen.
+
+The installed app opens without browser controls. Starting it offline shows Keepsake's
+connection error rather than a browser error page; nothing is saved offline.
+
+Turn on reminders in Profile settings. On iPhone and iPad this needs iOS 16.4 or later,
+and Keepsake must be opened from its Home Screen icon. Each profile gets at most one
+reminder a day, sent once reviews or new facts are ready, between its chosen time and
+midnight in its study timezone. No reminder is sent after that day's study budget is
+spent. Tapping it opens scheduled practice. On iPhone and iPad, the icon's badge counts
+ready reviews and new facts. Several household profiles can share one phone, and each
+profile can receive reminders on several devices.
+
+On Android, long-press the icon for Practise, Add a fact and Match pairs. Sharing a page
+or text to Keepsake opens the fact form with its title, text and address filled in.
+Neither is available on iOS.
+
+The server sends reminders through each browser's push service, such as
+`web.push.apple.com` or `fcm.googleapis.com`, so it needs outbound HTTPS. It creates its
+push signing key on first use and stores it in SQLite; backups keep it, so restored
+subscriptions keep working. [Scheduling](docs/scheduling.md#reminders) explains how the
+reminder policy relates to the saved research.
+
 ## Agent skill
 
 The canonical [keepsake-add-facts skill](skills/keepsake-add-facts/SKILL.md) is stored here.
@@ -312,6 +341,7 @@ Node is only needed to build the frontend.
 | `MAX_CONNECTIONS` | `128` | Concurrent TCP connections |
 | `MAX_IN_FLIGHT` | `32` | Concurrent requests; excess requests receive 503 with `Retry-After` |
 | `MAX_BODY_BYTES` | `524288` | Request-body size limit in bytes |
+| `PUSH_CONTACT` | `https://github.com/JosiahBull/keepsake` | `mailto:` or `https:` contact sent to push services with each reminder |
 
 Run the server from the repository root with its defaults. `.env` files are not loaded
 automatically. Embedded, append-only migrations run on startup. SQLite uses WAL, foreign

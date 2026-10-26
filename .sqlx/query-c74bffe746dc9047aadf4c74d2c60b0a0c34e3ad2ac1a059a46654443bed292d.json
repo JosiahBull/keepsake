@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT endpoint, origin, p256dh, auth FROM push_devices WHERE profile_id = ? ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "name": "endpoint",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "push_devices",
+            "name": "endpoint"
+          }
+        }
+      },
+      {
+        "name": "origin",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "push_devices",
+            "name": "origin"
+          }
+        }
+      },
+      {
+        "name": "p256dh",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "push_devices",
+            "name": "p256dh"
+          }
+        }
+      },
+      {
+        "name": "auth",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "push_devices",
+            "name": "auth"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c74bffe746dc9047aadf4c74d2c60b0a0c34e3ad2ac1a059a46654443bed292d"
+}

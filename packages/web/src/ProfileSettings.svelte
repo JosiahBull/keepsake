@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import type { components } from "@keepsake/client";
   import { json, errorMessage, type Profile } from "./profiles";
+  import Reminders from "./Reminders.svelte";
 
   let {
     profile,
@@ -179,6 +180,8 @@
       </div>
       {#if notice}<p role="status">{notice}</p>{/if}
     </form>
+    <!-- Reminder windows follow the saved study timezone. -->
+    {#key settings.timezone}<Reminders {profile} />{/key}
   {:else}<button class="quiet" onclick={load}>Try again</button>{/if}
 </section>
 

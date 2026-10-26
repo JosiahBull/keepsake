@@ -10,7 +10,7 @@ pub use events::{
     expose, expose_at, expose_at_for, expose_for, submit, submit_at, submit_at_for, submit_for,
 };
 pub use models::*;
-pub use selection::{queue, queue_at, queue_at_for, queue_for};
+pub use selection::{queue, queue_at, queue_at_for, queue_for, summary_at_for, summary_for};
 pub use storage::{
     approve_practice, approve_practice_for, export_events, export_events_for, settings,
     settings_for, target, target_for, update_settings, update_settings_for,

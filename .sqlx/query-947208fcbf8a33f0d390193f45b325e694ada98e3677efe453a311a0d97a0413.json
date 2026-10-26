@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM push_devices WHERE endpoint = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "947208fcbf8a33f0d390193f45b325e694ada98e3677efe453a311a0d97a0413"
+}

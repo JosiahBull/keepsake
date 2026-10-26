@@ -3,13 +3,16 @@
   import { type components, type paths } from "@keepsake/client";
   import createClient from "openapi-fetch";
   import type { Snippet } from "svelte";
-  import type { Profile, Screen } from "./profiles";
+  import type { FactDraft, Profile, Screen } from "./profiles";
+  import { refreshBadge } from "./pwa";
 
   let {
     profile,
     initialView = "library",
     onNavigate,
     profileMenu,
+    draft = null,
+    onDraftOpened,
     onShare,
     blocked = $bindable(false),
     dirty = $bindable(false),
@@ -18,6 +21,8 @@
     initialView?: "library" | "practice" | "matching";
     onNavigate: (view: Screen) => void;
     profileMenu: Snippet;
+    draft?: FactDraft | null;
+    onDraftOpened?: () => void;
     onShare: (ids: number[]) => void;
     blocked?: boolean;
     dirty?: boolean;
@@ -112,13 +117,14 @@
   let practiceRequest = 0;
   let matchingRequest = 0;
 
-  // Fact form
-  let showAdd = $state(false);
+  // Fact form, optionally opened with shared context from the system share sheet
+  const initialDraft = untrack(() => draft);
+  let showAdd = $state(initialDraft !== null);
   let saving = $state(false);
   let prompt = $state("");
   let answer = $state("");
-  let context = $state("");
-  let source = $state("");
+  let context = $state(initialDraft?.context ?? "");
+  let source = $state(initialDraft?.source ?? "");
   let tags = $state("");
 
   // Practice session
@@ -215,6 +221,7 @@
   });
 
   onMount(() => {
+    if (initialDraft) onDraftOpened?.();
     if (initialView === "practice") void startPractice();
     else if (initialView === "matching") void startMatching();
     else void loadFacts();
@@ -597,6 +604,7 @@
       studyQueue = unwrap(
         await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }),
       );
+      void refreshBadge(profileId);
     } catch (caught) {
       practiceError = `Could not check the next review. ${message(caught)}`;
     }
@@ -1025,7 +1033,10 @@
               <textarea bind:value={answer} required maxlength="20000" rows="3"
               ></textarea>
             </label>
-            <details class="form-details">
+            <details
+              class="form-details"
+              open={Boolean(initialDraft?.context || initialDraft?.source)}
+            >
               <summary>Context, source and tags (optional)</summary>
               <div class="optional-fields">
                 <label>
@@ -1653,6 +1664,9 @@
 
   :global(body) {
     margin: 0;
+    /* An installed app with viewport-fit=cover can draw under the notch and home indicator. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+      env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: #f5f8f7;
     color: #18362f;
     font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;

@@ -56,8 +56,13 @@ fn normalize_error(response: &mut Response) {
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|kind| kind.split(';').next() == Some("application/json"));
-    let message = if status.is_server_error() && status != StatusCode::SERVICE_UNAVAILABLE {
+    let message = if status.is_server_error()
+        && !matches!(
+            status,
+            StatusCode::SERVICE_UNAVAILABLE | StatusCode::BAD_GATEWAY
+        ) {
         // Internal diagnostics belong in server logs, never in a response body.
+        // Busy and push-service responses carry fixed guidance instead.
         Some("Could not access the library")
     } else if (status.is_client_error() || status.is_server_error()) && !json {
         Some(status.canonical_reason().unwrap_or("Request failed"))

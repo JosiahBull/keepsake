@@ -9,6 +9,24 @@ pub struct Config {
     pub shutdown_grace: Duration,
     pub http: HttpConfig,
     pub limits: Limits,
+    pub push: PushConfig,
+}
+
+#[derive(Clone, Debug)]
+pub struct PushConfig {
+    /// The VAPID subject push services may use to contact the operator.
+    pub contact: String,
+    /// Allows plain-HTTP and loopback push endpoints, for tests with a local push service.
+    pub allow_insecure_endpoints: bool,
+}
+
+impl Default for PushConfig {
+    fn default() -> Self {
+        Self {
+            contact: "https://github.com/JosiahBull/keepsake".into(),
+            allow_insecure_endpoints: false,
+        }
+    }
 }
 
 impl Config {
@@ -53,6 +71,23 @@ impl Config {
                 max_body_bytes: count_from_env("MAX_BODY_BYTES", 512 * 1024, 16 * 1024 * 1024)?,
                 max_in_flight: count_from_env("MAX_IN_FLIGHT", 32, 16_384)?,
                 request_timeout: seconds_from_env("REQUEST_TIMEOUT_SECS", 30)?,
+            },
+            push: PushConfig {
+                contact: match std::env::var("PUSH_CONTACT") {
+                    Ok(contact) => {
+                        // Apple's push service rejects VAPID subjects that are not mailto: or https: URLs.
+                        ensure!(
+                            (contact.starts_with("mailto:") || contact.starts_with("https://"))
+                                && contact.len() <= 255
+                                && !contact.chars().any(char::is_whitespace),
+                            "PUSH_CONTACT must be a mailto: or https: URL"
+                        );
+                        contact
+                    }
+                    Err(std::env::VarError::NotPresent) => PushConfig::default().contact,
+                    Err(error) => return Err(error).context("read PUSH_CONTACT"),
+                },
+                allow_insecure_endpoints: false,
             },
         })
     }

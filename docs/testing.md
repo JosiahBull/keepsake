@@ -16,11 +16,17 @@ pnpm --filter @keepsake/web test:e2e:ui
 `pnpm check` also type-checks the browser harness and specifications.
 
 The suite runs desktop Chromium, mobile Chromium and mobile WebKit. It covers
+the web app manifest, Home Screen shortcuts, shared pages, reminder settings,
 fact forms, CLI/browser persistence across restarts, literal and Māori macron
 search, pagination and keyboard focus, every practice format and rating, mixed
 sessions, matching, loading states, retries and stale search responses.
 Success paths use the real API. Recovery tests intercept only the deliberate
-failure or delayed response. Unexpected browser exceptions and requests outside
+failure or delayed response. Reminder settings tests replace only the browser's push
+subscription, which needs a vendor push service; every request still reaches the real
+API. The service worker test runs in Chromium's new headless mode, because the default
+headless shell denies notifications. It delivers a push through the DevTools protocol,
+then reloads offline to check the cached shell. Rust tests deliver encrypted reminders
+to a local push service and decrypt them. Unexpected browser exceptions and requests outside
 the test server fail the test. Most cases reset the migrated database to an empty
 library and add synthetic facts. Household-default cases retain the bundled facts
 and offers to check first startup, acceptance, and separate progress. Tests never

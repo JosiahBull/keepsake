@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT private_key FROM push_keys WHERE id = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "private_key",
+        "ordinal": 0,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "push_keys",
+            "name": "private_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c887392d1d4e71205dfecc287f7081eebe8323c6b85c4035c45e618bc7437a55"
+}
