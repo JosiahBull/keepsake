@@ -7,6 +7,7 @@
     type SharePage,
     type Screen,
   } from "./profiles";
+  import { play } from "./sounds";
   let {
     profile,
     direction,
@@ -79,17 +80,20 @@
         method: "POST",
         body: JSON.stringify(pending.body),
       });
-      notice =
-        pending.path === "accept-batch" || pending.path.endsWith("/accept")
-          ? "Copies added to your library."
-          : pending.path.endsWith("/decline")
-            ? "Share declined."
-            : "Share withdrawn.";
+      const accepted =
+        pending.path === "accept-batch" || pending.path.endsWith("/accept");
+      notice = accepted
+        ? "Copies added to your library."
+        : pending.path.endsWith("/decline")
+          ? "Share declined."
+          : "Share withdrawn.";
+      if (accepted) play("keep");
       pending = null;
       selected = [];
       await load();
     } catch (caught) {
       error = `Could not save this change. ${errorMessage(caught)}`;
+      play("alert");
     } finally {
       saving = false;
     }

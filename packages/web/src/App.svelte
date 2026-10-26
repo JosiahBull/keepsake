@@ -14,6 +14,7 @@
   } from "./profiles";
   import { preload } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
+  import { play, unlockSoundsOnTap } from "./sounds";
 
   let profiles = $state<Profile[]>([]);
   let active = $state<Profile | null>(null);
@@ -192,6 +193,7 @@
   onMount(() => {
     let disposed = false;
     void serviceWorker();
+    const stopUnlockingSounds = unlockSoundsOnTap();
     preloadLaunch();
     void json<Profile[]>("/api/profiles")
       .then((result) => {
@@ -270,6 +272,7 @@
       navigator.serviceWorker.addEventListener("message", notificationClick);
     return () => {
       disposed = true;
+      stopUnlockingSounds();
       window.removeEventListener("popstate", pop);
       window.removeEventListener("beforeunload", leave);
       document.removeEventListener("visibilitychange", visibility);
@@ -394,9 +397,11 @@
       shareIds = [];
       shareSubmission = null;
       notice = "Facts shared.";
+      play("send");
       navigate("sent");
     } catch (caught) {
       shareError = `Could not share these facts. ${errorMessage(caught)} Retry with the same selection.`;
+      play("alert");
     } finally {
       sharing = false;
     }
