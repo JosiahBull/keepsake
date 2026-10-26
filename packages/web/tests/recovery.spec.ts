@@ -26,10 +26,6 @@ async function expectNavigationDisabled(page: Page) {
       .getByRole("button", { name, exact: true })).toBeDisabled();
   }
   await expect(page.locator(".add-top")).toBeDisabled();
-  await expect(page.locator(".ratings button")).toHaveCount(4);
-  for (const rating of await page.locator(".ratings button").all()) {
-    await expect(rating).toBeDisabled();
-  }
 }
 
 test("library retries a failed load and shows loading until the real response arrives", async ({ app, page }) => {
@@ -204,12 +200,12 @@ test("a failed fact save preserves every draft field and retry inserts exactly o
   }
 });
 
-test("review retry keeps the revealed question and blocks navigation until one review is saved", async ({ app, page }) => {
-  const prompt = "Which question must remain during a retry?";
+test("a failed review save lets practice finish and blocks leaving until one retry saves it", async ({ app, page }) => {
+  const prompt = "Which review must survive a retry?";
   const fact = await app.createFact({
     prompt,
-    answer: "This question",
-    practices: [{ kind: "flashcard", prompt, answer: "This question" }],
+    answer: "This review",
+    practices: [{ kind: "flashcard", prompt, answer: "This review" }],
   });
   const retry = gate();
   let posts = 0;
@@ -230,20 +226,27 @@ test("review retry keeps the revealed question and blocks navigation until one r
     await page.getByLabel("Your answer").fill("My original attempt");
     await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
     await page.getByRole("button", { name: "Good Correct", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText("Review was not saved.");
-    await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
-    await expect(page.getByLabel("Your answer")).toHaveValue("My original attempt");
-    await expect(page.getByLabel("Your answer")).toHaveAttribute("readonly", "");
+    await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText("Could not save a review. Temporarily unavailable.");
+    await expect(page.getByRole("status")).toHaveText("Saving…");
+    await expect(page.getByText("1 review saved.", { exact: true })).toHaveCount(0);
+    await expectNavigationDisabled(page);
+    // The open menu can cover the alert on a phone, so close it before retrying.
+    const profileMenu = page.getByLabel("Profile: Josiah", { exact: true });
+    await profileMenu.click();
+    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeDisabled();
+    await profileMenu.click();
     expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
 
-    await page.getByRole("button", { name: "Good Correct", exact: true }).click();
-    await expect(page.getByRole("status")).toHaveText("Saving review…");
-    await expectNavigationDisabled(page);
-    await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Retry save", exact: true }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveText("Saving…");
+    await profileMenu.click();
+    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeDisabled();
     retry.release();
 
-    await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
     await expect(page.getByText("1 review saved.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeEnabled();
     const reviews = await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json();
     expect(reviews.total).toBe(1);
     expect(reviews.items[0]).toMatchObject({
@@ -258,23 +261,24 @@ test("review retry keeps the revealed question and blocks navigation until one r
   }
 });
 
-test("matching review retry preserves the pair and only counts a durable review", async ({ app, page }) => {
+test("a failed matching review keeps the round moving and later reviews wait their turn", async ({ app, page }) => {
   const facts = await Promise.all([1, 2, 3].map((number) => app.createFact({
     prompt: `Durable matching question ${number}`,
     answer: `Durable matching answer ${number}`,
     tags: ["synthetic-durable-matching-bank"],
   })));
-  const fact = facts[0];
   const retry = gate();
-  let posts = 0;
+  const sent: number[] = [];
   await page.route(/\/api\/profiles\/1\/reviews$/, async (route) => {
-    posts += 1;
-    if (posts === 1) {
+    sent.push(route.request().postDataJSON().fact_id);
+    if (sent.length === 1) {
       await unavailable(route);
       return;
     }
 
-    await retry.promise;
+    if (sent.length === 2) {
+      await retry.promise;
+    }
     await route.continue();
   });
 
@@ -282,31 +286,35 @@ test("matching review retry preserves the pair and only counts a durable review"
     await page.goto("/");
     await page.getByRole("button", { name: "Match pairs", exact: true }).click();
     const game = page.getByRole("region", { name: "Matching pairs game" });
-    await game.getByRole("button", { name: fact.prompt, exact: true }).click();
-    await game.getByRole("button", { name: fact.answer, exact: true }).click();
+    await game.getByRole("button", { name: facts[0].prompt, exact: true }).click();
+    await game.getByRole("button", { name: facts[0].answer, exact: true }).click();
     await game.getByRole("button", { name: "Hard Correct, with difficulty", exact: true }).click();
-    await expect(page.getByRole("alert")).toContainText("Review was not saved.");
-    await expect(game.getByText("0 of 3 matched", { exact: true })).toBeVisible();
-    await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeVisible();
-    expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
-
-    await game.getByRole("button", { name: "Hard Correct, with difficulty", exact: true }).click();
-    await expect(page.getByText("Saving review…", { exact: true })).toBeVisible();
-    await expectNavigationDisabled(page);
-    retry.release();
-
+    await expect(page.getByRole("alert")).toContainText("Could not save a review. Temporarily unavailable.");
     await expect(game.getByText("1 of 3 matched", { exact: true })).toBeVisible();
     await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeHidden();
-    await expect(game.getByRole("button", { name: new RegExp(fact.prompt) })).toBeDisabled();
-    const reviews = await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json();
-    expect(reviews.total).toBe(1);
-    expect(reviews.items[0]).toMatchObject({
-      fact_id: fact.id,
-      practice_id: null,
-      method: "matching",
-      outcome: "hard",
-    });
-    expect(posts).toBe(2);
+    await expectNavigationDisabled(page);
+
+    // The learner keeps playing; this rating queues behind the failed one.
+    await game.getByRole("button", { name: facts[1].prompt, exact: true }).click();
+    await game.getByRole("button", { name: facts[1].answer, exact: true }).click();
+    await game.getByRole("button", { name: "Good Correct", exact: true }).click();
+    await expect(game.getByText("2 of 3 matched", { exact: true })).toBeVisible();
+    expect(sent).toEqual([facts[0].id]);
+
+    await page.getByRole("button", { name: "Retry save", exact: true }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect.poll(() => sent).toEqual([facts[0].id, facts[0].id]);
+    retry.release();
+
+    await expect.poll(() => sent).toEqual([facts[0].id, facts[0].id, facts[1].id]);
+    await expect(page.getByRole("navigation", { name: "Main navigation" })
+      .getByRole("button", { name: "Library", exact: true })).toBeEnabled();
+    for (const [index, outcome] of [[0, "hard"], [1, "good"]] as const) {
+      const fact = facts[index];
+      await expect.poll(async () =>
+        (await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).items)
+        .toMatchObject([{ fact_id: fact.id, practice_id: null, method: "matching", outcome }]);
+    }
   } finally {
     retry.release();
   }

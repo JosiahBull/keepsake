@@ -3,8 +3,10 @@
   import { type components, type paths } from "@keepsake/client";
   import createClient from "openapi-fetch";
   import type { Snippet } from "svelte";
+  import { preloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
+  import { Rejected, SaveQueue } from "./saves.svelte";
 
   let {
     profile,
@@ -28,7 +30,10 @@
     dirty?: boolean;
   } = $props();
   const profileId = untrack(() => profile.id);
-  const api = createClient<paths>({ baseUrl: "/" });
+  const api = createClient<paths>({
+    baseUrl: "/",
+    fetch: (request) => preloaded(request) ?? fetch(request),
+  });
   const controller = new AbortController();
   api.use({
     async onRequest({ request }) {
@@ -47,17 +52,15 @@
   type Method = components["schemas"]["PracticeKind"];
   type Outcome = components["schemas"]["ReviewOutcome"];
   type Fact = components["schemas"]["FactSummary"];
+  type FactSample = components["schemas"]["FactSample"];
+  type NewReview = components["schemas"]["NewReview"];
   type Question = components["schemas"]["PracticeQuestion"];
+  type PracticeSession = components["schemas"]["PracticeSession"];
   type StudyQuestion = components["schemas"]["StudyQuestion"];
   type StudyQueue = components["schemas"]["StudyQueue"];
   type StudySubmission = components["schemas"]["StudySubmission"];
   type StudyResult = components["schemas"]["StudyResult"];
   type ExposureSubmission = components["schemas"]["ExposureSubmission"];
-  type PendingExposure = {
-    body: ExposureSubmission;
-    error: string;
-    busy: boolean;
-  };
 
   const modes: { id: Method; name: string; instruction: string }[] = [
     {
@@ -127,26 +130,31 @@
   let source = $state(initialDraft?.source ?? "");
   let tags = $state("");
 
+  // Saves reach the server in order. The learner waits only for a save that must
+  // precede what is shown next, such as the exposure before an answer.
+  const saves = new SaveQueue();
+  let waiting = $state(0);
+  let saveWarning = $state("");
+
   // Practice session
   let queue = $state<(Question | StudyQuestion)[]>([]);
   let practiceMode = $state<"scheduled" | "extra">("scheduled");
   let studyQueue = $state<StudyQueue | null>(null);
+  let checkingNext = $state(false);
+  let nextPractice: Promise<PracticeSession | null> | null = null;
   let recalled = $state(false);
-  let pendingSubmission = $state<StudySubmission | null>(null);
-  let feedbackEventId = $state<number | null>(null);
+  let feedback: { body: StudySubmission; result: StudyResult } | null = null;
   let studyConflict = $state(false);
   let exposureOnly = $state(false);
-  let exposures = $state<PendingExposure[]>([]);
-  let matchingExposureId = $state<string | null>(null);
   const locallyExposed = new Map<number, number>();
   let practiceLoading = $state(false);
   let practiceError = $state("");
   let practiceTotal = $state(0);
   let cursor = $state(0);
+  // Identifies the question on screen, so a late save cannot change the next one.
+  let shown = 0;
   let revealed = $state(false);
   let revealRequested = $state(false);
-  let pendingAnswerExposureId = $state<string | null>(null);
-  let choiceExposureId = $state<string | null>(null);
   let choicesReady = $state(false);
   let disclosedFacts = $state<number[]>([]);
   const disclosureRequests = new Map<number, string>();
@@ -155,14 +163,16 @@
   let startedAt = $state(0);
   let responseMs = $state(0);
   let sessionCount = $state(0);
+  let savedCount = $state(0);
   let reviewError = $state("");
-  let recording = $state(false);
 
   // Matching round
   let matchFacts = $state<Fact[]>([]);
   let matchingLoading = $state(false);
   let matchingError = $state("");
   let matchAnswers = $state<Fact[]>([]);
+  let roundReady = $state(false);
+  let nextSample: Promise<FactSample | null> | null = null;
   let matched = $state<number[]>([]);
   let selectedPrompt = $state<number | null>(null);
   let selectedAnswer = $state<number | null>(null);
@@ -187,29 +197,13 @@
       ? current
       : null,
   );
-  const exposing = $derived(exposures.some((exposure) => exposure.busy));
   const navigationBlocked = $derived(
-    recording || exposing || pendingSubmission !== null || saving,
-  );
-  const matchingBlocked = $derived(
-    exposures.some(
-      (exposure) => exposure.body.submission_id === matchingExposureId,
-    ),
-  );
-  const answerExposurePending = $derived(
-    Boolean(
-      current &&
-      exposures.some((exposure) =>
-        exposure.body.fact_ids.includes(current.fact.id),
-      ),
-    ),
+    waiting > 0 || saves.failure !== null || saving,
   );
 
   $effect(() => {
-    blocked =
-      navigationBlocked ||
-      exposures.length > 0 ||
-      Boolean(reviewError && !studyConflict);
+    // Leaving would discard saves that have not reached the server.
+    blocked = saves.size > 0 || saving;
     dirty = Boolean(
       response.trim() ||
       prompt.trim() ||
@@ -371,7 +365,7 @@
       notice = "Fact saved.";
       search = "";
       clearTimeout(searchTimer);
-      await loadFacts(null, []);
+      void loadFacts(null, []);
     } catch (caught) {
       error = `Could not save the fact. ${message(caught)}`;
     } finally {
@@ -379,12 +373,100 @@
     }
   }
 
+  // Saves
+  /** Saves before showing what it records, such as an answer, so the learner waits for it. */
+  async function saveBeforeShowing<T>(
+    label: string,
+    send: () => Promise<T>,
+  ): Promise<T> {
+    waiting += 1;
+    try {
+      return await saves.add(label, send);
+    } finally {
+      waiting -= 1;
+    }
+  }
+
+  /** Saves a rating while the learner moves on. A refused rating leaves a warning. */
+  function saveReview(send: () => Promise<unknown>): Promise<boolean> {
+    return saves.add("Could not save a review.", send).then(
+      () => true,
+      (caught: unknown) => {
+        saveWarning = `A review was not saved. ${message(caught)}`;
+        return false;
+      },
+    );
+  }
+
+  async function postReview(body: NewReview) {
+    return unwrapSave(await api.POST("/api/reviews", { body }));
+  }
+
+  async function postStudyEvent(body: StudySubmission) {
+    return unwrapSave(await api.POST("/api/study/events", { body }));
+  }
+
+  /** Resolves true once the exposure is saved, or false if the server refused it. */
+  async function recordExposure(
+    factIds: number[],
+    method: Method | "matching",
+  ): Promise<boolean> {
+    const body: ExposureSubmission = {
+      submission_id: crypto.randomUUID(),
+      fact_ids: factIds,
+      method,
+    };
+    factIds.forEach((id) => locallyExposed.set(id, Date.now()));
+    try {
+      await saveBeforeShowing("Could not save this activity.", async () =>
+        unwrapSave(await api.POST("/api/study/exposures", { body })),
+      );
+      return true;
+    } catch (caught) {
+      saveWarning = `Could not save this activity. ${message(caught)}`;
+      return false;
+    }
+  }
+
+  async function discloseFact(event: Event, factId: number) {
+    if (!(event.currentTarget as HTMLDetailsElement).open) {
+      clearDisclosure(factId);
+      return;
+    }
+
+    const request = crypto.randomUUID();
+    disclosureRequests.set(factId, request);
+    if (
+      (await recordExposure([factId], "flashcard")) &&
+      disclosureRequests.get(factId) === request
+    ) {
+      disclosedFacts = [...new Set([...disclosedFacts, factId])];
+    }
+  }
+
+  function clearDisclosure(factId: number) {
+    disclosedFacts = disclosedFacts.filter((id) => id !== factId);
+    disclosureRequests.delete(factId);
+  }
+
   // Practice actions
+  const practiceSample = () =>
+    api.GET("/api/practice", { params: { query: { limit: 20 } } });
+  const matchingSample = () =>
+    api.GET("/api/facts/sample", { params: { query: { limit: 4 } } });
+
+  /** Starts a request early. A failure here falls back to a fresh request when needed. */
+  function prefetch<T>(request: Promise<{ data?: T }>): Promise<T | null> {
+    return request.then(
+      (result) => result.data ?? null,
+      () => null,
+    );
+  }
+
   function resetQuestion() {
+    shown += 1;
     revealed = false;
     revealRequested = false;
-    pendingAnswerExposureId = null;
-    choiceExposureId = null;
     choicesReady = false;
     response = "";
     choice = null;
@@ -392,36 +474,29 @@
     responseMs = 0;
     reviewError = "";
     recalled = false;
-    pendingSubmission = null;
-    feedbackEventId = null;
+    feedback = null;
     studyConflict = false;
     exposureOnly = false;
     if (
       practiceMode === "extra" &&
       current?.practice.kind === "multiple_choice"
     ) {
-      void exposeChoices(current);
+      void exposeChoices(current.fact.id);
     }
   }
 
-  async function exposeChoices(question: Question) {
-    const id = await recordExposure([question.fact.id], "multiple_choice");
-    if (current?.practice.id !== question.practice.id) {
-      return;
+  async function exposeChoices(factId: number) {
+    const question = shown;
+    if (
+      (await recordExposure([factId], "multiple_choice")) &&
+      question === shown
+    ) {
+      choicesReady = true;
     }
-
-    choiceExposureId = id;
-    choicesReady = !exposures.some((entry) => entry.body.submission_id === id);
   }
 
   async function startPractice(extra = false) {
     if (navigationBlocked) {
-      return;
-    }
-
-    if (!extra && exposures.length) {
-      view = "practice";
-      practiceError = "Save the pending activity before starting practice.";
       return;
     }
 
@@ -430,25 +505,31 @@
     onNavigate("practice");
     practiceLoading = true;
     practiceError = "";
+    saveWarning = "";
     practiceMode = extra ? "extra" : "scheduled";
     studyQueue = null;
+    checkingNext = false;
     queue = [];
     cursor = 0;
     sessionCount = 0;
+    savedCount = 0;
     resetQuestion();
 
     try {
-      const session = extra
-        ? unwrap(
-            await api.GET("/api/practice", {
-              params: { query: { limit: 20 } },
-            }),
-          )
-        : unwrap(
-            await api.GET("/api/study/queue", {
-              params: { query: { limit: 20 } },
-            }),
-          );
+      let session: PracticeSession | StudyQueue;
+      if (extra) {
+        const prefetched = nextPractice;
+        nextPractice = null;
+        session = (await prefetched) ?? unwrap(await practiceSample());
+      } else {
+        // A queue read before earlier saves land could offer their targets again.
+        await saves.idle();
+        session = unwrap(
+          await api.GET("/api/study/queue", {
+            params: { query: { limit: 20 } },
+          }),
+        );
+      }
 
       if (request !== practiceRequest) {
         return;
@@ -473,140 +554,113 @@
     }
   }
 
+  // The queue checked after a session's saves is the next session.
+  function continuePractice() {
+    if (!studyQueue || navigationBlocked) {
+      return;
+    }
+
+    practiceRequest += 1;
+    queue = studyQueue.items;
+    practiceTotal = studyQueue.total_due + studyQueue.new_remaining;
+    cursor = 0;
+    sessionCount = 0;
+    savedCount = 0;
+    saveWarning = "";
+    resetQuestion();
+  }
+
   async function reveal() {
-    if (revealRequested || recording) {
+    if (revealRequested || !current) {
       return;
     }
 
     responseMs = Math.max(0, Date.now() - startedAt);
     revealRequested = true;
+    const question = shown;
     if (scheduledQuestion) {
       exposureOnly = !recalled && !response.trim();
-      pendingSubmission = studySubmission(null, "exposure");
-      await saveStudySubmission(false);
-    } else if (!scheduledQuestion && current) {
-      pendingAnswerExposureId = await recordExposure(
-        [current.fact.id],
-        current.practice.kind,
-      );
-      if (
-        !exposures.some(
-          (entry) => entry.body.submission_id === pendingAnswerExposureId,
-        )
-      ) {
-        revealed = true;
+      const body = feedbackSubmission(scheduledQuestion);
+      try {
+        const result = await saveBeforeShowing(
+          "Could not save this activity.",
+          () => postStudyEvent(body),
+        );
+        if (question === shown) {
+          feedback = { body, result };
+          revealed = true;
+        }
+      } catch (caught) {
+        if (question === shown) {
+          studyConflict = true;
+          reviewError =
+            caught instanceof Rejected && caught.status === 409
+              ? "This attempt is no longer current. Refresh practice."
+              : `Could not save this activity. ${message(caught)}`;
+        }
       }
+      return;
+    }
+
+    // Extra practice ignores schedules, so the next session can load during the last rating.
+    if (cursor === queue.length - 1) nextPractice ??= prefetch(practiceSample());
+    if (
+      (await recordExposure([current.fact.id], current.practice.kind)) &&
+      question === shown
+    ) {
+      revealed = true;
     }
   }
 
-  function studySubmission(
-    outcome: Outcome | null,
-    kind: "attempt" | "exposure",
-  ): StudySubmission {
-    if (!scheduledQuestion) {
-      throw new Error("No scheduled question is available.");
-    }
+  function feedbackSubmission(question: StudyQuestion): StudySubmission {
     return {
       submission_id: crypto.randomUUID(),
-      target_id: scheduledQuestion.target_id,
-      practice_id: scheduledQuestion.practice.id,
-      content_revision: scheduledQuestion.content_revision,
-      expected_version: scheduledQuestion.schedule_version,
-      kind,
+      target_id: question.target_id,
+      practice_id: question.practice.id,
+      content_revision: question.content_revision,
+      expected_version: question.schedule_version,
+      kind: "exposure",
       context: "scheduled",
-      method: scheduledQuestion.practice.kind,
-      outcome,
+      method: question.practice.kind,
+      outcome: null,
       response_ms: responseMs,
       attempted: recalled || Boolean(response.trim()),
       assisted: false,
       prior_exposure:
-        Date.now() -
-          (locallyExposed.get(scheduledQuestion.fact.id) ?? -Infinity) <
+        Date.now() - (locallyExposed.get(question.fact.id) ?? -Infinity) <
         600_000,
-      ...(kind === "attempt" && feedbackEventId !== null
-        ? { feedback_event_id: feedbackEventId }
-        : {}),
     };
   }
 
-  async function saveStudySubmission(
-    advance = pendingSubmission?.kind === "attempt",
-  ) {
-    if (!pendingSubmission || recording) {
-      return;
-    }
-    recording = true;
-    reviewError = "";
-    try {
-      const response = await api.POST("/api/study/events", {
-        body: pendingSubmission,
-      });
-      if (response.response.status === 409) {
-        studyConflict = true;
-        pendingSubmission = null;
-        reviewError = "This attempt is no longer current. Refresh practice.";
-        return;
-      }
-      const result: StudyResult = unwrap(response);
-      if (
-        pendingSubmission.kind === "exposure" &&
-        pendingSubmission.attempted
-      ) {
-        feedbackEventId = result.event_id;
-      }
-      if (pendingSubmission.kind === "exposure") {
-        revealed = true;
-      }
-      if (
-        scheduledQuestion &&
-        result.schedule.target_id === scheduledQuestion.target_id
-      ) {
-        scheduledQuestion.schedule_version = result.schedule.version;
-      }
-      if (studyQueue) {
-        studyQueue = { ...studyQueue, next_due_at: result.next_due_at };
-      }
-      pendingSubmission = null;
-
-      if (advance) {
-        sessionCount += 1;
-        cursor += 1;
-        resetQuestion();
-        if (cursor >= queue.length) {
-          await refreshStudyOverview();
-        }
-      }
-    } catch (caught) {
-      const action =
-        pendingSubmission?.kind === "exposure"
-          ? "Could not save this activity."
-          : "Could not save this attempt.";
-      reviewError = `${action} ${message(caught)}`;
-    } finally {
-      recording = false;
-    }
-  }
-
-  async function continueAfterExposure() {
-    if (recording || pendingSubmission || studyConflict) {
-      return;
-    }
-
+  function nextQuestion() {
     cursor += 1;
     resetQuestion();
-    if (cursor >= queue.length) {
-      await refreshStudyOverview();
+    if (practiceMode === "scheduled" && cursor >= queue.length) {
+      void refreshStudyOverview();
     }
   }
 
   async function refreshStudyOverview() {
+    const request = practiceRequest;
+    checkingNext = true;
     try {
-      studyQueue = unwrap(
+      // The next queue must reflect every rating from this session.
+      await saves.idle();
+      const overview = unwrap(
         await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }),
       );
-      void refreshBadge(profileId);
+      if (request === practiceRequest) {
+        studyQueue = overview;
+        void refreshBadge(profileId);
+      }
     } catch (caught) {
-      practiceError = `Could not check the next review. ${message(caught)}`;
+      if (request === practiceRequest) {
+        practiceError = `Could not check the next review. ${message(caught)}`;
+      }
+    } finally {
+      if (request === practiceRequest) {
+        checkingNext = false;
+      }
     }
   }
 
@@ -634,126 +688,43 @@
     }).format(new Date(timestamp * 1000));
   }
 
-  async function saveExposure(submissionId: string) {
-    const exposure = exposures.find(
-      (entry) => entry.body.submission_id === submissionId,
-    );
-    if (!exposure || exposure.busy) {
+  function grade(outcome: Outcome) {
+    if (!current || !revealed || studyConflict) {
       return;
     }
 
-    exposures = exposures.map((entry) =>
-      entry === exposure ? { ...entry, busy: true, error: "" } : entry,
-    );
-    try {
-      unwrap(await api.POST("/api/study/exposures", { body: exposure.body }));
-      const authorizedFacts = exposure.body.fact_ids.filter(
-        (id) => disclosureRequests.get(id) === submissionId,
-      );
-      disclosedFacts = [...new Set([...disclosedFacts, ...authorizedFacts])];
-      exposures = exposures.filter(
-        (entry) => entry.body.submission_id !== submissionId,
-      );
-      if (pendingAnswerExposureId === submissionId) {
-        revealed = true;
-      }
-      if (choiceExposureId === submissionId) {
-        choicesReady = true;
-      }
-    } catch (caught) {
-      exposures = exposures.map((entry) =>
-        entry.body.submission_id === submissionId
-          ? { ...entry, busy: false, error: message(caught) }
-          : entry,
-      );
-    }
-  }
-
-  async function recordExposure(
-    factIds: number[],
-    method: Method | "matching",
-    disclosureFactId?: number,
-  ) {
-    const body: ExposureSubmission = {
-      submission_id: crypto.randomUUID(),
-      fact_ids: factIds,
-      method,
-    };
-    factIds.forEach((id) => locallyExposed.set(id, Date.now()));
-    if (disclosureFactId !== undefined) {
-      disclosureRequests.set(disclosureFactId, body.submission_id);
-    }
-    exposures = [...exposures, { body, error: "", busy: false }];
-    await saveExposure(body.submission_id);
-    return body.submission_id;
-  }
-
-  function discloseFact(event: Event, factId: number) {
-    if ((event.currentTarget as HTMLDetailsElement).open) {
-      void recordExposure([factId], "flashcard", factId);
-    } else {
-      clearDisclosure(factId);
-    }
-  }
-
-  function clearDisclosure(factId: number) {
-    disclosedFacts = disclosedFacts.filter((id) => id !== factId);
-    disclosureRequests.delete(factId);
-  }
-
-  async function recordReview(
-    factId: number,
-    practiceId: number | null,
-    method: Method | "matching",
-    outcome: Outcome,
-    elapsed: number,
-  ) {
-    unwrap(
-      await api.POST("/api/reviews", {
-        body: {
-          fact_id: factId,
-          practice_id: practiceId,
-          method,
-          outcome,
-          response_ms: elapsed,
-        },
-      }),
-    );
-  }
-
-  async function grade(outcome: Outcome) {
-    if (!current || recording || answerExposurePending) {
-      return;
-    }
-
+    let saved: Promise<boolean>;
     if (scheduledQuestion) {
-      if (exposureOnly || studyConflict || pendingSubmission) {
+      if (!feedback || exposureOnly) {
         return;
       }
-      pendingSubmission = studySubmission(outcome, "attempt");
-      await saveStudySubmission();
-      return;
-    }
-
-    recording = true;
-    reviewError = "";
-
-    try {
-      await recordReview(
-        current.fact.id,
-        current.practice.id,
-        current.practice.kind,
+      // A rating refers to its own feedback and the schedule state that feedback produced.
+      const attempt: StudySubmission = {
+        ...feedback.body,
+        submission_id: crypto.randomUUID(),
+        kind: "attempt",
         outcome,
-        responseMs,
-      );
-      cursor += 1;
-      sessionCount += 1;
-      resetQuestion();
-    } catch (caught) {
-      reviewError = `Review was not saved. ${message(caught)} Try again.`;
-    } finally {
-      recording = false;
+        expected_version: feedback.result.schedule.version,
+        feedback_event_id: feedback.result.event_id,
+      };
+      saved = saveReview(() => postStudyEvent(attempt));
+    } else {
+      const review: NewReview = {
+        fact_id: current.fact.id,
+        practice_id: current.practice.id,
+        method: current.practice.kind,
+        outcome,
+        response_ms: responseMs,
+      };
+      saved = saveReview(() => postReview(review));
     }
+
+    const session = practiceRequest;
+    void saved.then((ok) => {
+      if (ok && session === practiceRequest) savedCount += 1;
+    });
+    sessionCount += 1;
+    nextQuestion();
   }
 
   // Matching actions
@@ -767,8 +738,10 @@
     onNavigate("matching");
     matchingLoading = true;
     matchingError = "";
+    saveWarning = "";
     matchFacts = [];
     matchAnswers = [];
+    roundReady = false;
     matched = [];
     selectedPrompt = null;
     selectedAnswer = null;
@@ -776,14 +749,11 @@
     matchFeedback = "";
     matchStarted = {};
     matchMisses = {};
-    reviewError = "";
 
     try {
-      const sample = unwrap(
-        await api.GET("/api/facts/sample", {
-          params: { query: { limit: 4 } },
-        }),
-      );
+      const prefetched = nextSample;
+      nextSample = null;
+      const sample = (await prefetched) ?? unwrap(await matchingSample());
 
       if (request !== matchingRequest) {
         return;
@@ -791,11 +761,17 @@
 
       matchFacts = sample.items;
       matchAnswers = shuffled(matchFacts);
-      if (matchFacts.length >= 3) {
-        matchingExposureId = await recordExposure(
+      matchingLoading = false;
+      // The answers stay hidden until their exposure is saved.
+      if (
+        matchFacts.length >= 3 &&
+        (await recordExposure(
           matchFacts.map((fact) => fact.id),
           "matching",
-        );
+        )) &&
+        request === matchingRequest
+      ) {
+        roundReady = true;
       }
     } catch (caught) {
       if (request === matchingRequest) {
@@ -809,7 +785,7 @@
   }
 
   function choosePrompt(id: number) {
-    if (pendingMatch !== null || recording || matchingBlocked) {
+    if (pendingMatch !== null) {
       return;
     }
 
@@ -822,7 +798,7 @@
   }
 
   function chooseAnswer(id: number) {
-    if (selectedPrompt === null || pendingMatch !== null || recording) {
+    if (selectedPrompt === null || pendingMatch !== null) {
       return;
     }
 
@@ -831,6 +807,10 @@
       pendingMatch = id;
       matchMs = Math.max(0, Date.now() - matchStarted[id]);
       matchFeedback = "Matched. Rate your attempt.";
+      // Matching ignores schedules, so the next round can load during the last rating.
+      if (matched.length === matchFacts.length - 1) {
+        nextSample ??= prefetch(matchingSample());
+      }
     } else {
       matchMisses = {
         ...matchMisses,
@@ -840,30 +820,27 @@
     }
   }
 
-  async function gradeMatch(outcome: Outcome) {
-    if (pendingMatch === null || recording) {
+  function gradeMatch(outcome: Outcome) {
+    if (pendingMatch === null) {
       return;
     }
 
-    const id = pendingMatch;
-    recording = true;
-    reviewError = "";
-
-    try {
-      await recordReview(id, null, "matching", outcome, matchMs);
-      matched = [...matched, id];
-      pendingMatch = null;
-      selectedPrompt = null;
-      selectedAnswer = null;
-      matchFeedback =
-        matched.length === matchFacts.length
-          ? "Round complete."
-          : "Choose another question.";
-    } catch (caught) {
-      reviewError = `Review was not saved. ${message(caught)} Try the rating again.`;
-    } finally {
-      recording = false;
-    }
+    const review: NewReview = {
+      fact_id: pendingMatch,
+      practice_id: null,
+      method: "matching",
+      outcome,
+      response_ms: matchMs,
+    };
+    void saveReview(() => postReview(review));
+    matched = [...matched, pendingMatch];
+    pendingMatch = null;
+    selectedPrompt = null;
+    selectedAnswer = null;
+    matchFeedback =
+      matched.length === matchFacts.length
+        ? "Round complete."
+        : "Choose another question.";
   }
 
   // Shared helpers
@@ -879,6 +856,26 @@
     }
 
     return result.data;
+  }
+
+  /** Like unwrap, but marks a refusal that resending cannot change as Rejected. */
+  function unwrapSave<T>(result: {
+    data?: T;
+    error?: components["schemas"]["ErrorBody"];
+    response: Response;
+  }): T {
+    const { status } = result.response;
+    if (
+      result.error &&
+      status >= 400 &&
+      status < 500 &&
+      status !== 408 &&
+      status !== 429
+    ) {
+      throw new Rejected(result.error.error, status);
+    }
+
+    return unwrap(result);
   }
 
   function message(caught: unknown) {
@@ -908,6 +905,14 @@
 </script>
 
 <svelte:head><title>Keepsake</title></svelte:head>
+
+{#snippet savedReviews()}
+  {#if saves.size}
+    <p role="status">Saving…</p>
+  {:else}
+    <p>{savedCount} {savedCount === 1 ? "review" : "reviews"} saved.</p>
+  {/if}
+{/snippet}
 
 <div class="app-shell">
   <header class="app-header">
@@ -953,20 +958,21 @@
   </header>
 
   <main>
-    {#if exposing}
+    {#if waiting && view !== "practice"}
       <p role="status">Saving…</p>
     {/if}
-    {#each exposures.filter((entry) => entry.error) as exposure (exposure.body.submission_id)}
+    {#if saves.failure}
       <div class="message error" role="alert">
-        Could not save this activity. {exposure.error}
-        <button
-          class="text-button"
-          disabled={exposure.busy}
-          onclick={() => saveExposure(exposure.body.submission_id)}
+        {saves.failure.label}
+        {message(saves.failure.error)}
+        <button class="text-button" onclick={() => saves.retry()}
           >Retry save</button
         >
       </div>
-    {/each}
+    {/if}
+    {#if saveWarning}
+      <div class="message error" role="alert">{saveWarning}</div>
+    {/if}
     {#if error && view === "library"}
       <div class="message error" role="alert">
         {error}
@@ -1278,8 +1284,7 @@
             {#if !revealed}
               <button
                 class="primary"
-                disabled={recording ||
-                  revealRequested ||
+                disabled={revealRequested ||
                   (mode === "multiple_choice" && choice === null)}
                 onclick={reveal}
               >
@@ -1339,10 +1344,8 @@
                   </p>
                   <button
                     class="primary"
-                    disabled={recording ||
-                      pendingSubmission !== null ||
-                      studyConflict}
-                    onclick={continueAfterExposure}>Continue</button
+                    disabled={studyConflict}
+                    onclick={nextQuestion}>Continue</button
                   >
                 {:else}
                   <h3>Rate your attempt</h3>
@@ -1350,10 +1353,7 @@
                     {#each ratings as rating}
                       <button
                         class="rating"
-                        disabled={recording ||
-                          pendingSubmission !== null ||
-                          studyConflict ||
-                          answerExposurePending}
+                        disabled={studyConflict}
                         onclick={() => grade(rating.id)}
                       >
                         <strong>{rating.name}</strong>
@@ -1369,26 +1369,14 @@
                 {/if}
               </div>
             {/if}
-            {#if reviewError}
+            {#if studyConflict}
               <p class="error inline-error" role="alert">{reviewError}</p>
-              {#if studyConflict}
-                <button class="quiet" onclick={() => startPractice()}
-                  >Refresh practice</button
-                >
-              {:else if pendingSubmission}
-                <button
-                  class="quiet"
-                  disabled={recording}
-                  onclick={() => saveStudySubmission()}>Retry save</button
-                >
-              {/if}
+              <button class="quiet" onclick={() => startPractice()}
+                >Refresh practice</button
+              >
             {/if}
-            {#if recording}
-              <p role="status">
-                {pendingSubmission?.kind === "exposure"
-                  ? "Saving…"
-                  : "Saving review…"}
-              </p>
+            {#if waiting}
+              <p role="status">Saving…</p>
             {/if}
           {:else if practiceMode === "scheduled"}
             <div class="session-done">
@@ -1397,15 +1385,12 @@
                   ? "Session complete"
                   : "Nothing due right now"}
               </h2>
-              {#if sessionCount > 0}<p>
-                  {sessionCount}
-                  {sessionCount === 1 ? "review" : "reviews"} saved.
-                </p>{/if}
-              {#if studyQueue?.next_due_at}<p>
+              {#if sessionCount > 0}{@render savedReviews()}{/if}
+              {#if !checkingNext && studyQueue?.next_due_at}<p>
                   Next review: {dueLabel(studyQueue.next_due_at)}.
                 </p>{/if}
-              {#if studyQueue && studyQueue.items.length > 0}
-                <button class="primary" onclick={() => startPractice()}
+              {#if !checkingNext && studyQueue && studyQueue.items.length > 0}
+                <button class="primary" onclick={continuePractice}
                   >Continue practice</button
                 >
               {/if}
@@ -1414,10 +1399,7 @@
           {:else if sessionCount > 0}
             <div class="session-done">
               <h2>Session complete</h2>
-              <p>
-                {sessionCount}
-                {sessionCount === 1 ? "review" : "reviews"} saved.
-              </p>
+              {@render savedReviews()}
               <button class="primary" onclick={showLibrary}>Library</button>
               <button class="quiet" onclick={() => startPractice(true)}
                 >Practise again</button
@@ -1480,8 +1462,8 @@
             Practise
           </button>
         </section>
-      {:else if matchingBlocked}
-        <!-- The global save status or retry alert explains why the round is hidden. -->
+      {:else if !roundReady}
+        <!-- The save status or an alert explains why the round is hidden. -->
       {:else}
         <section class="matching-stage" aria-label="Matching pairs game">
           <p class="card-meta">
@@ -1496,10 +1478,7 @@
                   class="match-tile"
                   class:selected={selectedPrompt === fact.id}
                   class:matched={matched.includes(fact.id)}
-                  disabled={matched.includes(fact.id) ||
-                    pendingMatch !== null ||
-                    recording ||
-                    matchingBlocked}
+                  disabled={matched.includes(fact.id) || pendingMatch !== null}
                   onclick={() => choosePrompt(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -1522,9 +1501,7 @@
                   class:matched={matched.includes(fact.id)}
                   disabled={matched.includes(fact.id) ||
                     selectedPrompt === null ||
-                    pendingMatch !== null ||
-                    recording ||
-                    matchingBlocked}
+                    pendingMatch !== null}
                   onclick={() => chooseAnswer(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -1579,25 +1556,13 @@
 
               <div class="ratings">
                 {#each ratings as rating}
-                  <button
-                    class="rating"
-                    disabled={recording}
-                    onclick={() => gradeMatch(rating.id)}
-                  >
+                  <button class="rating" onclick={() => gradeMatch(rating.id)}>
                     <strong>{rating.name}</strong>
                     <span>{rating.detail}</span>
                   </button>
                 {/each}
               </div>
             </div>
-          {/if}
-
-          {#if reviewError}
-            <p class="error inline-error" role="alert">{reviewError}</p>
-          {/if}
-
-          {#if recording}
-            <p role="status">Saving review…</p>
           {/if}
 
           {#if matched.length === matchFacts.length}

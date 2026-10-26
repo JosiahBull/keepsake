@@ -90,6 +90,14 @@ result. Reusing a UUID for a different payload or submitting an old state versio
 a conflict. Batch exposures have the same retry guarantees. The older `/api/reviews`
 endpoint remains supplementary and cannot update FSRS state.
 
+The browser sends saves one at a time, in the order the learner made them, so the server
+applies the same sequence as an interface that waited for every response. Exposures still
+save before their answers or options appear; ratings save while the next question is shown.
+A failed save holds back later saves until it is retried with the same UUID. A
+refusal, such as a conflict, cannot succeed on retry; the browser drops that save and says
+so. A due queue is read only after earlier saves finish. Extra practice and matching
+samples ignore schedules, so the browser loads the next round before the current one ends.
+
 Events retain the target revision, assessment conditions, algorithm and parameter version,
 exact elapsed time, model interval, policy override and before/after state. They also retain
 the canonical request and recorded result. Export uses bounded cursors:

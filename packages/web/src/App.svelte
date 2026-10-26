@@ -12,6 +12,7 @@
     type Profile,
     type Screen,
   } from "./profiles";
+  import { preload } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
 
   let profiles = $state<Profile[]>([]);
@@ -107,6 +108,32 @@
     window.scrollTo(0, 0);
   }
 
+  // Guess the first screen from the address so its data loads alongside the profiles.
+  function preloadLaunch() {
+    const route = /^\/p\/(\d+)\/(library|practice|matching)\/?$/.exec(
+      location.pathname,
+    );
+    if (route) {
+      preload(Number(route[1]), route[2] as "library" | "practice" | "matching");
+      return;
+    }
+    if (location.pathname !== "/" && location.pathname !== "/share") return;
+    let remembered: string | null = null;
+    try {
+      remembered = localStorage.getItem("keepsake.profile");
+    } catch {
+      /* Without storage, the first screen loads after the profiles. */
+    }
+    if (!remembered || !/^\d+$/.test(remembered)) return;
+    const open = new URLSearchParams(location.search).get("open");
+    preload(
+      Number(remembered),
+      location.pathname === "/" && (open === "practice" || open === "matching")
+        ? open
+        : "library",
+    );
+  }
+
   function readLocation() {
     mountId += 1;
     const match =
@@ -165,6 +192,7 @@
   onMount(() => {
     let disposed = false;
     void serviceWorker();
+    preloadLaunch();
     void json<Profile[]>("/api/profiles")
       .then((result) => {
         if (disposed) return;

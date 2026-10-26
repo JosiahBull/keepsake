@@ -271,14 +271,16 @@ test("retrying after a committed but lost review response keeps one UUID and one
   await startScheduled(page);
   await attempt(page);
   await page.getByRole("button", { name: /^Good\b/ }).click();
-  await expect(page.getByRole("alert")).toContainText("Could not save this attempt.");
-  await expect(page.getByRole("heading", { name: fact.prompt, exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Easy\b/ })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("Could not save a review.");
+  await expect(page.getByRole("status")).toHaveText("Saving…");
+  await expect(page.getByText(/^Next review:/)).toHaveCount(0);
   const retried = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Retry save", exact: true }).click();
   expect(await (await retried).json()).toEqual(committed);
-  await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+  await expect(page.getByText("1 review saved.", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Next review:/)).toBeVisible();
   expect(requests).toHaveLength(2);
   expect(requests[1]).toEqual(requests[0]);
   expect((await events(app)).items).toHaveLength(2);
