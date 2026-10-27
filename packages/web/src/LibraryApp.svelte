@@ -1609,6 +1609,8 @@
   /* Global defaults and accessible focus */
   :global(*) {
     box-sizing: border-box;
+    /* Quick taps on buttons and tiles must not zoom the page; pinch zoom still works. */
+    touch-action: manipulation;
   }
 
   :global(body) {
@@ -1667,6 +1669,8 @@
   :global(input),
   :global(textarea) {
     width: 100%;
+    /* iOS zooms into a focused field whose text is smaller than 16px. */
+    font-size: 1rem;
     background: #fff;
     color: #18362f;
     border: 1px solid #b4c8c0;

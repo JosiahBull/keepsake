@@ -131,7 +131,6 @@
   }
 
   main {
-    min-height: calc(100vh - 112px);
     padding: 2rem 0 4rem;
   }
 
