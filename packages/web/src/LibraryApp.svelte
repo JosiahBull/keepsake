@@ -3,6 +3,8 @@
   import { type components, type paths } from "@keepsake/client";
   import createClient from "openapi-fetch";
   import type { Snippet } from "svelte";
+  import AppShell from "./AppShell.svelte";
+  import LibraryHeading from "./LibraryHeading.svelte";
   import { preloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
@@ -953,698 +955,638 @@
   {/if}
 {/snippet}
 
-<div class="app-shell">
-  <header class="app-header">
-    <a
-      class="brand"
-      href="#library"
-      onclick={showLibrary}
-      aria-label="Keepsake library"
-    >
-      <img src="/keepsake-logo.png" alt="Keepsake" width="2172" height="724" />
-    </a>
-    <nav aria-label="Main navigation">
-      <button
-        class:active={view === "library"}
-        disabled={navigationBlocked}
-        onclick={showLibrary}
+<AppShell
+  {profileId}
+  current={view}
+  disabled={navigationBlocked}
+  adding={showAdd}
+  onNavigate={(next) => {
+    if (next === "library") showLibrary();
+    else if (next === "practice") void startPractice();
+    else void startMatching();
+  }}
+  onAdd={openAdd}
+  {profileMenu}
+>
+  {#if waiting && view !== "practice"}
+    <p role="status">Saving…</p>
+  {/if}
+  {#if saves.failure}
+    <div class="message error" role="alert">
+      {saves.failure.label}
+      {message(saves.failure.error)}
+      <button class="text-button" onclick={() => saves.retry()}
+        >Retry save</button
       >
-        Library
-      </button>
-      <button
-        class:active={view === "practice"}
-        disabled={navigationBlocked}
-        onclick={() => startPractice()}
-      >
-        Practise
-      </button>
-      <button
-        class:active={view === "matching"}
-        disabled={navigationBlocked}
-        onclick={startMatching}
-      >
-        Match pairs
-      </button>
-    </nav>
-    <button
-      class="primary add-top"
-      disabled={navigationBlocked}
-      onclick={openAdd}
-    >
-      {showAdd ? "Close form" : "Add a fact"}
-    </button>
-    {@render profileMenu()}
-  </header>
+    </div>
+  {/if}
+  {#if saveWarning}
+    <div class="message error" role="alert">{saveWarning}</div>
+  {/if}
+  {#if error && view === "library"}
+    <div class="message error" role="alert">
+      {error}
 
-  <main>
-    {#if waiting && view !== "practice"}
-      <p role="status">Saving…</p>
-    {/if}
-    {#if saves.failure}
-      <div class="message error" role="alert">
-        {saves.failure.label}
-        {message(saves.failure.error)}
-        <button class="text-button" onclick={() => saves.retry()}
-          >Retry save</button
+      {#if !showAdd}
+        <button class="text-button" onclick={() => loadFacts()}
+          >Try again</button
         >
-      </div>
-    {/if}
-    {#if saveWarning}
-      <div class="message error" role="alert">{saveWarning}</div>
-    {/if}
-    {#if error && view === "library"}
-      <div class="message error" role="alert">
-        {error}
+      {/if}
+    </div>
+  {/if}
 
-        {#if !showAdd}
-          <button class="text-button" onclick={() => loadFacts()}
-            >Try again</button
-          >
-        {/if}
-      </div>
-    {/if}
+  {#if notice}
+    <p class="message success" role="status">{notice}</p>
+  {/if}
 
-    {#if notice}
-      <p class="message success" role="status">{notice}</p>
-    {/if}
+  {#if view === "library"}
+    <LibraryHeading
+      current="library"
+      disabled={blocked}
+      addDisabled={navigationBlocked}
+      adding={showAdd}
+      onAdd={openAdd}
+      {onNavigate}
+    >
+      {#if !error && !loading}
+        <span class="muted">
+          {totalFacts}
+          {totalFacts === 1 ? "fact" : "facts"}
+        </span>
+      {/if}
+    </LibraryHeading>
 
-    {#if view === "library"}
-      <div class="page-heading">
-        <h1>Library</h1>
-        <button
-          class="primary mobile-add"
-          disabled={navigationBlocked}
-          onclick={openAdd}>{showAdd ? "Close form" : "Add a fact"}</button
-        >
-
-        {#if !error && !loading}
-          <span class="muted">
-            {totalFacts}
-            {totalFacts === 1 ? "fact" : "facts"}
-          </span>
-        {/if}
-      </div>
-
-      <div class="library-tabs">
-        <button class="active" disabled>My library</button><button
+    {#if selectedFacts.length}<div class="share-selection">
+        <span>{selectedFacts.length} selected</span><button
+          class="quiet"
           disabled={blocked}
-          onclick={() => onNavigate("sharing")}>Shared with me</button
-        ><button disabled={blocked} onclick={() => onNavigate("sent")}
-          >Sent facts</button
+          onclick={() => onShare(selectedFacts)}>Share selected</button
+        ><button class="text-button" onclick={() => (selectedFacts = [])}
+          >Clear selection</button
         >
-      </div>
+      </div>{/if}
 
-      {#if selectedFacts.length}<div class="share-selection">
-          <span>{selectedFacts.length} selected</span><button
-            class="quiet"
-            disabled={blocked}
-            onclick={() => onShare(selectedFacts)}>Share selected</button
-          ><button class="text-button" onclick={() => (selectedFacts = [])}
-            >Clear selection</button
-          >
-        </div>{/if}
-
-      {#if showAdd}
-        <section class="add-panel" aria-labelledby="add-heading">
-          <h2 id="add-heading">Add a fact</h2>
-          <form onsubmit={addFact}>
-            <label>
-              Question
-              <textarea bind:value={prompt} required maxlength="8000" rows="2"
-              ></textarea>
-            </label>
-            <label>
-              Answer
-              <textarea bind:value={answer} required maxlength="20000" rows="3"
-              ></textarea>
-            </label>
-            <details
-              class="form-details"
-              open={Boolean(initialDraft?.context || initialDraft?.source)}
-            >
-              <summary>Context, source and tags (optional)</summary>
-              <div class="optional-fields">
-                <label>
-                  Context
-                  <textarea
-                    bind:value={context}
-                    maxlength="30000"
-                    rows="2"
-                    placeholder="Background or qualifications"
-                  ></textarea>
-                </label>
-                <div class="form-pair">
-                  <label>
-                    Source
-                    <input
-                      bind:value={source}
-                      maxlength="2000"
-                      placeholder="URL, book or document"
-                    />
-                  </label>
-                  <label>
-                    Tags <span class="optional">comma separated</span>
-                    <input bind:value={tags} maxlength="1000" />
-                  </label>
-                </div>
-              </div>
-            </details>
-            <div class="form-actions">
-              <button type="submit" class="primary" disabled={saving}>
-                {saving ? "Saving…" : "Save fact"}
-              </button>
-              <button
-                type="button"
-                class="quiet"
-                onclick={() => {
-                  showAdd = false;
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </section>
-      {/if}
-
-      {#if totalFacts > 0 || search || pageHistory.length > 0}
-        <div class="library-tools">
-          <label class="search">
-            <span class="sr-only">Search facts</span>
-            <input
-              type="search"
-              value={search}
-              oninput={searchLibrary}
-              placeholder="Search facts or tags"
-              maxlength="1000"
-            />
+    {#if showAdd}
+      <section class="add-panel" aria-labelledby="add-heading">
+        <h2 id="add-heading">Add a fact</h2>
+        <form onsubmit={addFact}>
+          <label>
+            Question
+            <textarea bind:value={prompt} required maxlength="8000" rows="2"
+            ></textarea>
           </label>
-        </div>
-      {/if}
-      {#if loading}
-        <p role="status">Loading library…</p>
-      {:else if totalFacts === 0 && !search}
-        {#if !showAdd && !error}
-          <p class="empty-state">No facts yet. Add a fact to start.</p>
-        {/if}
-      {:else}
-        <section class="fact-list" aria-label="Saved facts">
-          {#each facts as fact (fact.id)}
-            <article class="fact-row">
-              <input
-                class="fact-select"
-                type="checkbox"
-                aria-label={`Select ${fact.prompt}`}
-                checked={selectedFacts.includes(fact.id)}
-                disabled={!selectedFacts.includes(fact.id) &&
-                  selectedFacts.length >= 20}
-                onchange={() =>
-                  (selectedFacts = selectedFacts.includes(fact.id)
-                    ? selectedFacts.filter((id) => id !== fact.id)
-                    : [...selectedFacts, fact.id])}
-              />
-              <details
-                class="fact-details"
-                ontoggle={(event) => discloseFact(event, fact.id)}
-              >
-                <summary onclick={() => clearDisclosure(fact.id)}>
-                  <h2>{fact.prompt}</h2>
-                </summary>
-                {#if disclosedFacts.includes(fact.id)}
-                  <div class="fact-body">
-                    <p class="answer-copy">{fact.answer}</p>
-
-                    {#if fact.context}
-                      <p class="context-copy">{fact.context}</p>
-                    {/if}
-
-                    {#if fact.source}
-                      <p class="source">
-                        Source:
-                        {#if sourceUrl(fact.source)}
-                          <a
-                            href={fact.source}
-                            title={fact.source}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {fact.source}
-                          </a>
-                        {:else}
-                          {fact.source}
-                        {/if}
-                      </p>
-                    {/if}
-
-                    {#if fact.shared_by}<p class="source">
-                        Shared by {fact.shared_by}
-                      </p>{/if}
-
-                    {#if fact.tags.length}
-                      <p class="tags">Tags: {fact.tags.join(", ")}</p>
-                    {/if}
-                  </div>
-                {/if}
-              </details>
-            </article>
-          {:else}
-            {#if !error}
-              <p class="no-results">
-                No facts match “{search}”. Clear or change your search.
-              </p>
-            {/if}
-          {/each}
-        </section>
-        {#if pageHistory.length > 0 || nextCursor !== null}
-          <nav class="pagination" aria-label="Library pages">
-            <button
-              class="quiet"
-              disabled={loading || pageHistory.length === 0}
-              onclick={previousPage}>Previous</button
-            >
-            <span class="muted">Page {pageHistory.length + 1}</span>
-            <button
-              class="quiet"
-              disabled={loading || nextCursor === null}
-              onclick={nextPage}>Next</button
-            >
-          </nav>
-        {/if}
-      {/if}
-    {:else if view === "practice"}
-      <h1 class="sr-only">Practise</h1>
-      <div class="practice-layout">
-        <div class="practice-toolbar">
-          <span class="muted"
-            >{practiceMode === "scheduled"
-              ? "Scheduled recall"
-              : "Extra practice · does not advance recall"}</span
+          <label>
+            Answer
+            <textarea bind:value={answer} required maxlength="20000" rows="3"
+            ></textarea>
+          </label>
+          <details
+            class="form-details"
+            open={Boolean(initialDraft?.context || initialDraft?.source)}
           >
-          <button
-            class="text-button"
-            disabled={navigationBlocked}
-            onclick={() => startPractice(practiceMode === "scheduled")}
-          >
-            {practiceMode === "scheduled"
-              ? "Extra practice"
-              : "Scheduled recall"}
-          </button>
-        </div>
-        {#if studyQueue?.budget_reached}
-          <p class="message" role="status">
-            Daily study budget reached. You can stop here or keep going.
-          </p>
-        {/if}
-        <section
-          class="practice-stage"
-          aria-label={selectedMode?.name ?? "Practice session"}
-        >
-          {#if practiceLoading}
-            <p role="status">Loading practice…</p>
-          {:else if practiceError}
-            <div class="message error" role="alert">{practiceError}</div>
-            <button
-              class="quiet"
-              onclick={() => startPractice(practiceMode === "extra")}
-              >Try again</button
-            >
-          {:else if current}
-            <p class="card-meta">
-              {selectedMode?.name} · {cursor + 1} of {queue.length}
-            </p>
-            <h2 class="question">{current.practice.prompt}</h2>
-
-            {#if mode === "multiple_choice"}
-              {#if choicesReady}
-                <fieldset
-                  class="choices"
-                  disabled={revealed || revealRequested}
-                >
-                  <legend class="sr-only">Choose an answer</legend>
-
-                  {#each choiceOptions as option}
-                    <label
-                      class:chosen={choice === option}
-                      class:correct={revealed &&
-                        option === current.practice.answer}
-                      class:incorrect={revealed &&
-                        choice === option &&
-                        option !== current.practice.answer}
-                    >
-                      <input
-                        type="radio"
-                        name="answer"
-                        value={option}
-                        bind:group={choice}
-                      />
-                      <span>{option}</span>
-                    </label>
-                  {/each}
-                </fieldset>
-              {/if}
-            {:else}
-              <label class="response-label">
-                Your answer <span class="optional">optional</span>
+            <summary>Context, source and tags (optional)</summary>
+            <div class="optional-fields">
+              <label>
+                Context
                 <textarea
-                  rows={mode === "flashcard" || mode === "cloze" ? 3 : 5}
-                  bind:value={response}
-                  readonly={revealed || revealRequested}
-                  placeholder="Write or say your answer before revealing."
+                  bind:value={context}
+                  maxlength="30000"
+                  rows="2"
+                  placeholder="Background or qualifications"
                 ></textarea>
               </label>
-              {#if scheduledQuestion && !revealRequested}
-                <label class="recall-confirmation">
-                  <input type="checkbox" bind:checked={recalled} />
-                  I tried to recall
+              <div class="form-pair">
+                <label>
+                  Source
+                  <input
+                    bind:value={source}
+                    maxlength="2000"
+                    placeholder="URL, book or document"
+                  />
                 </label>
-              {/if}
-            {/if}
-
-            {#if !revealed}
-              <button
-                class="primary"
-                disabled={revealRequested ||
-                  (mode === "multiple_choice" && choice === null)}
-                onclick={reveal}
-              >
-                {mode === "multiple_choice" ? "Check answer" : "Reveal answer"}
-              </button>
-            {:else}
-              <div class="answer-panel">
-                <h3>
-                  {mode === "multiple_choice"
-                    ? choice === current.practice.answer
-                      ? "Correct"
-                      : "Correct answer"
-                    : "Answer"}
-                </h3>
-                <p class="answer-copy">{current.practice.answer}</p>
-
-                {#if current.practice.explanation}
-                  <p class="context-copy">{current.practice.explanation}</p>
-                {/if}
-
-                {#if current.fact.context && current.fact.context !== current.practice.explanation}
-                  <details>
-                    <summary>Context</summary>
-                    <p class="context-copy">{current.fact.context}</p>
-                  </details>
-                {/if}
-
-                {#if current.fact.source}
-                  <p class="source">
-                    Source:
-                    {#if sourceUrl(current.fact.source)}
-                      <a
-                        href={current.fact.source}
-                        title={current.fact.source}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {current.fact.source}
-                      </a>
-                    {:else}
-                      {current.fact.source}
-                    {/if}
-                  </p>
-                {/if}
-
-                {#if practiceMode === "extra"}
-                  <p class="verification-note">
-                    Check generated answers against their source.
-                  </p>
-                {/if}
+                <label>
+                  Tags <span class="optional">comma separated</span>
+                  <input bind:value={tags} maxlength="1000" />
+                </label>
               </div>
-              <div class="grade-panel">
-                {#if exposureOnly}
-                  <p>
-                    Answer viewed without a recall attempt. This does not
-                    advance its schedule.
-                  </p>
-                  <button
-                    class="primary"
-                    disabled={studyConflict}
-                    onclick={() => {
-                      play("file");
-                      nextQuestion();
-                    }}>Continue</button
+            </div>
+          </details>
+          <div class="form-actions">
+            <button type="submit" class="primary" disabled={saving}>
+              {saving ? "Saving…" : "Save fact"}
+            </button>
+            <button
+              type="button"
+              class="quiet"
+              onclick={() => {
+                showAdd = false;
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </section>
+    {/if}
+
+    {#if totalFacts > 0 || search || pageHistory.length > 0}
+      <div class="library-tools">
+        <label class="search">
+          <span class="sr-only">Search facts</span>
+          <input
+            type="search"
+            value={search}
+            oninput={searchLibrary}
+            placeholder="Search facts or tags"
+            maxlength="1000"
+          />
+        </label>
+      </div>
+    {/if}
+    {#if loading}
+      <p role="status">Loading library…</p>
+    {:else if totalFacts === 0 && !search}
+      {#if !showAdd && !error}
+        <p class="empty-state">No facts yet. Add a fact to start.</p>
+      {/if}
+    {:else}
+      <section class="fact-list" aria-label="Saved facts">
+        {#each facts as fact (fact.id)}
+          <article class="fact-row">
+            <input
+              class="fact-select"
+              type="checkbox"
+              aria-label={`Select ${fact.prompt}`}
+              checked={selectedFacts.includes(fact.id)}
+              disabled={!selectedFacts.includes(fact.id) &&
+                selectedFacts.length >= 20}
+              onchange={() =>
+                (selectedFacts = selectedFacts.includes(fact.id)
+                  ? selectedFacts.filter((id) => id !== fact.id)
+                  : [...selectedFacts, fact.id])}
+            />
+            <details
+              class="fact-details"
+              ontoggle={(event) => discloseFact(event, fact.id)}
+            >
+              <summary onclick={() => clearDisclosure(fact.id)}>
+                <h2>{fact.prompt}</h2>
+              </summary>
+              {#if disclosedFacts.includes(fact.id)}
+                <div class="fact-body">
+                  <p class="answer-copy">{fact.answer}</p>
+
+                  {#if fact.context}
+                    <p class="context-copy">{fact.context}</p>
+                  {/if}
+
+                  {#if fact.source}
+                    <p class="source">
+                      Source:
+                      {#if sourceUrl(fact.source)}
+                        <a
+                          href={fact.source}
+                          title={fact.source}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {fact.source}
+                        </a>
+                      {:else}
+                        {fact.source}
+                      {/if}
+                    </p>
+                  {/if}
+
+                  {#if fact.shared_by}<p class="source">
+                      Shared by {fact.shared_by}
+                    </p>{/if}
+
+                  {#if fact.tags.length}
+                    <p class="tags">Tags: {fact.tags.join(", ")}</p>
+                  {/if}
+                </div>
+              {/if}
+            </details>
+          </article>
+        {:else}
+          {#if !error}
+            <p class="no-results">
+              No facts match “{search}”. Clear or change your search.
+            </p>
+          {/if}
+        {/each}
+      </section>
+      {#if pageHistory.length > 0 || nextCursor !== null}
+        <nav class="pagination" aria-label="Library pages">
+          <button
+            class="quiet"
+            disabled={loading || pageHistory.length === 0}
+            onclick={previousPage}>Previous</button
+          >
+          <span class="muted">Page {pageHistory.length + 1}</span>
+          <button
+            class="quiet"
+            disabled={loading || nextCursor === null}
+            onclick={nextPage}>Next</button
+          >
+        </nav>
+      {/if}
+    {/if}
+  {:else if view === "practice"}
+    <h1 class="sr-only">Practise</h1>
+    <div class="practice-layout">
+      <div class="practice-toolbar">
+        <span class="muted"
+          >{practiceMode === "scheduled"
+            ? "Scheduled recall"
+            : "Extra practice · does not advance recall"}</span
+        >
+        <button
+          class="text-button"
+          disabled={navigationBlocked}
+          onclick={() => startPractice(practiceMode === "scheduled")}
+        >
+          {practiceMode === "scheduled"
+            ? "Extra practice"
+            : "Scheduled recall"}
+        </button>
+      </div>
+      {#if studyQueue?.budget_reached}
+        <p class="message" role="status">
+          Daily study budget reached. You can stop here or keep going.
+        </p>
+      {/if}
+      <section
+        class="practice-stage"
+        aria-label={selectedMode?.name ?? "Practice session"}
+      >
+        {#if practiceLoading}
+          <p role="status">Loading practice…</p>
+        {:else if practiceError}
+          <div class="message error" role="alert">{practiceError}</div>
+          <button
+            class="quiet"
+            onclick={() => startPractice(practiceMode === "extra")}
+            >Try again</button
+          >
+        {:else if current}
+          <p class="card-meta">
+            {selectedMode?.name} · {cursor + 1} of {queue.length}
+          </p>
+          <h2 class="question">{current.practice.prompt}</h2>
+
+          {#if mode === "multiple_choice"}
+            {#if choicesReady}
+              <fieldset
+                class="choices"
+                disabled={revealed || revealRequested}
+              >
+                <legend class="sr-only">Choose an answer</legend>
+
+                {#each choiceOptions as option}
+                  <label
+                    class:chosen={choice === option}
+                    class:correct={revealed &&
+                      option === current.practice.answer}
+                    class:incorrect={revealed &&
+                      choice === option &&
+                      option !== current.practice.answer}
                   >
-                {:else}
-                  <h3>Rate your attempt</h3>
-                  <div class="ratings">
-                    {#each ratings as rating}
-                      <button
-                        class="rating"
-                        disabled={studyConflict}
-                        onclick={() => grade(rating.id)}
-                      >
-                        <strong>{rating.name}</strong>
-                        <span>{rating.detail}</span>
-                        {#if scheduledQuestion}<span
-                            >{intervalLabel(
-                              scheduledQuestion.intervals[rating.id],
-                            )}</span
-                          >{/if}
-                      </button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
+                    <input
+                      type="radio"
+                      name="answer"
+                      value={option}
+                      bind:group={choice}
+                    />
+                    <span>{option}</span>
+                  </label>
+                {/each}
+              </fieldset>
             {/if}
-            {#if studyConflict}
-              <p class="error inline-error" role="alert">{reviewError}</p>
-              <button class="quiet" onclick={() => startPractice()}
-                >Refresh practice</button
-              >
-            {/if}
-            {#if waiting}
-              <p role="status">Saving…</p>
-            {/if}
-          {:else if practiceMode === "scheduled"}
-            <div class="session-done">
-              <h2>
-                {sessionCount > 0
-                  ? "Session complete"
-                  : "Nothing due right now"}
-              </h2>
-              {#if sessionCount > 0}{@render savedReviews()}{/if}
-              {#if !checkingNext && studyQueue?.next_due_at}<p>
-                  Next review: {dueLabel(studyQueue.next_due_at)}.
-                </p>{/if}
-              {#if !checkingNext && studyQueue && studyQueue.items.length > 0}
-                <button class="primary" onclick={continuePractice}
-                  >Continue practice</button
-                >
-              {/if}
-              <button class="quiet" onclick={showLibrary}>Library</button>
-            </div>
-          {:else if sessionCount > 0}
-            <div class="session-done">
-              <h2>Session complete</h2>
-              {@render savedReviews()}
-              <button class="primary" onclick={showLibrary}>Library</button>
-              <button class="quiet" onclick={() => startPractice(true)}
-                >Practise again</button
-              >
-            </div>
           {:else}
-            <div class="session-done">
-              <h2>
-                {practiceTotal ? "No practice prompts yet." : "No facts yet."}
-              </h2>
+            <label class="response-label">
+              Your answer <span class="optional">optional</span>
+              <textarea
+                rows={mode === "flashcard" || mode === "cloze" ? 3 : 5}
+                bind:value={response}
+                readonly={revealed || revealRequested}
+                placeholder="Write or say your answer before revealing."
+              ></textarea>
+            </label>
+            {#if scheduledQuestion && !revealRequested}
+              <label class="recall-confirmation">
+                <input type="checkbox" bind:checked={recalled} />
+                I tried to recall
+              </label>
+            {/if}
+          {/if}
 
-              {#if practiceTotal}
-                <p>
-                  Generate prompts with <code
-                    >keepsake generate ID --agent claude</code
-                  >.
+          {#if !revealed}
+            <button
+              class="primary"
+              disabled={revealRequested ||
+                (mode === "multiple_choice" && choice === null)}
+              onclick={reveal}
+            >
+              {mode === "multiple_choice" ? "Check answer" : "Reveal answer"}
+            </button>
+          {:else}
+            <div class="answer-panel">
+              <h3>
+                {mode === "multiple_choice"
+                  ? choice === current.practice.answer
+                    ? "Correct"
+                    : "Correct answer"
+                  : "Answer"}
+              </h3>
+              <p class="answer-copy">{current.practice.answer}</p>
+
+              {#if current.practice.explanation}
+                <p class="context-copy">{current.practice.explanation}</p>
+              {/if}
+
+              {#if current.fact.context && current.fact.context !== current.practice.explanation}
+                <details>
+                  <summary>Context</summary>
+                  <p class="context-copy">{current.fact.context}</p>
+                </details>
+              {/if}
+
+              {#if current.fact.source}
+                <p class="source">
+                  Source:
+                  {#if sourceUrl(current.fact.source)}
+                    <a
+                      href={current.fact.source}
+                      title={current.fact.source}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {current.fact.source}
+                    </a>
+                  {:else}
+                    {current.fact.source}
+                  {/if}
                 </p>
-              {:else}
+              {/if}
+
+              {#if practiceMode === "extra"}
+                <p class="verification-note">
+                  Check generated answers against their source.
+                </p>
+              {/if}
+            </div>
+            <div class="grade-panel">
+              {#if exposureOnly}
+                <p>
+                  Answer viewed without a recall attempt. This does not
+                  advance its schedule.
+                </p>
                 <button
                   class="primary"
+                  disabled={studyConflict}
                   onclick={() => {
-                    view = "library";
-                    showAdd = true;
-                  }}
+                    play("file");
+                    nextQuestion();
+                  }}>Continue</button
                 >
-                  Add a fact
-                </button>
+              {:else}
+                <h3>Rate your attempt</h3>
+                <div class="ratings">
+                  {#each ratings as rating}
+                    <button
+                      class="rating"
+                      disabled={studyConflict}
+                      onclick={() => grade(rating.id)}
+                    >
+                      <strong>{rating.name}</strong>
+                      <span>{rating.detail}</span>
+                      {#if scheduledQuestion}<span
+                          >{intervalLabel(
+                            scheduledQuestion.intervals[rating.id],
+                          )}</span
+                        >{/if}
+                    </button>
+                  {/each}
+                </div>
               {/if}
             </div>
           {/if}
-        </section>
-        {#if selectedMode}
-          <details class="study-notes">
-            <summary>Practice notes</summary>
-            <p>
-              {selectedMode.instruction}
-              {#if practiceMode === "scheduled"}
-                Only an unaided recall attempt changes the review schedule.
-                Viewing an answer delays assessment for ten minutes.
-              {:else}
-                Extra practice samples up to 20 prompts. Recognition,
-                explanation and application do not advance the recall schedule.
-              {/if}
-            </p>
-          </details>
+          {#if studyConflict}
+            <p class="error inline-error" role="alert">{reviewError}</p>
+            <button class="quiet" onclick={() => startPractice()}
+              >Refresh practice</button
+            >
+          {/if}
+          {#if waiting}
+            <p role="status">Saving…</p>
+          {/if}
+        {:else if practiceMode === "scheduled"}
+          <div class="session-done">
+            <h2>
+              {sessionCount > 0
+                ? "Session complete"
+                : "Nothing due right now"}
+            </h2>
+            {#if sessionCount > 0}{@render savedReviews()}{/if}
+            {#if !checkingNext && studyQueue?.next_due_at}<p>
+                Next review: {dueLabel(studyQueue.next_due_at)}.
+              </p>{/if}
+            {#if !checkingNext && studyQueue && studyQueue.items.length > 0}
+              <button class="primary" onclick={continuePractice}
+                >Continue practice</button
+              >
+            {/if}
+            <button class="quiet" onclick={showLibrary}>Library</button>
+          </div>
+        {:else if sessionCount > 0}
+          <div class="session-done">
+            <h2>Session complete</h2>
+            {@render savedReviews()}
+            <button class="primary" onclick={showLibrary}>Library</button>
+            <button class="quiet" onclick={() => startPractice(true)}
+              >Practise again</button
+            >
+          </div>
+        {:else}
+          <div class="session-done">
+            <h2>
+              {practiceTotal ? "No practice prompts yet." : "No facts yet."}
+            </h2>
+
+            {#if practiceTotal}
+              <p>
+                Generate prompts with <code
+                  >keepsake generate ID --agent claude</code
+                >.
+              </p>
+            {:else}
+              <button
+                class="primary"
+                onclick={() => {
+                  view = "library";
+                  showAdd = true;
+                }}
+              >
+                Add a fact
+              </button>
+            {/if}
+          </div>
         {/if}
-      </div>
-    {:else}
-      <h1 class="sr-only">Match pairs</h1>
-
-      {#if matchingLoading}
-        <p role="status">Loading matching pairs…</p>
-      {:else if matchingError}
-        <div class="message error" role="alert">{matchingError}</div>
-        <button class="quiet" onclick={startMatching}>Try again</button>
-      {:else if matchFacts.length < 3}
-        <section class="empty-state">
-          <h2>Add three related facts with a shared topic tag to play.</h2>
-          <button class="primary" onclick={() => startPractice()}>
-            Practise
-          </button>
-        </section>
-      {:else if !roundReady}
-        <!-- The save status or an alert explains why the round is hidden. -->
-      {:else}
-        <section class="matching-stage" aria-label="Matching pairs game">
-          <p class="card-meta">
-            {matched.length} of {matchFacts.length} matched
+      </section>
+      {#if selectedMode}
+        <details class="study-notes">
+          <summary>Practice notes</summary>
+          <p>
+            {selectedMode.instruction}
+            {#if practiceMode === "scheduled"}
+              Only an unaided recall attempt changes the review schedule.
+              Viewing an answer delays assessment for ten minutes.
+            {:else}
+              Extra practice samples up to 20 prompts. Recognition,
+              explanation and application do not advance the recall schedule.
+            {/if}
           </p>
-          <div class="matching-columns">
-            <div>
-              <h2>Questions</h2>
+        </details>
+      {/if}
+    </div>
+  {:else}
+    <h1 class="sr-only">Match pairs</h1>
 
-              {#each matchFacts as fact}
-                <button
-                  class="match-tile"
-                  class:selected={selectedPrompt === fact.id}
-                  class:matched={matched.includes(fact.id)}
-                  disabled={matched.includes(fact.id) || pendingMatch !== null}
-                  onclick={() => choosePrompt(fact.id)}
-                >
-                  {#if matched.includes(fact.id)}
-                    <span aria-label="Matched">✓</span>
-                  {/if}
-                  {fact.prompt}
-                </button>
-              {/each}
-            </div>
-            <div>
-              <h2>Answers</h2>
+    {#if matchingLoading}
+      <p role="status">Loading matching pairs…</p>
+    {:else if matchingError}
+      <div class="message error" role="alert">{matchingError}</div>
+      <button class="quiet" onclick={startMatching}>Try again</button>
+    {:else if matchFacts.length < 3}
+      <section class="empty-state">
+        <h2>Add three related facts with a shared topic tag to play.</h2>
+        <button class="primary" onclick={() => startPractice()}>
+          Practise
+        </button>
+      </section>
+    {:else if !roundReady}
+      <!-- The save status or an alert explains why the round is hidden. -->
+    {:else}
+      <section class="matching-stage" aria-label="Matching pairs game">
+        <p class="card-meta">
+          {matched.length} of {matchFacts.length} matched
+        </p>
+        <div class="matching-columns">
+          <div>
+            <h2>Questions</h2>
 
-              {#each matchAnswers as fact}
-                <button
-                  class="match-tile"
-                  class:wrong={selectedAnswer === fact.id &&
-                    selectedAnswer !== selectedPrompt}
-                  class:selected={selectedAnswer === fact.id &&
-                    selectedAnswer === selectedPrompt}
-                  class:matched={matched.includes(fact.id)}
-                  disabled={matched.includes(fact.id) ||
-                    selectedPrompt === null ||
-                    pendingMatch !== null}
-                  onclick={() => chooseAnswer(fact.id)}
-                >
-                  {#if matched.includes(fact.id)}
-                    <span aria-label="Matched">✓</span>
-                  {/if}
-                  {fact.answer}
+            {#each matchFacts as fact}
+              <button
+                class="match-tile"
+                class:selected={selectedPrompt === fact.id}
+                class:matched={matched.includes(fact.id)}
+                disabled={matched.includes(fact.id) || pendingMatch !== null}
+                onclick={() => choosePrompt(fact.id)}
+              >
+                {#if matched.includes(fact.id)}
+                  <span aria-label="Matched">✓</span>
+                {/if}
+                {fact.prompt}
+              </button>
+            {/each}
+          </div>
+          <div>
+            <h2>Answers</h2>
+
+            {#each matchAnswers as fact}
+              <button
+                class="match-tile"
+                class:wrong={selectedAnswer === fact.id &&
+                  selectedAnswer !== selectedPrompt}
+                class:selected={selectedAnswer === fact.id &&
+                  selectedAnswer === selectedPrompt}
+                class:matched={matched.includes(fact.id)}
+                disabled={matched.includes(fact.id) ||
+                  selectedPrompt === null ||
+                  pendingMatch !== null}
+                onclick={() => chooseAnswer(fact.id)}
+              >
+                {#if matched.includes(fact.id)}
+                  <span aria-label="Matched">✓</span>
+                {/if}
+                {fact.answer}
+              </button>
+            {/each}
+          </div>
+        </div>
+        <p class="match-feedback" role="status">
+          {matchFeedback || "Choose a question, then its answer."}
+        </p>
+
+        {#if pendingMatch !== null}
+          <div class="grade-panel">
+            <h3>Rate your recognition</h3>
+
+            {#if pendingFact?.context}
+              <p class="context-copy">{pendingFact.context}</p>
+            {/if}
+
+            {#if pendingFact?.source}
+              <p class="source">
+                Source:
+                {#if sourceUrl(pendingFact.source)}
+                  <a
+                    href={pendingFact.source}
+                    title={pendingFact.source}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {pendingFact.source}
+                  </a>
+                {:else}
+                  {pendingFact.source}
+                {/if}
+              </p>
+            {/if}
+
+            {#if matchMisses[pendingMatch]}
+              <p>
+                {matchMisses[pendingMatch]} incorrect {matchMisses[
+                  pendingMatch
+                ] === 1
+                  ? "choice"
+                  : "choices"}. Choose Again if you guessed.
+              </p>
+            {:else}
+              <p>Choose Again if you guessed.</p>
+            {/if}
+
+            <div class="ratings">
+              {#each ratings as rating}
+                <button class="rating" onclick={() => gradeMatch(rating.id)}>
+                  <strong>{rating.name}</strong>
+                  <span>{rating.detail}</span>
                 </button>
               {/each}
             </div>
           </div>
-          <p class="match-feedback" role="status">
-            {matchFeedback || "Choose a question, then its answer."}
-          </p>
+        {/if}
 
-          {#if pendingMatch !== null}
-            <div class="grade-panel">
-              <h3>Rate your recognition</h3>
-
-              {#if pendingFact?.context}
-                <p class="context-copy">{pendingFact.context}</p>
-              {/if}
-
-              {#if pendingFact?.source}
-                <p class="source">
-                  Source:
-                  {#if sourceUrl(pendingFact.source)}
-                    <a
-                      href={pendingFact.source}
-                      title={pendingFact.source}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {pendingFact.source}
-                    </a>
-                  {:else}
-                    {pendingFact.source}
-                  {/if}
-                </p>
-              {/if}
-
-              {#if matchMisses[pendingMatch]}
-                <p>
-                  {matchMisses[pendingMatch]} incorrect {matchMisses[
-                    pendingMatch
-                  ] === 1
-                    ? "choice"
-                    : "choices"}. Choose Again if you guessed.
-                </p>
-              {:else}
-                <p>Choose Again if you guessed.</p>
-              {/if}
-
-              <div class="ratings">
-                {#each ratings as rating}
-                  <button class="rating" onclick={() => gradeMatch(rating.id)}>
-                    <strong>{rating.name}</strong>
-                    <span>{rating.detail}</span>
-                  </button>
-                {/each}
-              </div>
-            </div>
-          {/if}
-
-          {#if matched.length === matchFacts.length}
-            <div class="form-actions">
-              <button class="primary" onclick={startMatching}>Play again</button
-              >
-              <button class="quiet" onclick={() => startPractice()}>
-                Practise
-              </button>
-            </div>
-          {/if}
-        </section>
-        <p class="study-notes">
-          Matching tests recognition, which differs from unaided recall.
-        </p>
-      {/if}
+        {#if matched.length === matchFacts.length}
+          <div class="form-actions">
+            <button class="primary" onclick={startMatching}>Play again</button
+            >
+            <button class="quiet" onclick={() => startPractice()}>
+              Practise
+            </button>
+          </div>
+        {/if}
+      </section>
+      <p class="study-notes">
+        Matching tests recognition, which differs from unaided recall.
+      </p>
     {/if}
-  </main>
-</div>
+  {/if}
+</AppShell>
 
 <style>
-  .mobile-add {
-    display: none;
-  }
-  .library-tabs {
-    display: flex;
-    gap: 0.4rem;
-    border-bottom: 1px solid #cedbd5;
-    margin-bottom: 1.4rem;
-  }
-  .library-tabs button {
-    padding: 0.7rem 1rem;
-    color: #244c44;
-    background: transparent;
-  }
-  .library-tabs .active {
-    background: #e3ede7;
-    opacity: 1;
-    font-weight: 600;
-  }
   .share-selection {
     display: flex;
     gap: 1rem;
@@ -1742,50 +1684,6 @@
     color: #65776f;
   }
 
-  /* Application shell and navigation */
-  .app-shell {
-    max-width: 1240px;
-    margin: auto;
-    padding: 0 3rem;
-  }
-
-  .app-header {
-    min-height: 112px;
-    display: flex;
-    align-items: center;
-    gap: 2.5rem;
-    border-bottom: 1px solid #cedbd5;
-  }
-
-  .brand {
-    flex-shrink: 0;
-    width: 165px;
-  }
-
-  .brand img {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  nav {
-    display: flex;
-    gap: 0.35rem;
-    margin-left: auto;
-  }
-
-  nav button {
-    background: none;
-    color: #51675e;
-    padding: 0.7rem 0.9rem;
-  }
-
-  nav button.active {
-    color: #18362f;
-    background: #e3ede7;
-    font-weight: 600;
-  }
-
   .primary {
     background: #244c44;
     color: #fff;
@@ -1808,29 +1706,7 @@
     background: #e8f0eb;
   }
 
-  /* Page headings and library */
-  main {
-    min-height: calc(100vh - 112px);
-    padding: 2rem 0 4rem;
-  }
-
-  .page-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  h1 {
-    font-family:
-      "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
-    font-size: 2rem;
-    font-weight: 500;
-    letter-spacing: -0.035em;
-    line-height: 1.2;
-    margin-bottom: 0;
-  }
-
+  /* Library */
   h2 {
     font-size: 1.25rem;
     font-weight: 600;
@@ -2020,6 +1896,11 @@
     align-items: center;
     gap: 1rem;
     margin: 1.5rem 0 0;
+  }
+
+  .pagination button {
+    color: #51675e;
+    padding: 0.7rem 0.9rem;
   }
 
   /* Practice session */
@@ -2261,67 +2142,15 @@
   }
 
   @media (max-width: 850px) {
-    .app-shell {
-      padding: 0 1.5rem;
-    }
-
-    .app-header {
-      gap: 1rem;
-    }
-
-    .brand {
-      width: 140px;
-    }
-
-    nav button {
+    .pagination button {
       padding: 0.65rem;
       font-size: 0.9rem;
-    }
-
-    .add-top {
-      font-size: 0.85rem;
-      padding: 0.75rem 0.8rem;
     }
   }
 
   @media (max-width: 580px) {
-    .app-shell {
-      padding: 0 1rem;
-    }
-
-    .app-header {
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      padding: 1.1rem 0 0.8rem;
-      min-height: auto;
-    }
-
-    .brand {
-      width: 145px;
-    }
-
-    nav {
-      order: 3;
-      width: 100%;
-      margin: 0.8rem 0 0;
-    }
-
-    nav button {
+    .pagination button {
       flex: 1;
-    }
-
-    .add-top {
-      display: none;
-    }
-    .mobile-add {
-      display: block;
-      margin-left: auto;
-      font-size: 0.85rem;
-      padding: 0.75rem 0.8rem;
-    }
-
-    main {
-      padding-top: 1.5rem;
     }
 
     .fact-details h2 {

@@ -240,6 +240,46 @@ test("decline and withdrawal resolve an offer without creating facts", async ({
   ).toBe(0);
 });
 
+test("library tabs keep the header, heading and tab bar in place", async ({
+  page,
+}) => {
+  await page.goto("/p/1/library");
+  await expect(
+    page.getByText("No facts yet. Add a fact to start."),
+  ).toBeVisible();
+  const library = page
+    .getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Library", exact: true });
+  const layout = async () => ({
+    navigation: await library.boundingBox(),
+    heading: await page
+      .getByRole("heading", { name: "Library", level: 1 })
+      .boundingBox(),
+    tabs: (
+      await page
+        .getByRole("button", { name: "My library", exact: true })
+        .boundingBox()
+    )?.y,
+    add: await page
+      .getByRole("button", { name: "Add a fact", exact: true })
+      .boundingBox(),
+  });
+  const before = await layout();
+  for (const name of ["Shared with me", "Sent facts"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(
+      page.getByRole("button", { name, exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(library).toHaveAttribute("aria-current", "page");
+    expect(await layout()).toEqual(before);
+  }
+  await page.getByRole("button", { name: "Add a fact", exact: true }).click();
+  await expect(page).toHaveURL(/\/p\/1\/library$/);
+  await expect(
+    page.getByRole("region", { name: "Add a fact", exact: true }),
+  ).toBeVisible();
+});
+
 test("switching confirms a typed answer, then clears queues, feedback and exposed answers", async ({
   app,
   page,

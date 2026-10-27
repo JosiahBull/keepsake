@@ -1,22 +1,14 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
-  import {
-    json,
-    errorMessage,
-    type Profile,
-    type SharePage,
-    type Screen,
-  } from "./profiles";
+  import { json, errorMessage, type Profile, type SharePage } from "./profiles";
   import { play } from "./sounds";
   let {
     profile,
     direction,
-    onNavigate,
     blocked = $bindable(false),
   }: {
     profile: Profile;
     direction: "inbox" | "sent";
-    onNavigate: (screen: Screen) => void;
     blocked?: boolean;
   } = $props();
   const id = untrack(() => profile.id);
@@ -100,20 +92,6 @@
   }
 </script>
 
-<h1>Library</h1>
-<div class="tabs">
-  <button disabled={blocked} onclick={() => onNavigate("library")}
-    >My library</button
-  ><button
-    class:active={direction === "inbox"}
-    disabled={blocked}
-    onclick={() => onNavigate("sharing")}>Shared with me</button
-  ><button
-    class:active={direction === "sent"}
-    disabled={blocked}
-    onclick={() => onNavigate("sent")}>Sent facts</button
-  >
-</div>
 {#if notice}<p class="message" role="status">{notice}</p>{/if}
 {#if error}<div class="message error" role="alert">
     {error}<button
@@ -207,28 +185,6 @@
   >{/if}
 
 <style>
-  h1 {
-    font:
-      500 2rem/1.2 "Iowan Old Style",
-      Palatino,
-      serif;
-    letter-spacing: -0.035em;
-  }
-  .tabs {
-    display: flex;
-    gap: 0.4rem;
-    border-bottom: 1px solid #cedbd5;
-    margin-bottom: 1.4rem;
-  }
-  .tabs button {
-    padding: 0.7rem 1rem;
-    color: #244c44;
-    background: transparent;
-  }
-  .tabs .active {
-    background: #e3ede7;
-    font-weight: 600;
-  }
   .selection {
     display: flex;
     gap: 0.8rem;
@@ -287,6 +243,7 @@
     background: #e3ede7;
     padding: 1rem 1.2rem;
     border-radius: 6px;
+    margin-bottom: 1.5rem;
   }
   .error {
     color: #833d2b;
@@ -307,10 +264,6 @@
     }
     .share-row:has(.share-select) .actions {
       margin-left: 2rem;
-    }
-    .tabs button {
-      padding: 0.7rem 0.55rem;
-      font-size: 0.9rem;
     }
   }
 </style>
