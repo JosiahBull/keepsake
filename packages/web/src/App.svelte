@@ -674,6 +674,8 @@
 <style>
   :global(select) {
     font: inherit;
+    /* iOS zooms into a focused field whose text is smaller than 16px. */
+    font-size: 1rem;
     width: 100%;
     color: #18362f;
     background: white;

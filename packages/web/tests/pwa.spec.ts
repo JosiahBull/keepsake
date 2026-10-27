@@ -183,6 +183,53 @@ test("reminders can be turned on, timed and turned off for this device", async (
   await expect(reminders.getByLabel("Earliest reminder")).toHaveCount(0);
 });
 
+// iOS zooms into a focused field whose text is under 16px and leaves the page zoomed.
+function smallFields(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLInputElement>("input, textarea, select")]
+      .filter((field) => field.type !== "checkbox" && field.type !== "radio" && field.getClientRects().length > 0)
+      .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+      .map((field) => field.labels?.[0]?.textContent?.trim() ?? field.outerHTML),
+  );
+}
+
+test("typing does not zoom the page and short screens do not scroll", async ({ app, page }) => {
+  await simulatePush(page);
+  await page.goto("/p/1/library");
+  await expect(page.getByText("No facts yet. Add a fact to start.", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
+  // Double-tapping a button must not zoom; pinch zoom stays available.
+  expect(await page.getByRole("button", { name: "Sent facts", exact: true })
+    .evaluate((button) => getComputedStyle(button).touchAction)).toBe("manipulation");
+
+  const fact = await app.createFact();
+  const partner = await app.request.post("/api/profiles", { data: { name: "Partner", handle: "partner" } });
+  expect(partner.status()).toBe(201);
+  await page.reload();
+  await page.getByRole("button", { name: "Add a fact", exact: true }).click();
+  await page.getByText("Context, source and tags (optional)", { exact: true }).click();
+  await expect(page.getByLabel("Tags")).toBeVisible();
+  expect(await smallFields(page)).toEqual([]);
+
+  await page.getByRole("checkbox", { name: `Select ${fact.prompt}`, exact: true }).check();
+  await page.getByRole("button", { name: "Share selected", exact: true }).click();
+  await expect(page.getByLabel("Share with", { exact: true })).toBeVisible();
+  expect(await smallFields(page)).toEqual([]);
+  await page.getByRole("button", { name: "Cancel", exact: true }).last().click();
+
+  await page.getByRole("button", { name: "Close form", exact: true }).first().click();
+  await page.getByRole("navigation", { name: "Main navigation" })
+    .getByRole("button", { name: "Practise", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Your answer optional" })).toBeVisible();
+  expect(await smallFields(page)).toEqual([]);
+
+  await page.goto("/p/1/settings");
+  const reminders = page.getByRole("region", { name: "Reminders", exact: true });
+  await reminders.getByRole("button", { name: "Turn on reminders", exact: true }).click();
+  await expect(reminders.getByLabel("Earliest reminder")).toBeVisible();
+  expect(await smallFields(page)).toEqual([]);
+});
+
 test("Safari explains that reminders need the Home Screen app", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-webkit", "iPhone guidance depends on the iPhone user agent");
   await page.addInitScript(() => {
