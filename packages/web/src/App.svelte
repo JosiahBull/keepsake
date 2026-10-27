@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import AppShell from "./AppShell.svelte";
   import LibraryApp from "./LibraryApp.svelte";
+  import LibraryHeading from "./LibraryHeading.svelte";
   import ProfileSettings from "./ProfileSettings.svelte";
   import Sharing from "./Sharing.svelte";
   import {
@@ -372,6 +374,14 @@
     }
   }
 
+  // The fact form lives in the library, so open it there.
+  function addFact() {
+    requestNavigation(() => {
+      draft = { context: "", source: "" };
+      navigate("library");
+    });
+  }
+
   function openShare(ids: number[]) {
     shareIds = [...ids];
     recipient = "";
@@ -532,54 +542,47 @@
     />
   {/key}
 {:else}
-  <div class="shell">
-    <header>
-      <button
-        class="logo-button"
-        aria-label="Keepsake library"
-        onclick={() => requestNavigation(() => navigate("library"))}
-        ><img src="/keepsake-logo.png" alt="Keepsake" /></button
-      >
-      <nav aria-label="Main navigation">
-        {#each ["library", "practice", "matching"] as item}<button
-            disabled={blocked}
-            onclick={() => requestNavigation(() => navigate(item as Screen))}
-            >{item === "library"
-              ? "Library"
-              : item === "practice"
-                ? "Practise"
-                : "Match pairs"}</button
-          >{/each}
-      </nav>
-      {@render profileMenu()}
-    </header>
-    <main>
-      {#if notice}<p class="message" role="status">{notice}</p>{/if}
-      {#key `${active.id}/${screen}`}
-        {#if screen === "settings"}
-          <ProfileSettings
-            profile={active}
-            bind:blocked
-            bind:dirty
-            onSaved={(profile) => {
-              profiles = profiles.map((item) =>
-                item.id === profile.id ? profile : item,
-              );
-              active = profile;
-            }}
-            onCancel={() => requestNavigation(() => navigate("library"))}
-          />
-        {:else}
-          <Sharing
-            profile={active}
-            direction={screen === "sent" ? "sent" : "inbox"}
-            onNavigate={(next) => requestNavigation(() => navigate(next))}
-            bind:blocked
-          />
-        {/if}
-      {/key}
-    </main>
-  </div>
+  <AppShell
+    profileId={active.id}
+    current={screen === "settings" ? null : "library"}
+    disabled={blocked}
+    onNavigate={(next) => requestNavigation(() => navigate(next))}
+    onAdd={addFact}
+    {profileMenu}
+  >
+    {#if notice}<p class="message" role="status">{notice}</p>{/if}
+    {#if screen === "sharing" || screen === "sent"}
+      <LibraryHeading
+        current={screen}
+        disabled={blocked}
+        addDisabled={blocked}
+        onAdd={addFact}
+        onNavigate={(next) => requestNavigation(() => navigate(next))}
+      />
+    {/if}
+    {#key `${active.id}/${screen}`}
+      {#if screen === "settings"}
+        <ProfileSettings
+          profile={active}
+          bind:blocked
+          bind:dirty
+          onSaved={(profile) => {
+            profiles = profiles.map((item) =>
+              item.id === profile.id ? profile : item,
+            );
+            active = profile;
+          }}
+          onCancel={() => requestNavigation(() => navigate("library"))}
+        />
+      {:else}
+        <Sharing
+          profile={active}
+          direction={screen === "sent" ? "sent" : "inbox"}
+          bind:blocked
+        />
+      {/if}
+    {/key}
+  </AppShell>
 {/if}
 
 {#if pendingNavigation}
@@ -678,39 +681,9 @@
     border-radius: 6px;
     padding: 0.8rem 0.9rem;
   }
-  .shell {
-    max-width: 1240px;
-    margin: auto;
-    padding: 0 3rem;
-  }
-  header {
-    min-height: 112px;
-    display: flex;
-    align-items: center;
-    gap: 1.25rem;
-    border-bottom: 1px solid #cedbd5;
-  }
-  .logo-button {
-    padding: 0;
-    background: none;
-  }
-  .logo-button img,
   .entry-logo {
     width: 165px;
     display: block;
-  }
-  nav {
-    display: flex;
-    margin-left: auto;
-    gap: 0.35rem;
-  }
-  nav button {
-    background: transparent;
-    color: #51675e;
-    padding: 0.7rem 0.9rem;
-  }
-  main {
-    padding: 2rem 0 4rem;
   }
   .entry {
     max-width: 500px;
@@ -847,6 +820,7 @@
     background: #e3ede7;
     padding: 1rem 1.2rem;
     border-radius: 6px;
+    margin-bottom: 1.5rem;
   }
   .error {
     color: #833d2b;
@@ -871,40 +845,9 @@
       Palatino,
       serif;
   }
-  @media (max-width: 850px) {
-    .shell {
-      padding: 0 1.5rem;
-    }
-    header {
-      gap: 0.7rem;
-      flex-wrap: wrap;
-    }
-    nav button {
-      padding: 0.65rem;
-      font-size: 0.9rem;
-    }
-  }
   @media (max-width: 580px) {
-    .shell {
-      padding: 0 1rem;
-    }
-    header {
-      padding: 1.1rem 0 0.8rem;
-      min-height: auto;
-    }
-    .logo-button img {
-      width: 145px;
-    }
     .profile-menu {
       margin-left: auto;
-    }
-    nav {
-      order: 3;
-      width: 100%;
-      margin: 0.8rem 0 0;
-    }
-    nav button {
-      flex: 1;
     }
     .dialog {
       padding: 1.3rem;
