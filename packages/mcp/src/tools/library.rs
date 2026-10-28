@@ -11,6 +11,7 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::{ErrorData, schemars, tool, tool_router};
 use serde::Deserialize;
+use strum::IntoEnumIterator;
 
 use crate::config::MAX_ROWS;
 use crate::convert::{clip, table};
@@ -53,20 +54,29 @@ fn text(value: String) -> CallToolResult {
 }
 
 fn media_summary(media: &[QuestionMedia]) -> String {
-    let count = |kind: MediaKind| media.iter().filter(|item| item.kind == kind).count();
-    match (count(MediaKind::Image), count(MediaKind::Audio)) {
-        (0, 0) => String::new(),
-        (images, 0) => format!("{images} image(s)"),
-        (0, clips) => format!("{clips} clip(s)"),
-        (images, clips) => format!("{images} image(s), {clips} clip(s)"),
-    }
+    MediaKind::iter()
+        .filter_map(|kind| {
+            let count = media.iter().filter(|item| item.kind == kind).count();
+            let noun = match kind {
+                MediaKind::Image => "image(s)",
+                MediaKind::Audio => "clip(s)",
+            };
+            (count > 0).then(|| format!("{count} {noun}"))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn measured(item: &QuestionMedia) -> String {
-    match (item.width, item.height, item.duration_ms) {
-        (Some(width), Some(height), _) => format!("{width}×{height} px"),
-        (_, _, Some(ms)) => format!("{:.1} s", ms as f64 / 1000.0),
-        _ => String::new(),
+    match item.kind {
+        MediaKind::Image => match (item.width, item.height) {
+            (Some(width), Some(height)) => format!("{width}×{height} px"),
+            (None, _) | (_, None) => String::new(),
+        },
+        MediaKind::Audio => item
+            .duration_ms
+            .map(|ms| format!("{:.1} s", ms as f64 / 1000.0))
+            .unwrap_or_default(),
     }
 }
 
@@ -258,13 +268,10 @@ impl KeepsakeMcp {
             .await
             .map_err(|error| Failure::Internal(error.into()))?;
         let data = Base64::encode_string(&bytes);
-        Ok(CallToolResult::success(vec![
-            if file.content_type.starts_with("image/") {
-                ContentBlock::image(data, file.content_type)
-            } else {
-                ContentBlock::audio(data, file.content_type)
-            },
-        ]))
+        Ok(CallToolResult::success(vec![match file.kind {
+            MediaKind::Image => ContentBlock::image(data, file.content_type),
+            MediaKind::Audio => ContentBlock::audio(data, file.content_type),
+        }]))
     }
 
     async fn tags(&self) -> Outcome {

@@ -6,7 +6,7 @@
 use base64ct::{Base64, Encoding};
 use keepsake_core::{
     facts::{self, NewFact, NewPractice, PracticeKind},
-    media::{self, NewQuestionMedia},
+    media::{self, NewQuestionMedia, UploadFormat},
 };
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
@@ -106,12 +106,19 @@ pub struct AddPracticesParams {
 }
 
 fn practice(draft: DraftPractice) -> NewPractice {
+    let DraftPractice {
+        kind,
+        prompt,
+        answer,
+        choices,
+        explanation,
+    } = draft;
     NewPractice {
-        kind: draft.kind.into(),
-        prompt: draft.prompt,
-        answer: draft.answer,
-        choices: draft.choices,
-        explanation: draft.explanation,
+        kind: kind.into(),
+        prompt,
+        answer,
+        choices,
+        explanation,
     }
 }
 
@@ -164,47 +171,60 @@ impl KeepsakeMcp {
         let mut drafts = Vec::with_capacity(params.facts.len());
         for (index, draft) in params.facts.into_iter().enumerate() {
             let number = index + 1;
+            let DraftFact {
+                prompt,
+                answer,
+                context,
+                source,
+                tags,
+                practices,
+                media: attached,
+            } = draft;
             let fact = NewFact {
-                prompt: draft.prompt,
-                answer: draft.answer,
-                context: draft.context,
-                source: draft.source,
-                tags: draft.tags,
-                practices: draft.practices.into_iter().map(practice).collect(),
+                prompt,
+                answer,
+                context,
+                source,
+                tags,
+                practices: practices.into_iter().map(practice).collect(),
+                // Filled in once each file is stored.
                 media: Vec::new(),
             };
             facts::validate_new_fact(&fact)
                 .map_err(|error| refused(format!("Fact {number}: {error}")))?;
-            if draft.media.len() > media::MAX_QUESTION_MEDIA {
+            if attached.len() > media::MAX_QUESTION_MEDIA {
                 return Err(refused(format!(
                     "Fact {number}: a question can have at most {} images or clips.",
                     media::MAX_QUESTION_MEDIA
                 )));
             }
-            let mut files = Vec::with_capacity(draft.media.len());
-            for (position, item) in draft.media.into_iter().enumerate() {
-                let bytes = Base64::decode_vec(item.data_base64.trim()).map_err(|_| {
-                    refused(format!(
-                        "Fact {number}, media {}: data_base64 is not valid base64.",
-                        position + 1
-                    ))
-                })?;
-                media::check(&item.content_type, bytes.clone().into())
+            let mut files = Vec::with_capacity(attached.len());
+            for (position, item) in attached.into_iter().enumerate() {
+                let DraftMedia {
+                    data_base64,
+                    content_type,
+                    description,
+                } = item;
+                let at = |error: String| {
+                    refused(format!("Fact {number}, media {}: {error}", position + 1))
+                };
+                let bytes = Base64::decode_vec(data_base64.trim())
+                    .map_err(|_| at("data_base64 is not valid base64.".into()))?;
+                let format = UploadFormat::parse_content_type(&content_type)
+                    .map_err(|error| at(error.to_string()))?;
+                media::check(format, bytes.clone().into())
                     .await
-                    .map_err(|error| {
-                        refused(format!("Fact {number}, media {}: {error}", position + 1))
-                    })?;
-                files.push((item.content_type, bytes, item.description));
+                    .map_err(|error| at(error.to_string()))?;
+                files.push((format, bytes, description));
             }
             drafts.push((fact, files));
         }
 
         let mut proposed = Vec::with_capacity(drafts.len());
         for (mut fact, files) in drafts {
-            for (content_type, bytes, description) in files {
+            for (format, bytes, description) in files {
                 // An upload left unattached by a failed save is removed after a day.
-                let upload =
-                    media::upload(&self.pool, self.profile.id, &content_type, bytes).await?;
+                let upload = media::upload(&self.pool, self.profile.id, format, bytes).await?;
                 fact.media.push(NewQuestionMedia {
                     media_id: upload.media_id,
                     alt: description,

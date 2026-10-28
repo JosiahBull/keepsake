@@ -226,12 +226,15 @@ pub fn router_with_mcp(
         .route("/api", get(|| async { StatusCode::NOT_FOUND }));
     // A ceiling of off, the default, is the only thing that makes /mcp not a route at all.
     // Otherwise it stays mounted and each profile's own setting decides what it serves.
-    if mcp.ceiling != McpMode::Off {
-        tracing::info!(
-            ceiling = mcp.ceiling.as_str(),
-            "mcp endpoints mounted at /mcp/PROFILE; each serves at most its profile's setting"
-        );
-        app = app.route("/mcp/{profile}", any(agent_access_api::endpoint));
+    match mcp.ceiling {
+        McpMode::Off => {}
+        McpMode::Read | McpMode::Write => {
+            tracing::info!(
+                ceiling = mcp.ceiling.as_str(),
+                "mcp endpoints mounted at /mcp/PROFILE; each serves at most its profile's setting"
+            );
+            app = app.route("/mcp/{profile}", any(agent_access_api::endpoint));
+        }
     }
     let app = app
         .fallback_service(

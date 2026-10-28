@@ -5,13 +5,25 @@
 //! `KEEPSAKE_MCP` ceiling, which only the host's operator can raise.
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use strum::EnumIter;
 use utoipa::ToSchema;
 
 use crate::profiles::ProfileError;
 
 /// Ordered from least to most capable: `min` with a ceiling can only lower it.
 #[derive(
-    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, ToSchema,
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Deserialize,
+    Serialize,
+    ToSchema,
+    EnumIter,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum McpMode {
@@ -79,6 +91,8 @@ pub async fn set_mode(
 
 #[cfg(test)]
 mod tests {
+    use strum::IntoEnumIterator;
+
     use super::McpMode;
 
     /// A ceiling relies on this order: `min` read the wrong way round would raise access.
@@ -97,7 +111,7 @@ mod tests {
 
     #[test]
     fn parsing_is_exact() {
-        for mode in [McpMode::Off, McpMode::Read, McpMode::Write] {
+        for mode in McpMode::iter() {
             assert_eq!(mode.as_str().parse::<McpMode>(), Ok(mode));
         }
         assert!("wrtie".parse::<McpMode>().is_err());

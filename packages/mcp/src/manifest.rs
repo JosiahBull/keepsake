@@ -11,7 +11,7 @@ use crate::server::KeepsakeMcp;
 pub struct ToolSummary {
     pub name: String,
     /// `read` for a tool served with read access, `write` for one added by write access.
-    pub tier: &'static str,
+    pub tier: McpMode,
     pub description: String,
     pub read_only: Option<bool>,
     pub destructive: Option<bool>,
@@ -28,7 +28,13 @@ fn names(value: Option<&serde_json::Value>) -> Vec<String> {
             .iter()
             .filter_map(|item| item.as_str().map(str::to_string))
             .collect(),
-        _ => Vec::new(),
+        Some(
+            serde_json::Value::Null
+            | serde_json::Value::Bool(_)
+            | serde_json::Value::Number(_)
+            | serde_json::Value::String(_),
+        )
+        | None => Vec::new(),
     };
     names.sort();
     names
@@ -47,9 +53,9 @@ pub fn manifest() -> Vec<ToolSummary> {
             let annotations = tool.annotations.as_ref();
             ToolSummary {
                 tier: if read.contains(tool.name.as_ref()) {
-                    "read"
+                    McpMode::Read
                 } else {
-                    "write"
+                    McpMode::Write
                 },
                 name: tool.name.to_string(),
                 description: tool.description.map(|d| d.to_string()).unwrap_or_default(),
@@ -101,7 +107,7 @@ mod tests {
         let read = KeepsakeMcp::router_for(McpMode::Read).list_all().len();
         let write = manifest();
         assert!(write.len() > read);
-        for tool in write.iter().filter(|tool| tool.tier == "write") {
+        for tool in write.iter().filter(|tool| tool.tier == McpMode::Write) {
             assert_eq!(tool.read_only, Some(false), "{}", tool.name);
             assert_eq!(tool.destructive, Some(false), "{} only adds", tool.name);
         }

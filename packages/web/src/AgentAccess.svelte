@@ -9,12 +9,13 @@
   let { profile }: { profile: Profile } = $props();
   const id = untrack(() => profile.id);
   const endpoint = `${location.origin}/mcp/${untrack(() => profile.handle)}`;
-  const ORDER: Mode[] = ["off", "read", "write"];
+  // A Record must name every mode, and the order follows it: least access first.
   const LABELS: Record<Mode, string> = {
     off: "Off",
     read: "Read only",
     write: "Read and add facts",
   };
+  const ORDER = Object.keys(LABELS) as Mode[];
   let access = $state<Access | null>(null);
   let busy = $state(false);
   let error = $state("");

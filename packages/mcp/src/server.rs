@@ -49,13 +49,16 @@ impl KeepsakeMcp {
     /// Read on every request, so switching access off in the app applies to the next
     /// call with no cache to go stale in the permissive direction.
     pub async fn effective_mode(&self) -> Result<McpMode, ErrorData> {
-        if self.ceiling == McpMode::Off {
-            return Ok(McpMode::Off);
+        match self.ceiling {
+            // Nothing can raise off, so there is no setting to read.
+            McpMode::Off => Ok(McpMode::Off),
+            McpMode::Read | McpMode::Write => {
+                let stored = agent_access::mode(&self.pool, self.profile.id)
+                    .await
+                    .map_err(internal)?;
+                Ok(self.ceiling.min(stored))
+            }
         }
-        let stored = agent_access::mode(&self.pool, self.profile.id)
-            .await
-            .map_err(internal)?;
-        Ok(self.ceiling.min(stored))
     }
 }
 
