@@ -13,6 +13,10 @@ Scheduled recall with feedback and the next review intervals:
 
 ![A typed recall attempt, revealed answer, and Again, Hard, Good and Easy interval choices](docs/screenshots/scheduled-recall.png)
 
+A question asked with a picture and an audio clip:
+
+![Scheduled recall of a question with a picture of an apple and an audio clip](docs/screenshots/question-media-practice.png)
+
 Matching questions and answers from the same topic:
 
 ![A matching round with four food and drink words from one te reo Māori topic bank](docs/screenshots/matching.png)
