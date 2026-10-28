@@ -10,7 +10,7 @@ use super::{
     storage::*,
     *,
 };
-use crate::facts::{NewReview, Review, ReviewMethod, ReviewOutcome};
+use crate::facts::{NewReview, Review, ReviewOutcome};
 
 pub async fn submit_for(
     pool: &SqlitePool,
@@ -50,7 +50,7 @@ fn validate_submission(input: &StudySubmission, now: i64) -> anyhow::Result<()> 
     invalid(
         input
             .feedback_event_id
-            .is_none_or(|id| id > 0 && input.kind == EventKind::Attempt),
+            .is_none_or(|id| id > 0 && input.kind.is_attempt()),
         "feedback_event_id must identify feedback for an attempt",
     )?;
     match input.kind {
@@ -61,7 +61,7 @@ fn validate_submission(input: &StudySubmission, now: i64) -> anyhow::Result<()> 
         EventKind::Exposure => invalid(
             input.outcome.is_none()
                 && (!input.attempted
-                    || (input.context == StudyContext::Scheduled && input.practice_id.is_some())),
+                    || (input.context.is_scheduled() && input.practice_id.is_some())),
             "Feedback cannot include a rating; attempted feedback requires a scheduled prompt",
         ),
     }
@@ -124,29 +124,25 @@ async fn apply(
         }
         None => {
             invalid(
-                input.kind == EventKind::Exposure
-                    || matches!(
-                        input.method,
-                        ReviewMethod::Matching | ReviewMethod::Flashcard
-                    ),
+                input.kind.is_exposure() || input.method.recorded_without_practice(),
                 "This method requires a practice_id",
             )?;
             false
         }
     };
-    let qualifying = input.kind == EventKind::Attempt
-        && matches!(input.context, StudyContext::Scheduled | StudyContext::Audit)
-        && matches!(input.method, ReviewMethod::Flashcard | ReviewMethod::Cloze)
+    let qualifying = input.kind.is_attempt()
+        && input.context.assesses_recall()
+        && input.method.assesses_recall()
         && input.attempted
         && !input.assisted
         && !input.prior_exposure
         && mapping;
-    let unaided_feedback = input.kind == EventKind::Exposure
+    let unaided_feedback = input.kind.is_exposure()
         && input.attempted
         && !input.assisted
         && !input.prior_exposure
         && mapping
-        && matches!(input.method, ReviewMethod::Flashcard | ReviewMethod::Cloze);
+        && input.method.assesses_recall();
     let feedback_at = if input.feedback_event_id.is_some() {
         own_feedback(connection, profile_id, &input, &before, now).await?
     } else {
@@ -158,7 +154,7 @@ async fn apply(
             feedback_at.is_some() || before.blocked_until.is_none_or(|until| until <= now),
             "The answer was recently exposed. Try recall later.",
         )?;
-        if input.context == StudyContext::Scheduled {
+        if input.context.is_scheduled() {
             conflict(
                 before.due_at.is_none_or(|due| due <= now),
                 "This target is not due yet",
@@ -166,7 +162,7 @@ async fn apply(
         }
     }
     let settings = load_settings(connection, profile_id).await?;
-    if input.context == StudyContext::Scheduled && before.introduced_at.is_none() {
+    if input.context.is_scheduled() && before.introduced_at.is_none() {
         let (start, end) = day_bounds(now, &settings.timezone)?;
         let introduced = introduced_today(connection, profile_id, start, end).await?;
         conflict(
@@ -199,21 +195,24 @@ async fn apply(
             ReviewOutcome::Good => transitions.good,
             ReviewOutcome::Easy => transitions.easy,
         };
-        let interval = if matches!(outcome, ReviewOutcome::Again) {
-            policy_override_seconds = Some(RETRY_SECONDS);
-            if before.phase == "review" {
-                after.lapses += 1;
+        let interval = match outcome {
+            ReviewOutcome::Again => {
+                policy_override_seconds = Some(RETRY_SECONDS);
+                if before.phase == "review" {
+                    after.lapses += 1;
+                }
+                after.phase = if before.phase == "review" || before.phase == "relearning" {
+                    "relearning"
+                } else {
+                    "learning"
+                }
+                .into();
+                RETRY_SECONDS
             }
-            after.phase = if before.phase == "review" || before.phase == "relearning" {
-                "relearning"
-            } else {
-                "learning"
+            ReviewOutcome::Hard | ReviewOutcome::Good | ReviewOutcome::Easy => {
+                after.phase = "review".into();
+                transition.interval_seconds
             }
-            .into();
-            RETRY_SECONDS
-        } else {
-            after.phase = "review".into();
-            transition.interval_seconds
         };
         after.stability = Some(transition.memory.stability);
         after.difficulty = Some(transition.memory.difficulty);
@@ -233,7 +232,7 @@ async fn apply(
             .context("exposure timestamp overflow")?;
         after.blocked_until = Some(before.blocked_until.unwrap_or(0).max(until));
         policy_override_seconds = Some(RETRY_SECONDS);
-        if input.context == StudyContext::Scheduled && after.introduced_at.is_none() {
+        if input.context.is_scheduled() && after.introduced_at.is_none() {
             after.introduced_at = Some(now);
             after.phase = "learning".into();
         }
@@ -274,16 +273,8 @@ async fn apply(
     save_schedule(connection, &after).await?;
     let before_json = serde_json::to_string(&before)?;
     let after_json = serde_json::to_string(&after)?;
-    let kind = if input.kind == EventKind::Attempt {
-        "attempt"
-    } else {
-        "exposure"
-    };
-    let context = match input.context {
-        StudyContext::Scheduled => "scheduled",
-        StudyContext::Supplementary => "supplementary",
-        StudyContext::Audit => "audit",
-    };
+    let kind = input.kind.as_str();
+    let context = input.context.as_str();
     let outcome = input.outcome.map(|outcome| outcome.as_str());
     let saved = sqlx::query!(
         "INSERT INTO study_events(profile_id, submission_id, target_id, content_revision, occurred_at, kind, context, method, outcome,
@@ -403,8 +394,8 @@ async fn own_feedback(
         .ok_or_else(|| StudyError::Conflict("Feedback does not belong to this target".into()))?;
     let feedback: StudySubmission = serde_json::from_str(&latest.request_json)?;
     let state: Schedule = serde_json::from_str(&latest.after_json)?;
-    let matching = feedback.kind == EventKind::Exposure
-        && feedback.context == StudyContext::Scheduled
+    let matching = feedback.kind.is_exposure()
+        && feedback.context.is_scheduled()
         && feedback.attempted
         && feedback.context == input.context
         && feedback.assisted == input.assisted

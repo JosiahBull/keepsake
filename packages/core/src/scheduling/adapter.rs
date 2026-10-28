@@ -71,10 +71,15 @@ pub fn next(
     let model = FSRS::new(parameters).context("construct pinned FSRS model")?;
     let states = model
         .next_states(
-            memory.map(|memory| MemoryState {
-                stability: memory.stability,
-                difficulty: memory.difficulty,
-            }),
+            memory.map(
+                |Memory {
+                     stability,
+                     difficulty,
+                 }| MemoryState {
+                    stability,
+                    difficulty,
+                },
+            ),
             retention,
             elapsed_days,
         )

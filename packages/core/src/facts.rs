@@ -3,11 +3,12 @@ use std::{collections::HashSet, fmt};
 use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
+use strum::EnumIter;
 use utoipa::ToSchema;
 
 use crate::media::{NewQuestionMedia, QuestionMedia};
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema, EnumIter)]
 #[serde(rename_all = "snake_case")]
 pub enum PracticeKind {
     Flashcard,
@@ -26,6 +27,18 @@ impl PracticeKind {
             Self::Explain => "explain",
             Self::Apply => "apply",
         }
+    }
+
+    /// The stored text of a kind, as [`PracticeKind::as_str`] writes it.
+    pub(crate) fn parse(value: &str) -> anyhow::Result<Self> {
+        Ok(match value {
+            "flashcard" => Self::Flashcard,
+            "multiple_choice" => Self::MultipleChoice,
+            "cloze" => Self::Cloze,
+            "explain" => Self::Explain,
+            "apply" => Self::Apply,
+            other => anyhow::bail!("unknown practice kind {other}"),
+        })
     }
 }
 
@@ -198,26 +211,44 @@ pub(crate) struct PracticeRow {
 impl TryFrom<PracticeRow> for Practice {
     type Error = anyhow::Error;
     fn try_from(row: PracticeRow) -> anyhow::Result<Self> {
+        let PracticeRow {
+            id,
+            fact_id,
+            kind,
+            prompt,
+            answer,
+            choices,
+            explanation,
+        } = row;
         Ok(Self {
-            id: row.id,
-            fact_id: row.fact_id,
-            kind: serde_json::from_value(serde_json::Value::String(row.kind))?,
-            prompt: row.prompt,
-            answer: row.answer,
-            choices: serde_json::from_str(&row.choices)?,
-            explanation: row.explanation,
+            id,
+            fact_id,
+            kind: PracticeKind::parse(&kind)?,
+            prompt,
+            answer,
+            choices: serde_json::from_str(&choices)?,
+            explanation,
         })
     }
 }
 
 async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result<Fact> {
+    let FactRow {
+        id,
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
+        created_at,
+    } = row;
     let practices = sqlx::query_as!(
         PracticeRow,
         "SELECT id AS \"id!\", fact_id, kind, prompt, answer, choices, explanation
          FROM practices
          WHERE fact_id = ?
          ORDER BY id",
-        row.id
+        id
     )
     .fetch_all(&mut *connection)
     .await?
@@ -229,20 +260,20 @@ async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result
         "SELECT p.name FROM fact_shares s JOIN profiles p ON p.id=s.sender_id
          WHERE s.accepted_fact_id=? AND s.status='accepted' LIMIT 1",
     )
-    .bind(row.id)
+    .bind(id)
     .fetch_optional(&mut *connection)
     .await?;
-    let media = crate::media::for_fact(connection, row.id).await?;
+    let media = crate::media::for_fact(connection, id).await?;
     Ok(Fact {
         shared_by,
         media,
-        id: row.id,
-        prompt: row.prompt,
-        answer: row.answer,
-        context: row.context,
-        source: row.source,
-        tags: serde_json::from_str(&row.tags)?,
-        created_at: row.created_at,
+        id,
+        prompt,
+        answer,
+        context,
+        source,
+        tags: serde_json::from_str(&tags)?,
+        created_at,
         practices,
     })
 }
@@ -345,9 +376,14 @@ pub(crate) async fn insert_fact(
     profile_id: i64,
     mut fact: NewFact,
 ) -> anyhow::Result<Fact> {
-    if !fact.practices.iter().any(|p| {
-        p.kind == PracticeKind::Flashcard && p.prompt == fact.prompt && p.answer == fact.answer
-    }) {
+    let canonical = |practice: &NewPractice| match practice.kind {
+        PracticeKind::Flashcard => practice.prompt == fact.prompt && practice.answer == fact.answer,
+        PracticeKind::MultipleChoice
+        | PracticeKind::Cloze
+        | PracticeKind::Explain
+        | PracticeKind::Apply => false,
+    };
+    if !fact.practices.iter().any(canonical) {
         fact.practices.insert(
             0,
             NewPractice {
@@ -418,7 +454,36 @@ pub enum ReviewMethod {
     Matching,
 }
 
+impl From<PracticeKind> for ReviewMethod {
+    fn from(kind: PracticeKind) -> Self {
+        match kind {
+            PracticeKind::Flashcard => Self::Flashcard,
+            PracticeKind::MultipleChoice => Self::MultipleChoice,
+            PracticeKind::Cloze => Self::Cloze,
+            PracticeKind::Explain => Self::Explain,
+            PracticeKind::Apply => Self::Apply,
+        }
+    }
+}
+
 impl ReviewMethod {
+    /// Unaided recall of the fact's answer: the only evidence the recall schedule uses.
+    pub(crate) const fn assesses_recall(self) -> bool {
+        match self {
+            Self::Flashcard | Self::Cloze => true,
+            Self::MultipleChoice | Self::Explain | Self::Apply | Self::Matching => false,
+        }
+    }
+
+    /// Matching and the canonical flashcard are recorded against the fact rather than one
+    /// of its practice variants.
+    pub(crate) const fn recorded_without_practice(self) -> bool {
+        match self {
+            Self::Flashcard | Self::Matching => true,
+            Self::MultipleChoice | Self::Cloze | Self::Explain | Self::Apply => false,
+        }
+    }
+
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::Flashcard => "flashcard",
@@ -486,15 +551,12 @@ pub fn validate_review(review: &NewReview, fact: &Fact) -> anyhow::Result<()> {
                 .find(|p| p.id == id)
                 .context("practice does not belong to this fact")?;
             ensure!(
-                practice.kind.as_str() == review.method.as_str(),
+                ReviewMethod::from(practice.kind) == review.method,
                 "method does not match practice"
             );
         }
         None => ensure!(
-            matches!(
-                review.method,
-                ReviewMethod::Matching | ReviewMethod::Flashcard
-            ),
+            review.method.recorded_without_practice(),
             "this method requires a practice_id"
         ),
     }
@@ -544,13 +606,20 @@ pub async fn record_review_for(
             .fetch_one(&mut *connection)
             .await?;
 
+            let NewReview {
+                fact_id,
+                practice_id,
+                method,
+                outcome,
+                response_ms,
+            } = review;
             let review = Review {
                 id: saved.id,
-                fact_id: review.fact_id,
-                practice_id: review.practice_id,
-                method: review.method,
-                outcome: review.outcome,
-                response_ms: review.response_ms,
+                fact_id,
+                practice_id,
+                method,
+                outcome,
+                response_ms,
                 reviewed_at: saved.reviewed_at,
             };
             crate::scheduling::record_supplementary(connection, profile_id, &review).await?;

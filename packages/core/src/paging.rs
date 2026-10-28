@@ -26,16 +26,25 @@ impl TryFrom<FactRow> for FactSummary {
     type Error = anyhow::Error;
 
     fn try_from(row: FactRow) -> anyhow::Result<Self> {
+        let FactRow {
+            id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags,
+            created_at,
+        } = row;
         Ok(Self {
             shared_by: None,
             media: Vec::new(),
-            id: row.id,
-            prompt: row.prompt,
-            answer: row.answer,
-            context: row.context,
-            source: row.source,
-            tags: serde_json::from_str(&row.tags)?,
-            created_at: row.created_at,
+            id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags: serde_json::from_str(&tags)?,
+            created_at,
         })
     }
 }
@@ -315,14 +324,23 @@ pub async fn reviews_for(
     let items = rows
         .into_iter()
         .map(|row| {
+            let ReviewRow {
+                id,
+                fact_id,
+                practice_id,
+                method,
+                outcome,
+                response_ms,
+                reviewed_at,
+            } = row;
             Ok(Review {
-                id: row.id,
-                fact_id: row.fact_id,
-                practice_id: row.practice_id,
-                method: serde_json::from_value(serde_json::Value::String(row.method))?,
-                outcome: serde_json::from_value(serde_json::Value::String(row.outcome))?,
-                response_ms: row.response_ms,
-                reviewed_at: row.reviewed_at,
+                id,
+                fact_id,
+                practice_id,
+                method: serde_json::from_value(serde_json::Value::String(method))?,
+                outcome: serde_json::from_value(serde_json::Value::String(outcome))?,
+                response_ms,
+                reviewed_at,
             })
         })
         .collect::<anyhow::Result<_>>()?;

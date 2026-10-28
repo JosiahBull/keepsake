@@ -16,28 +16,13 @@ use std::{
 };
 
 use sqlx::SqlitePool;
+use strum::IntoEnumIterator;
 
 use super::{MediaKind, sha256_hex};
 
 #[derive(Clone, Debug)]
 pub struct MediaFiles {
     root: PathBuf,
-}
-
-fn kind_directory(kind: MediaKind) -> &'static str {
-    match kind {
-        MediaKind::Image => "images",
-        MediaKind::Audio => "audio",
-    }
-}
-
-/// The file extension for each served content type.
-pub(crate) fn extension(content_type: &str) -> Option<&'static str> {
-    Some(match content_type {
-        "image/avif" => "avif",
-        "audio/mp4" => "m4a",
-        _ => return None,
-    })
 }
 
 impl MediaFiles {
@@ -72,18 +57,16 @@ impl MediaFiles {
     }
 
     pub(crate) fn kind_dir(&self, kind: MediaKind) -> PathBuf {
-        self.media().join(kind_directory(kind))
+        self.media().join(kind.directory())
     }
 
-    pub(crate) fn path(&self, kind: MediaKind, file_sha256: &str, content_type: &str) -> PathBuf {
-        self.media()
-            .join(Self::relative(kind, file_sha256, content_type))
+    pub(crate) fn path(&self, kind: MediaKind, file_sha256: &str) -> PathBuf {
+        self.media().join(Self::relative(kind, file_sha256))
     }
 
     /// A served file's path within `media/`, such as `images/<sha256>.avif`.
-    pub(crate) fn relative(kind: MediaKind, file_sha256: &str, content_type: &str) -> PathBuf {
-        let extension = extension(content_type).unwrap_or("bin");
-        Path::new(kind_directory(kind)).join(format!("{file_sha256}.{extension}"))
+    pub(crate) fn relative(kind: MediaKind, file_sha256: &str) -> PathBuf {
+        Path::new(kind.directory()).join(format!("{file_sha256}.{}", kind.extension()))
     }
 
     /// A private file in `tmp/` for an upload in progress, removed when dropped.
@@ -100,12 +83,7 @@ impl MediaFiles {
     /// Write a served file and return its SHA-256. It is written in `tmp/`, synced, then
     /// renamed into place, so a reader never sees part of it. An identical file is
     /// replaced, which also renews its age for [`MediaFiles::sweep`].
-    pub(crate) fn place(
-        &self,
-        kind: MediaKind,
-        content_type: &str,
-        data: &[u8],
-    ) -> io::Result<String> {
+    pub(crate) fn place(&self, kind: MediaKind, data: &[u8]) -> io::Result<String> {
         let directory = self.kind_dir(kind);
         fs::create_dir_all(&directory)?;
         fs::create_dir_all(self.tmp())?;
@@ -116,7 +94,7 @@ impl MediaFiles {
         partial.write_all(data)?;
         partial.as_file().sync_all()?;
         partial
-            .persist(self.path(kind, &sha256, content_type))
+            .persist(self.path(kind, &sha256))
             .map_err(|error| error.error)?;
         #[cfg(unix)]
         fs::File::open(&directory)?.sync_all()?;
@@ -152,7 +130,7 @@ impl MediaFiles {
     ) -> io::Result<usize> {
         let now = SystemTime::now();
         let mut removed = 0;
-        for kind in [MediaKind::Image, MediaKind::Audio] {
+        for kind in MediaKind::iter() {
             let entries = match fs::read_dir(self.kind_dir(kind)) {
                 Ok(entries) => entries,
                 Err(error) if error.kind() == io::ErrorKind::NotFound => continue,

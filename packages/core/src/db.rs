@@ -87,9 +87,13 @@ fn sqlite_busy(error: &sqlx::Error) -> bool {
 pub fn is_overloaded(error: &anyhow::Error) -> bool {
     for cause in error.chain() {
         if let Some(error) = cause.downcast_ref::<WriteError>() {
-            return matches!(error, WriteError::Overloaded(_));
+            return match error {
+                WriteError::Overloaded(_) => true,
+                WriteError::RollbackFailed { .. } | WriteError::CommitFailed(_) => false,
+            };
         }
         if let Some(error) = cause.downcast_ref::<sqlx::Error>() {
+            // `sqlx::Error` is `#[non_exhaustive]`.
             return matches!(error, sqlx::Error::PoolTimedOut) || sqlite_busy(error);
         }
     }

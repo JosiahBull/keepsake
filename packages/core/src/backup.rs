@@ -157,8 +157,8 @@ async fn snapshot(
     )
     .fetch_one(&mut snapshot)
     .await?;
-    let files: Vec<(String, String, String)> = if has_media {
-        sqlx::query_as("SELECT DISTINCT kind, content_type, file_sha256 FROM media")
+    let files: Vec<(String, String)> = if has_media {
+        sqlx::query_as("SELECT DISTINCT kind, file_sha256 FROM media")
             .fetch_all(&mut snapshot)
             .await?
     } else {
@@ -191,8 +191,8 @@ async fn snapshot(
             None
         } else {
             let staged = tempfile::TempDir::new_in(&staging)?;
-            for (kind, content_type, sha256) in &files {
-                let relative = MediaFiles::relative(MediaKind::parse(kind)?, sha256, content_type);
+            for (kind, sha256) in &files {
+                let relative = MediaFiles::relative(MediaKind::parse(kind)?, sha256);
                 let source = match &media {
                     Media::Backup(live) => live.media().join(&relative),
                     Media::Restore(backup) => backup.join(&relative),

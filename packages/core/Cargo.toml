@@ -16,6 +16,7 @@ image = { version = "0.25", default-features = false, features = ["avif", "jpeg"
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"
+strum.workspace = true
 sqlx.workspace = true
 symphonia = { version = "0.6", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mkv", "mp3", "ogg", "pcm", "vorbis", "wav"] }
 # The reference Opus decoder (libopus, built with CMake), for clips browsers record.

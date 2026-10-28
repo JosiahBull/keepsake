@@ -8,10 +8,12 @@
 //!
 //! The upload itself is not kept.
 
+use std::time::Duration;
+
 use fdk_aac_rs::encoder::{Aot, Bitrate, ChannelMode, Encoder, EncoderError, Transport};
 use image::{DynamicImage, ImageEncoder, imageops::FilterType};
 
-use super::inspect::{Content, Pcm};
+use super::inspect::{Content, Layout, Pcm};
 use super::{MAX_MEDIA_BYTES, MediaKind, invalid, mp4};
 
 /// The longest edge served. Sharp on a large phone or laptop screen at 2× density.
@@ -23,13 +25,12 @@ const AVIF_QUALITY: u8 = 70;
 /// AAC-LC bitrate for each channel: transparent for speech, good for music.
 const AAC_BITS_PER_CHANNEL: u32 = 56_000;
 
-/// A file ready to serve, and what it holds.
+/// A file ready to serve in its kind's one format, and what it holds.
 pub(crate) struct Rendered {
     pub kind: MediaKind,
-    pub content_type: &'static str,
-    pub width: Option<i64>,
-    pub height: Option<i64>,
-    pub duration_ms: Option<i64>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub duration: Option<Duration>,
     pub data: Vec<u8>,
 }
 
@@ -41,7 +42,7 @@ pub(crate) fn render(content: Content) -> anyhow::Result<Rendered> {
     if rendered.data.is_empty() || rendered.data.len() > MAX_MEDIA_BYTES {
         anyhow::bail!(
             "rendered {} is {} bytes",
-            rendered.content_type,
+            rendered.kind.served_type(),
             rendered.data.len()
         );
     }
@@ -70,21 +71,20 @@ fn still(image: DynamicImage) -> anyhow::Result<Rendered> {
     }
     Ok(Rendered {
         kind: MediaKind::Image,
-        content_type: "image/avif",
-        width: Some(width.into()),
-        height: Some(height.into()),
-        duration_ms: None,
+        width: Some(width),
+        height: Some(height),
+        duration: None,
         data,
     })
 }
 
 fn clip(pcm: &Pcm) -> anyhow::Result<Rendered> {
-    let channel_mode = match pcm.channels {
-        1 => ChannelMode::Mono,
-        _ => ChannelMode::Stereo,
+    let channel_mode = match pcm.layout {
+        Layout::Mono => ChannelMode::Mono,
+        Layout::Stereo => ChannelMode::Stereo,
     };
     // Low sample rates cannot carry the full bitrate; AAC allows about six bits a sample.
-    let bitrate = AAC_BITS_PER_CHANNEL.min(3 * pcm.rate) * u32::from(pcm.channels);
+    let bitrate = AAC_BITS_PER_CHANNEL.min(3 * pcm.rate) * pcm.layout.channels() as u32;
     let mut encoder = Encoder::builder()
         .aot(Aot::AacLc)
         .sample_rate(pcm.rate)
@@ -132,7 +132,7 @@ fn clip(pcm: &Pcm) -> anyhow::Result<Rendered> {
     let data = mp4::m4a(&mp4::AacTrack {
         config: info.config(),
         sample_rate: pcm.rate,
-        channels: pcm.channels,
+        channels: pcm.layout.channels() as u16,
         frame_length: info.frame_length(),
         delay: info.delay(),
         samples,
@@ -140,11 +140,12 @@ fn clip(pcm: &Pcm) -> anyhow::Result<Rendered> {
     });
     Ok(Rendered {
         kind: MediaKind::Audio,
-        content_type: "audio/mp4",
         width: None,
         height: None,
-        // Rounded up, as the MP4's edit list is, so the two agree.
-        duration_ms: Some((samples * 1000).div_ceil(u64::from(pcm.rate)) as i64),
+        // Whole milliseconds, rounded up as the MP4's edit list is, so the two agree.
+        duration: Some(Duration::from_millis(
+            (samples * 1000).div_ceil(u64::from(pcm.rate)),
+        )),
         data,
     })
 }

@@ -3,6 +3,10 @@ use support as db;
 #[path = "support/media_files.rs"]
 mod files;
 
+fn format(declared: &str) -> media::UploadFormat {
+    media::UploadFormat::from_content_type(declared).unwrap()
+}
+
 use keepsake_core::{
     facts::{self, NewFact},
     media::{self, MediaKind, NewQuestionMedia},
@@ -43,8 +47,10 @@ async fn pool(directory: &tempfile::TempDir) -> sqlx::SqlitePool {
 async fn questions_keep_their_images_and_clips_in_order_across_reads() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
-    let image = media::upload(&pool, 1, "image/png", png(1)).await.unwrap();
-    let clip = media::upload(&pool, 1, "audio/wav", files::wav(300, 1))
+    let image = media::upload(&pool, 1, format("image/png"), png(1))
+        .await
+        .unwrap();
+    let clip = media::upload(&pool, 1, format("audio/wav"), files::wav(300, 1))
         .await
         .unwrap();
     // Served as AVIF and AAC in MP4, whatever was uploaded.
@@ -57,7 +63,7 @@ async fn questions_keep_their_images_and_clips_in_order_across_reads() {
         (MediaKind::Audio, "audio/mp4", Some(300))
     );
     assert_eq!(
-        media::upload(&pool, 1, "image/png", png(1))
+        media::upload(&pool, 1, format("image/png"), png(1))
             .await
             .unwrap()
             .media_id,
@@ -145,7 +151,10 @@ async fn uploads_are_checked_before_they_are_stored() {
             "5 MiB",
         ),
     ] {
-        let error = media::upload(&pool, 1, declared, bytes).await.unwrap_err();
+        let error = match media::UploadFormat::parse_content_type(declared) {
+            Ok(format) => media::upload(&pool, 1, format, bytes).await.unwrap_err(),
+            Err(error) => error,
+        };
         assert!(error.to_string().contains(message), "{error}");
     }
     let stored: i64 = sqlx::query_scalar("SELECT count(*) FROM media")
@@ -156,7 +165,9 @@ async fn uploads_are_checked_before_they_are_stored() {
     assert_eq!(files_in(&directory.path().join("media")), 0);
     assert_eq!(files_in(&directory.path().join("tmp")), 0);
 
-    let image = media::upload(&pool, 1, "image/png", png(2)).await.unwrap();
+    let image = media::upload(&pool, 1, format("image/png"), png(2))
+        .await
+        .unwrap();
     for (attached, message) in [
         (
             (0..5)
@@ -192,7 +203,9 @@ async fn another_profile_can_neither_read_nor_attach_an_upload() {
     )
     .await
     .unwrap();
-    let image = media::upload(&pool, 1, "image/png", png(3)).await.unwrap();
+    let image = media::upload(&pool, 1, format("image/png"), png(3))
+        .await
+        .unwrap();
     assert!(
         media::locate(&pool, guest.id, image.media_id)
             .await
@@ -227,7 +240,9 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
     )
     .await
     .unwrap();
-    let image = media::upload(&pool, 1, "image/png", png(4)).await.unwrap();
+    let image = media::upload(&pool, 1, format("image/png"), png(4))
+        .await
+        .unwrap();
     let source = facts::create_for(
         &pool,
         1,
@@ -281,7 +296,9 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
 async fn uploads_never_attached_are_removed_after_a_day() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
-    let attached = media::upload(&pool, 1, "image/png", png(5)).await.unwrap();
+    let attached = media::upload(&pool, 1, format("image/png"), png(5))
+        .await
+        .unwrap();
     facts::create_for(
         &pool,
         1,
@@ -291,9 +308,9 @@ async fn uploads_never_attached_are_removed_after_a_day() {
     .unwrap();
     let insert = |seed: u8, created_at: String| {
         sqlx::query_scalar::<_, i64>(
-            "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+            "INSERT INTO media(profile_id, kind, upload_sha256, file_sha256,
                byte_size, width, height, created_at)
-             VALUES(1, 'image', 'image/avif', ?, ?, 10, 4, 3, ?) RETURNING id",
+             VALUES(1, 'image', ?, ?, 10, 4, 3, ?) RETURNING id",
         )
         .bind(format!("{seed:0>64}"))
         .bind(format!("{seed:0>64}"))
@@ -307,7 +324,9 @@ async fn uploads_never_attached_are_removed_after_a_day() {
     let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ");
     let in_progress = insert(8, now.to_string()).fetch_one(&pool).await.unwrap();
 
-    let new = media::upload(&pool, 1, "image/png", png(6)).await.unwrap();
+    let new = media::upload(&pool, 1, format("image/png"), png(6))
+        .await
+        .unwrap();
     let remaining: Vec<i64> = sqlx::query_scalar("SELECT id FROM media ORDER BY id")
         .fetch_all(&pool)
         .await
@@ -321,7 +340,9 @@ async fn uploads_never_attached_are_removed_after_a_day() {
 async fn housekeeping_empties_tmp_and_removes_only_old_unreferenced_files() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
-    let kept = media::upload(&pool, 1, "image/png", png(9)).await.unwrap();
+    let kept = media::upload(&pool, 1, format("image/png"), png(9))
+        .await
+        .unwrap();
     let kept = media::locate(&pool, 1, kept.media_id)
         .await
         .unwrap()
@@ -362,7 +383,7 @@ async fn the_same_words_asked_of_different_pictures_can_be_matched() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
     for (seed, bird) in [(10, "Kererū"), (11, "Tūī"), (12, "Pīwakawaka")] {
-        let image = media::upload(&pool, 1, "image/png", png(seed))
+        let image = media::upload(&pool, 1, format("image/png"), png(seed))
             .await
             .unwrap();
         facts::create_for(
@@ -391,28 +412,22 @@ async fn the_same_words_asked_of_different_pictures_can_be_matched() {
 async fn the_schema_refuses_what_rendering_would_never_produce() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
-    for (kind, content_type, width, duration_ms) in [
-        ("image", "image/jpeg", Some(4), None),
-        ("image", "image/png", Some(4), None),
-        ("image", "image/webp", Some(4), None),
-        ("image", "image/gif", Some(4), None),
-        ("image", "image/svg+xml", Some(4), None),
-        ("image", "text/html", Some(4), None),
-        ("audio", "audio/wav", None, Some(10)),
-        ("audio", "audio/mpeg", None, Some(10)),
-        ("image", "audio/mp4", Some(4), None),
-        ("image", "image/avif", None, None),
-        ("image", "image/avif", Some(4097), None),
-        ("audio", "audio/mp4", None, None),
-        ("audio", "audio/mp4", None, Some(300_001)),
+    for (kind, width, duration_ms) in [
+        ("video", None, Some(10)),
+        ("gif", Some(4), None),
+        ("image", None, None),
+        ("image", Some(4), Some(10)),
+        ("image", Some(4097), None),
+        ("audio", None, None),
+        ("audio", Some(4), Some(10)),
+        ("audio", None, Some(300_001)),
     ] {
         let inserted = sqlx::query(
-            "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+            "INSERT INTO media(profile_id, kind, upload_sha256, file_sha256,
                byte_size, width, height, duration_ms)
-             VALUES(1, ?, ?, ?, ?, 1, ?, ?, ?)",
+             VALUES(1, ?, ?, ?, 1, ?, ?, ?)",
         )
         .bind(kind)
-        .bind(content_type)
         .bind("0".repeat(64))
         .bind("0".repeat(64))
         .bind(width)
@@ -420,7 +435,10 @@ async fn the_schema_refuses_what_rendering_would_never_produce() {
         .bind(duration_ms)
         .execute(&pool)
         .await;
-        assert!(inserted.is_err(), "{kind} {content_type} was stored");
+        assert!(
+            inserted.is_err(),
+            "{kind} {width:?} {duration_ms:?} was stored"
+        );
     }
     pool.close().await;
 }

@@ -34,7 +34,7 @@ fn transitions(
             difficulty,
         }),
         (None, None) => None,
-        _ => anyhow::bail!("incomplete memory state"),
+        (Some(_), None) | (None, Some(_)) => anyhow::bail!("incomplete memory state"),
     };
     let elapsed = match schedule.last_review_at {
         Some(last) => now
