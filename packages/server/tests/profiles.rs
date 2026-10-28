@@ -628,6 +628,40 @@ async fn share_batch_operations_are_atomic_and_sender_and_recipient_actions_are_
 }
 
 #[tokio::test]
+async fn only_its_owner_deletes_a_fact_and_its_pending_offers_are_withdrawn() {
+    let h = Household::new().await;
+    let unscoped = h.fact(1, "unscoped").await;
+    let path = format!("/api/facts/{}", unscoped["id"]);
+    expect(&h.app, "DELETE", &path, Value::Null, StatusCode::NO_CONTENT).await;
+    expect(&h.app, "GET", &path, Value::Null, StatusCode::NOT_FOUND).await;
+
+    h.partner().await;
+    let own = h.fact(1, "owned").await;
+    let offer = h.offer(&own, &uuid::Uuid::new_v4().to_string()).await;
+    let path = format!("/api/profiles/1/facts/{}", own["id"]);
+    expect(
+        &h.app,
+        "DELETE",
+        &format!("/api/profiles/2/facts/{}", own["id"]),
+        Value::Null,
+        StatusCode::NOT_FOUND,
+    )
+    .await;
+    h.get(&path).await;
+    expect(&h.app, "DELETE", &path, Value::Null, StatusCode::NO_CONTENT).await;
+    expect(&h.app, "GET", &path, Value::Null, StatusCode::NOT_FOUND).await;
+    expect(&h.app, "DELETE", &path, Value::Null, StatusCode::NOT_FOUND).await;
+    let sent = h.get("/api/profiles/1/shares?direction=sent").await;
+    assert_eq!(sent["items"][0]["id"], offer[0]["id"]);
+    assert_eq!(sent["items"][0]["status"], "withdrawn");
+    assert_eq!(
+        h.get("/api/profiles/2/shares?status=pending").await["total"],
+        0
+    );
+    h.pool.close().await;
+}
+
+#[tokio::test]
 async fn openapi_scoped_paths_declare_every_path_parameter_and_unique_operations() {
     let h = Household::new().await;
     let schema = h.get("/api/openapi.json").await;

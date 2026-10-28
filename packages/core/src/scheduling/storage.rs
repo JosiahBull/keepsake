@@ -169,6 +169,39 @@ pub(crate) async fn map_practices(
     Ok(())
 }
 
+/// Remove a fact's recall targets with their practice mappings, schedules and study
+/// events, which would otherwise keep the fact from being deleted.
+pub(crate) async fn forget_fact(
+    connection: &mut SqliteConnection,
+    fact_id: i64,
+) -> anyhow::Result<()> {
+    sqlx::query!(
+        "DELETE FROM study_events
+         WHERE target_id IN (SELECT id FROM learning_targets WHERE fact_id = ?)",
+        fact_id
+    )
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM target_practices
+         WHERE target_id IN (SELECT id FROM learning_targets WHERE fact_id = ?)",
+        fact_id
+    )
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query!(
+        "DELETE FROM schedule_states
+         WHERE target_id IN (SELECT id FROM learning_targets WHERE fact_id = ?)",
+        fact_id
+    )
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query!("DELETE FROM learning_targets WHERE fact_id = ?", fact_id)
+        .execute(connection)
+        .await?;
+    Ok(())
+}
+
 pub async fn approve_practice_for(
     pool: &SqlitePool,
     profile_id: i64,

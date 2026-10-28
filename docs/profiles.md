@@ -71,6 +71,10 @@ of an accepted offer returns the same copy. Later edits and new offers cannot re
 an existing accepted copy or its progress. Decline and withdrawal leave libraries
 unchanged. There is no live synchronization or automatic merging of duplicate facts.
 
+Deleting a fact withdraws its pending offers; accepted copies stay with their recipients.
+A recipient who deletes their copy leaves the offer accepted for both profiles, and
+accepting it again does not make another copy.
+
 CLI equivalents:
 
 ```sh

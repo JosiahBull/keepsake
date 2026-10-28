@@ -173,6 +173,20 @@ pub async fn get(
     ))
 }
 
+#[utoipa::path(delete, path = "/api/facts/{id}", params(("id" = i64, Path)), responses(
+    (status = 204, description = "The fact, its practices and its study history are deleted"), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn delete(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
+) -> Result<StatusCode, ApiError> {
+    facts::delete_for(&pool, profile_id, id)
+        .await
+        .map_err(ApiError::internal)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 #[utoipa::path(post, path = "/api/facts/{id}/practices", params(("id" = i64, Path)), request_body = [NewPractice], responses(
     (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]

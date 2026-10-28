@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO facts (id, profile_id, prompt, answer, context, source, tags)\n         VALUES ((SELECT max(id) + 1 FROM (\n                   SELECT max(id) AS id FROM facts UNION ALL SELECT max(id) FROM deleted_facts\n                 )), ?, ?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "07d57d4806f55f51a390c257b9a56d7994b48c9a26afb15b31c572b7e78ddfcb"
+}

@@ -504,6 +504,39 @@ async fn resolve_offer(
     .await
 }
 
+/// Withdraw a fact's pending offers as its sender deletes it. Resolved offers keep their
+/// history, and copies already accepted stay with their recipients.
+pub(crate) async fn withdraw_pending(
+    connection: &mut SqliteConnection,
+    profile_id: i64,
+    fact_id: i64,
+) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE fact_shares SET status='withdrawn', resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
+         WHERE sender_id=? AND source_fact_id=? AND status='pending'",
+        profile_id,
+        fact_id
+    )
+    .execute(connection)
+    .await?;
+    Ok(())
+}
+
+/// Once a recipient has deleted the copy an offer made, the offer stays accepted without
+/// naming it. Accepting the offer again does not make another copy.
+pub(crate) async fn forget_copy(
+    connection: &mut SqliteConnection,
+    fact_id: i64,
+) -> anyhow::Result<()> {
+    sqlx::query!(
+        "UPDATE fact_shares SET accepted_fact_id=NULL WHERE accepted_fact_id=?",
+        fact_id
+    )
+    .execute(connection)
+    .await?;
+    Ok(())
+}
+
 pub async fn decline(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<Share> {
     resolve_offer(pool, profile_id, id, false).await
 }

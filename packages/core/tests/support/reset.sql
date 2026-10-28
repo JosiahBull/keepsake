@@ -11,6 +11,7 @@ DELETE FROM learning_targets;
 DELETE FROM practices;
 DELETE FROM fact_media;
 DELETE FROM facts;
+DELETE FROM deleted_facts;
 DELETE FROM media;
 DELETE FROM scheduler_settings;
 DELETE FROM push_devices;

@@ -98,7 +98,9 @@ checked, so a read-only connection cannot reach one by accident.
   runs `keepsake study approve`.
 - **Sharing, profiles, settings, reminders, backups and restores.** These are household
   decisions.
-- **Editing or removing anything.** Keepsake has no route for either.
+- **Editing or deleting anything.** Keepsake has no route for editing. Deleting a fact
+  removes its study history for good, so only the learner does it, through the HTTP API
+  or the CLI.
 
 The first two follow from the [saved research](research/learning-and-retention-2026-10-24.md).
 A 2025 randomised field experiment found that unrestricted AI assistance improved assisted

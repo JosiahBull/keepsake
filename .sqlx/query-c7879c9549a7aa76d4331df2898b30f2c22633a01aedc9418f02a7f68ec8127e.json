@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM media\n             WHERE id=? AND NOT EXISTS (SELECT 1 FROM fact_media WHERE media_id=media.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "c7879c9549a7aa76d4331df2898b30f2c22633a01aedc9418f02a7f68ec8127e"
+}

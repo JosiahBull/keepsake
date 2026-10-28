@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM learning_targets WHERE fact_id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "2f450d9bf9a1a3b67e09eddcd1e1dcf318247837e57ff77d9917b0e882e4524e"
+}

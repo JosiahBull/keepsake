@@ -395,8 +395,12 @@ pub(crate) async fn insert_fact(
             },
         );
     }
+    // An ID past every deleted fact's; NULL, so SQLite chooses, in an empty library.
     let result = sqlx::query!(
-        "INSERT INTO facts (profile_id, prompt, answer, context, source, tags) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO facts (id, profile_id, prompt, answer, context, source, tags)
+         VALUES ((SELECT max(id) + 1 FROM (
+                   SELECT max(id) AS id FROM facts UNION ALL SELECT max(id) FROM deleted_facts
+                 )), ?, ?, ?, ?, ?, ?)",
         profile_id,
         fact.prompt,
         fact.answer,
@@ -438,6 +442,34 @@ pub async fn add_practices_for(
             }
             crate::scheduling::map_practices(connection, id).await?;
             load_id(connection, id).await?.context("fact missing")
+        })
+    })
+    .await
+}
+
+/// Delete a fact with its practices, reviews, schedule and study events, and return what
+/// it held. Its pending offers are withdrawn, and media no other question uses is removed.
+pub async fn delete_for(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<Fact> {
+    crate::db::write_transaction(pool, move |connection| {
+        Box::pin(async move {
+            crate::profiles::require_fact(connection, profile_id, id).await?;
+            let fact = load_id(connection, id).await?.context("fact missing")?;
+            crate::sharing::withdraw_pending(connection, profile_id, id).await?;
+            crate::scheduling::forget_fact(connection, id).await?;
+            crate::media::detach(connection, id).await?;
+            // An accepted offer names its copy until the copy is gone, so that reference
+            // is checked at commit rather than as the fact is deleted.
+            sqlx::query("PRAGMA defer_foreign_keys = ON")
+                .execute(&mut *connection)
+                .await?;
+            sqlx::query!("DELETE FROM facts WHERE id = ?", id)
+                .execute(&mut *connection)
+                .await?;
+            sqlx::query!("INSERT INTO deleted_facts (id) VALUES (?)", id)
+                .execute(&mut *connection)
+                .await?;
+            crate::sharing::forget_copy(connection, id).await?;
+            Ok(fact)
         })
     })
     .await

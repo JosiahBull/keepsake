@@ -67,6 +67,8 @@ material into executable shell syntax. Run `--help` for current flags.
   that exact reviewed JSON without regenerating it
 - `list --search '...' --limit 25` finds a page of saved knowledge; `show ID`
   includes its practice variants; `methods` describes practice types
+- `delete ID` removes a fact with its study history for good. Use it only when the
+  user asks to delete that fact
 - `--json list` returns `{items, next_cursor, total}`. Continue with
   `list --before CURSOR` and the same search until `next_cursor` is null;
   the first page is not the whole library. `--limit` accepts 1–100

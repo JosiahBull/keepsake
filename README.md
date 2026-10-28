@@ -118,6 +118,21 @@ SQLite file. The repository and skill launchers select this checkout's database
 from any directory. Point the CLI and server at the same file to access the same household profiles.
 There is no remote HTTP CLI mode.
 
+### Delete a fact
+
+Deleting a fact removes it with its practice variants, reviews, schedule and study
+history. Only a backup brings it back. The CLI prints what it deleted, so the content can
+be saved again, as a new fact with a fresh schedule. A deleted fact's ID is never reused.
+
+```sh
+keepsake --profile default delete FACT_ID
+curl -X DELETE http://localhost:8080/api/profiles/1/facts/FACT_ID
+```
+
+Offers of the fact still awaiting an answer are withdrawn. Copies other profiles have
+accepted stay. Images and clips that no other question uses stop being served, and the
+server removes their files when it next starts.
+
 ## Household profiles
 
 Each profile has a separate fact library, recall history, timezone, and study budget.

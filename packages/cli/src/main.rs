@@ -26,6 +26,7 @@ const AFTER_HELP: &str = concat!(
     "  keepsake --profile default add --file reviewed-fact.json\n",
     "  keepsake --profile default --json list\n",
     "  keepsake --profile default --json due\n",
+    "  keepsake --profile default delete FACT_ID\n",
     "  keepsake --profile default study submit --file attempt.json\n",
     "\n",
     "Agent calls send the supplied fact/context to your chosen provider using your local CLI login.\n",
@@ -99,6 +100,9 @@ enum Commands {
 
     /// Show a saved fact and its practice variants.
     Show { id: i64 },
+
+    /// Delete a fact with its practice variants and study history. This cannot be undone.
+    Delete { id: i64 },
 
     /// List due recall questions and today's remaining intake.
     Due {
@@ -268,6 +272,14 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
                         .await?
                         .context("fact not found in this profile")?;
                     output_fact(fact, json)?;
+                }
+                Commands::Delete { id } => {
+                    let fact = facts::delete_for(&pool, actor, id).await?;
+                    if json {
+                        print_json(&fact)?;
+                    } else {
+                        println!("Deleted #{} {}", fact.id, fact.prompt);
+                    }
                 }
                 Commands::Generate {
                     id,
