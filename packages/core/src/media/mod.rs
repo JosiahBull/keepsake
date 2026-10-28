@@ -127,6 +127,7 @@ pub struct QuestionMedia {
 /// Where a served file is, and what it is.
 pub struct StoredFile {
     pub path: PathBuf,
+    pub kind: MediaKind,
     pub content_type: &'static str,
     pub byte_size: i64,
 }
@@ -349,6 +350,7 @@ pub async fn locate(
     let kind = MediaKind::parse(&row.kind)?;
     Ok(Some(StoredFile {
         path: MediaFiles::for_pool(pool).path(kind, &row.file_sha256),
+        kind,
         content_type: kind.served_type(),
         byte_size: row.byte_size,
     }))
