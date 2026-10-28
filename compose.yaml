@@ -1,7 +1,7 @@
 name: keepsake
 services:
   keepsake:
-    image: ${KEEPSAKE_IMAGE:-ghcr.io/josiahbull/keepsake:0.6.0}
+    image: ${KEEPSAKE_IMAGE:-ghcr.io/josiahbull/keepsake:0.7.0}
     build: .
     ports:
       - "127.0.0.1:8080:8080"
