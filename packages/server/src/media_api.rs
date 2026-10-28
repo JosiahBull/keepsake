@@ -82,6 +82,7 @@ async fn receive(pool: &SqlitePool, mut body: Body) -> Result<Vec<u8>, ApiError>
     let storage = |error: std::io::Error| ApiError::internal(error.into());
     let (file, path) = MediaFiles::for_pool(pool)
         .partial_upload()
+        .await
         .map_err(storage)?
         .into_parts();
     let mut file = tokio::fs::File::from_std(file);

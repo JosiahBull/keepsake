@@ -3,6 +3,9 @@
 //!
 //! One Keepsake database per directory. The server removes files no row references, so
 //! two databases sharing a directory would remove each other's.
+//!
+//! These are blocking calls, made from the blocking pool where the bytes are produced,
+//! except [`MediaFiles::partial_upload`], which a request handler awaits.
 
 use std::{
     collections::HashSet,
@@ -84,11 +87,14 @@ impl MediaFiles {
     }
 
     /// A private file in `tmp/` for an upload in progress, removed when dropped.
-    pub fn partial_upload(&self) -> io::Result<tempfile::NamedTempFile> {
-        fs::create_dir_all(self.tmp())?;
-        tempfile::Builder::new()
-            .suffix(".upload")
-            .tempfile_in(self.tmp())
+    pub async fn partial_upload(&self) -> io::Result<tempfile::NamedTempFile> {
+        let tmp = self.tmp();
+        tokio::task::spawn_blocking(move || {
+            fs::create_dir_all(&tmp)?;
+            tempfile::Builder::new().suffix(".upload").tempfile_in(&tmp)
+        })
+        .await
+        .map_err(io::Error::other)?
     }
 
     /// Write a served file and return its SHA-256. It is written in `tmp/`, synced, then

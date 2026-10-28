@@ -22,5 +22,5 @@ symphonia = { version = "0.6", default-features = false, features = ["aac", "ala
 symphonia-adapter-libopus = "0.3"
 utoipa.workspace = true
 tempfile = "3"
-tokio = { workspace = true, features = ["sync"] }
+tokio = { workspace = true, features = ["fs", "sync"] }
 uuid.workspace = true

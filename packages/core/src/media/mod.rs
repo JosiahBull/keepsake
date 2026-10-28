@@ -149,7 +149,9 @@ pub async fn upload(
     let files = MediaFiles::for_pool(pool);
     let upload_sha256 = sha256_hex(&bytes);
     if let Some((existing, path)) = held(pool, &files, profile_id, &upload_sha256).await?
-        && path.is_file()
+        && tokio::fs::metadata(&path)
+            .await
+            .is_ok_and(|metadata| metadata.is_file())
     {
         return Ok(existing);
     }
