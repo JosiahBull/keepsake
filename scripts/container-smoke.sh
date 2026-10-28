@@ -76,8 +76,22 @@ curl "${curl_args[@]}" "$base/api/profiles" | jq -e '
   length == 2 and .[0].id == 1 and .[0].name == "Josiah"
   and .[0].handle == "default" and .[1].name == "Ansam" and .[1].handle == "ansam"
 ' >/dev/null
-curl "${curl_args[@]}" "$base/api/profiles/1/facts" | jq -e '.total == 40' >/dev/null
-curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e '.total == 60' >/dev/null
+# Each library also receives every default list item, converted in the background.
+listed=$(docker exec "$container" sh -c 'cat /app/default-lists/*/list.json' | \
+  jq -s 'map(.items | length) | add')
+((listed > 0))
+for ((attempt=0; attempt<600; attempt++)); do
+  docker logs "$container" > "$scratch/server.log" 2>&1
+  if grep -q 'default lists checked' "$scratch/server.log"; then break; fi
+  sleep 1
+done
+if ! grep -q "default lists checked added=$((2 * listed))\$" "$scratch/server.log" \
+  || grep -q 'default list item not added\|default lists not added' "$scratch/server.log"; then
+  echo "Expected both libraries to receive all $listed default list items within 10 minutes." >&2
+  exit 1
+fi
+curl "${curl_args[@]}" "$base/api/profiles/1/facts" | jq -e --argjson n "$listed" '.total == 40 + $n' >/dev/null
+curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e --argjson n "$listed" '.total == 60 + $n' >/dev/null
 curl "${curl_args[@]}" "$base/api/profiles/1/shares?direction=inbox&status=pending" | \
   jq -e '.total == 60 and all(.items[]; .sender_id == 2 and .recipient_id == 1 and (has("answer") | not))' >/dev/null
 
@@ -108,17 +122,19 @@ copy_id=$(jq -er '.[0].accepted_fact_id' "$scratch/accepted.json")
 curl "${curl_args[@]}" "$base/api/profiles/$partner_id/facts/$copy_id" | \
   jq -e '.answer == "Write-ahead logging" and .source == "container-smoke" and .shared_by != null' >/dev/null
 for profile_id in 1 "$partner_id"; do
-  expected_total=41
+  expected_total=$((41 + listed))
   expected_queue=5
   if [[ "$profile_id" == "$partner_id" ]]; then expected_total=1; expected_queue=1; fi
-  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/facts?limit=100" > "$scratch/library-$profile_id.json"
-  jq -e --argjson total "$expected_total" '.total == $total' "$scratch/library-$profile_id.json" >/dev/null
-  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/study/queue" | \
-    jq -e --argjson count "$expected_queue" --slurpfile library "$scratch/library-$profile_id.json" '
-      (.items | length) == $count and all(.items[]; .fact.id as $id | any($library[0].items[]; .id == $id))
-    ' >/dev/null
+  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/facts" | \
+    jq -e --argjson total "$expected_total" '.total == $total' >/dev/null
+  curl "${curl_args[@]}" "$base/api/profiles/$profile_id/study/queue" > "$scratch/queue-$profile_id.json"
+  jq -e --argjson count "$expected_queue" '(.items | length) == $count' "$scratch/queue-$profile_id.json" >/dev/null
+  # Libraries outgrow one page, so each queued fact is fetched from its owner's library.
+  for queued in $(jq -r '.items[].fact.id' "$scratch/queue-$profile_id.json"); do
+    curl "${curl_args[@]}" --output /dev/null "$base/api/profiles/$profile_id/facts/$queued"
+  done
 done
-curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e '.total == 60' >/dev/null
+curl "${curl_args[@]}" "$base/api/profiles/2/facts" | jq -e --argjson n "$listed" '.total == 60 + $n' >/dev/null
 curl "${curl_args[@]}" "$base/api/profiles/$partner_id/study/facts/$copy_id" | \
   jq -e '.phase == "new" and .stability == null and .difficulty == null' >/dev/null
-printf 'Container confinement, health, built SPA, profile isolation and copied recall passed: %s\n' "$KEEPSAKE_IMAGE"
+printf 'Container confinement, health, built SPA, default lists, profile isolation and copied recall passed: %s\n' "$KEEPSAKE_IMAGE"
