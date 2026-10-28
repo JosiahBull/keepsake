@@ -32,9 +32,6 @@ fn kind_directory(kind: MediaKind) -> &'static str {
 pub(crate) fn extension(content_type: &str) -> Option<&'static str> {
     Some(match content_type {
         "image/avif" => "avif",
-        "image/gif" => "gif",
-        "image/webp" => "webp",
-        "image/png" => "png",
         "audio/mp4" => "m4a",
         _ => return None,
     })

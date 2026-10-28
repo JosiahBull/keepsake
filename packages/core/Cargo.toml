@@ -12,7 +12,7 @@ fsrs.workspace = true
 # Decoders that prove an upload is the format it claims, and the encoders that turn it into
 # what is served: AVIF through rav1e and AAC through a Rust port of FDK AAC, both pure Rust.
 fdk-aac-rs = { version = "=0.1.0", default-features = false, features = ["encoder"] }
-image = { version = "0.25", default-features = false, features = ["avif", "gif", "jpeg", "png", "rayon", "webp"] }
+image = { version = "0.25", default-features = false, features = ["avif", "jpeg", "png", "rayon", "webp"] }
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10"

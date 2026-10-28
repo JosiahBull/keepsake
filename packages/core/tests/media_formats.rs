@@ -21,7 +21,6 @@ fn every_supported_image_decodes_with_its_dimensions() {
     for (declared, format) in [
         ("image/png", ImageFormat::Png),
         ("image/jpeg", ImageFormat::Jpeg),
-        ("image/gif", ImageFormat::Gif),
         ("image/webp", ImageFormat::WebP),
     ] {
         let inspection = accepted(declared, &files::image(format, 40, 30, 7));
@@ -30,10 +29,22 @@ fn every_supported_image_decodes_with_its_dimensions() {
         assert_eq!((inspection.width, inspection.height), (Some(40), Some(30)));
         assert_eq!(inspection.duration_ms, None);
     }
-    assert_eq!(
-        accepted("image/gif", &files::animated_gif()).width,
-        Some(16)
-    );
+}
+
+#[test]
+fn gifs_and_animations_are_refused() {
+    assert!(refused("image/gif", files::GIF).starts_with("Unsupported file type"));
+    assert!(refused("image/png", files::GIF).contains("Its contents do not match its type"));
+    for (declared, bytes) in [
+        ("image/png", files::animated_png()),
+        ("image/webp", files::animated_webp()),
+    ] {
+        assert_eq!(
+            refused(declared, &bytes),
+            "Animated images are not supported. Choose a still image.",
+            "{declared}"
+        );
+    }
 }
 
 #[test]
@@ -71,7 +82,7 @@ fn a_file_must_be_what_it_is_declared_to_be() {
         ("image/jpeg", png.clone()),
         ("audio/mpeg", files::wav(100, 1)),
         ("audio/wav", files::mp3(4)),
-        ("image/webp", files::image(ImageFormat::Gif, 4, 4, 1)),
+        ("image/webp", files::GIF.to_vec()),
         ("audio/flac", files::ogg_opus(2)),
     ] {
         assert!(
@@ -97,14 +108,11 @@ fn a_file_must_be_what_it_is_declared_to_be() {
 fn a_valid_signature_on_a_damaged_body_is_refused() {
     let png = files::png(2);
     let jpeg = files::image(ImageFormat::Jpeg, 64, 64, 2);
-    let gif = files::animated_gif();
     let wav = files::wav(200, 2);
     for (declared, bytes) in [
         ("image/png", png[..png.len() / 2].to_vec()),
         ("image/png", [&png[..16], &[0x42; 64][..]].concat()),
         ("image/jpeg", jpeg[..jpeg.len() / 3].to_vec()),
-        // The first frame is intact; the second is cut short.
-        ("image/gif", gif[..gif.len() - 40].to_vec()),
         ("audio/wav", wav[..44].to_vec()),
         ("audio/mp4", files::M4A[..files::M4A.len() / 2].to_vec()),
         (

@@ -1,16 +1,16 @@
 -- Images and audio clips asked with a fact's question. Each is checked, converted to the
 -- one format it is served in, and written beside the database as
--- media/images/<file_sha256>.<ext> or media/audio/<file_sha256>.m4a. Rows describe those
+-- media/images/<file_sha256>.avif or media/audio/<file_sha256>.m4a. Rows describe those
 -- files; the bytes never enter SQLite, and the upload itself is not kept.
 -- AUTOINCREMENT keeps IDs unique forever: browsers cache media by ID as immutable.
 CREATE TABLE media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
     kind TEXT NOT NULL CHECK (kind IN ('image', 'audio')),
-    -- What is served: AVIF for still images, the checked upload for animations, and AAC
-    -- in MP4 for clips. Nothing else can be stored by any route.
+    -- What is served: AVIF for images and AAC in MP4 for clips. Nothing else can be
+    -- stored by any route.
     content_type TEXT NOT NULL CHECK (
-        (kind = 'image' AND content_type IN ('image/avif', 'image/gif', 'image/webp', 'image/png'))
+        (kind = 'image' AND content_type = 'image/avif')
         OR (kind = 'audio' AND content_type = 'audio/mp4')
     ),
     -- The upload's hash, so the same file uploaded again is not processed again.

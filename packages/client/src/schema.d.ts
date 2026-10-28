@@ -809,8 +809,7 @@ export interface components {
         MediaKind: "image" | "audio";
         /**
          * @description A stored file, before or after it is attached to a question. Describes what is
-         *     served: AVIF for still images, the uploaded GIF, WebP or PNG for animations, and AAC
-         *     in MP4 for clips.
+         *     served: AVIF for images and AAC in MP4 for clips.
          */
         MediaUpload: {
             /** Format: int64 */
@@ -1521,7 +1520,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4. */
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4. */
         requestBody: {
             content: {
                 "application/octet-stream": string;
@@ -2186,7 +2185,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4. */
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4. */
         requestBody: {
             content: {
                 "application/octet-stream": string;

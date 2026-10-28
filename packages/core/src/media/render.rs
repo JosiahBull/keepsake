@@ -1,9 +1,7 @@
 //! The one format each kind of media is served in, made when it is stored.
 //!
-//! - Still images become AVIF, at most 2048 pixels on the long edge: small, and decoded
-//!   by every current browser.
-//! - Animations are served as uploaded, after every frame was decoded: nothing here
-//!   writes animated AVIF.
+//! - Images become AVIF, at most 2048 pixels on the long edge: small, and decoded by
+//!   every current browser. Animated images are refused before they get here.
 //! - Clips become AAC-LC in an MP4, index first. Phones and computers decode AAC in
 //!   hardware, it is compact at speech and music bitrates, and the index lets playback
 //!   and scrubbing start from the first bytes over range requests.
@@ -13,7 +11,7 @@
 use fdk_aac_rs::encoder::{Aot, Bitrate, ChannelMode, Encoder, EncoderError, Transport};
 use image::{DynamicImage, ImageEncoder, imageops::FilterType};
 
-use super::inspect::{Content, Inspection, Pcm};
+use super::inspect::{Content, Pcm};
 use super::{MAX_MEDIA_BYTES, MediaKind, invalid, mp4};
 
 /// The longest edge served. Sharp on a large phone or laptop screen at 2× density.
@@ -35,21 +33,9 @@ pub(crate) struct Rendered {
     pub data: Vec<u8>,
 }
 
-pub(crate) fn render(
-    inspection: Inspection,
-    content: Content,
-    upload: &[u8],
-) -> anyhow::Result<Rendered> {
+pub(crate) fn render(content: Content) -> anyhow::Result<Rendered> {
     let rendered = match content {
         Content::Still(image) => still(image)?,
-        Content::Animation => Rendered {
-            kind: MediaKind::Image,
-            content_type: inspection.content_type,
-            width: inspection.width,
-            height: inspection.height,
-            duration_ms: None,
-            data: upload.to_vec(),
-        },
         Content::Audio(pcm) => clip(&pcm)?,
     };
     if rendered.data.is_empty() || rendered.data.len() > MAX_MEDIA_BYTES {

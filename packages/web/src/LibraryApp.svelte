@@ -88,7 +88,6 @@
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
-    gif: "image/gif",
     webp: "image/webp",
     mp3: "audio/mpeg",
     aac: "audio/aac",
@@ -101,7 +100,7 @@
     flac: "audio/flac",
   };
   const SUPPORTED_MEDIA =
-    "Use a JPEG, PNG, GIF or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip.";
+    "Use a JPEG, PNG or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip.";
   // The server serves at most 2048 px and refuses uploads over 4096 px; phone photos are
   // larger than both.
   const IMAGE_EDGE = 2048;
@@ -386,10 +385,9 @@
 
   /**
    * Scale a large photo down and re-encode it as JPEG before uploading. The server turns
-   * it into AVIF, so this JPEG is a high-quality intermediate. GIFs keep their animation.
+   * it into AVIF, so this JPEG is a high-quality intermediate.
    */
   async function prepareImage(file: File, type: string): Promise<[Blob, string]> {
-    if (type === "image/gif") return [file, type];
     let bitmap: ImageBitmap;
     try {
       bitmap = await createImageBitmap(file);
@@ -1218,7 +1216,7 @@
               <span class="optional">optional · up to 4 · 5 MB each</span>
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp,audio/*"
+                accept="image/jpeg,image/png,image/webp,audio/*"
                 multiple
                 disabled={attachments.length >= MAX_ATTACHMENTS || saving}
                 onchange={chooseMedia}

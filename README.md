@@ -74,15 +74,15 @@ keepsake --profile ansam add --prompt 'Which bird is this?' --answer 'Kererū' \
   --media kereru.jpg --media kereru-call.m4a
 ```
 
-Keepsake accepts JPEG, PNG, GIF and WebP images and MP3, M4A, AAC, WAV, Ogg, WebM and
+Keepsake accepts still JPEG, PNG and WebP images and MP3, M4A, AAC, WAV, Ogg, WebM and
 FLAC clips. Each file declares its type, through `Content-Type` for the API or its
 extension for the CLI, and must decode as that type. Renamed, truncated and damaged
-files are refused, as are videos. Limits:
+files are refused, as are GIFs, animated images and videos. Limits:
 
 | Limit | Value |
 | --- | --- |
 | File size | 5 MiB |
-| Image size | 4096 pixels on each side; 200 frames for an animation |
+| Image size | 4096 pixels on each side |
 | Clip length | 5 minutes |
 | Media per question | 4 |
 | Media per profile | 1 GiB |
@@ -91,8 +91,7 @@ Every upload is converted to one format for serving, and the upload itself is no
 
 | Upload | Served as |
 | --- | --- |
-| Still image | AVIF, at most 2048 pixels on the long edge, turned upright from its EXIF orientation, with metadata such as location removed |
-| Animated GIF, WebP or PNG | As uploaded, after every frame is checked |
+| Image | AVIF, at most 2048 pixels on the long edge, turned upright from its EXIF orientation, with metadata such as location removed |
 | Audio clip | AAC-LC in MP4 (`.m4a`), 56 kbit/s a channel, at most two channels and 48 kHz |
 
 The clip's index comes before its audio, and the server answers byte ranges, so playback

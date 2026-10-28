@@ -393,6 +393,9 @@ async fn the_schema_refuses_what_rendering_would_never_produce() {
     let pool = pool(&directory).await;
     for (kind, content_type, width, duration_ms) in [
         ("image", "image/jpeg", Some(4), None),
+        ("image", "image/png", Some(4), None),
+        ("image", "image/webp", Some(4), None),
+        ("image", "image/gif", Some(4), None),
         ("image", "image/svg+xml", Some(4), None),
         ("image", "text/html", Some(4), None),
         ("audio", "audio/wav", None, Some(10)),
