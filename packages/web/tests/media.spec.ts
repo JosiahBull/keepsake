@@ -71,23 +71,30 @@ test("a question keeps its image and clip from the form through to practice", as
 
   const library = (await (await app.request.get("/api/profiles/1/facts")).json()) as FactPage;
   const [image, clip] = library.items[0].media;
-  expect(image).toMatchObject({ kind: "image", content_type: "image/png", width: 24, height: 16, alt: description });
-  expect(clip).toMatchObject({ kind: "audio", content_type: "audio/wav", duration_ms: 300, alt: "" });
+  // Served as AVIF and AAC in MP4, whatever was uploaded.
+  expect(image).toMatchObject({ kind: "image", content_type: "image/avif", width: 24, height: 16, alt: description });
+  expect(clip).toMatchObject({ kind: "audio", content_type: "audio/mp4", duration_ms: 300, alt: "" });
 
   const row = page.getByRole("article").filter({ hasText: "Which bird is this?" });
   await expect(row.getByText("1 image, 1 audio clip", { exact: true })).toBeVisible();
   await row.getByRole("heading", { name: "Which bird is this?", exact: true }).click();
+  // The browser itself decodes the AVIF and reads the clip's length from its index.
   const shown = row.getByRole("img", { name: description, exact: true });
   await expect(shown).toBeVisible();
   await expect.poll(() => shown.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(24);
-  await expect(row.getByLabel("Question audio", { exact: true })).toBeVisible();
+  const player = row.getByLabel("Question audio", { exact: true });
+  await expect(player).toBeVisible();
+  await expect
+    .poll(() => player.evaluate((element: HTMLAudioElement) => element.duration))
+    .toBeGreaterThan(0.25);
+  expect(await player.evaluate((element: HTMLAudioElement) => element.duration)).toBeLessThan(0.5);
 
   // Safari plays audio only from servers that answer byte ranges.
   const range = await app.request.get(`/api/profiles/1/media/${clip.media_id}`, {
-    headers: { range: "bytes=0-3" },
+    headers: { range: "bytes=4-11" },
   });
   expect(range.status()).toBe(206);
-  expect(await range.body()).toEqual(Buffer.from("RIFF"));
+  expect(await range.body()).toEqual(Buffer.from("ftypM4A "));
 
   await startExtraPractice(page);
   const stage = page.getByRole("region", { name: "Flashcards", exact: true });

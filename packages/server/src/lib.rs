@@ -231,7 +231,8 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/reviews", post(facts_api::review))
         .route(
             "/media",
-            post(media_api::upload).layer(DefaultBodyLimit::max(media_api::UPLOAD_LIMIT)),
+            // The upload streams into tmp/ and enforces the media limit itself.
+            post(media_api::upload).layer(DefaultBodyLimit::disable()),
         )
         .route("/media/{id}", get(media_api::download))
         .route("/study/queue", get(study_api::queue))

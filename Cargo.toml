@@ -31,3 +31,24 @@ uuid = { version = "1", features = ["v4"] }
 [profile.release]
 lto = "thin"
 strip = true
+
+# Image and audio encoders take seconds per file unoptimised, so development builds and
+# tests optimise them too.
+[profile.dev.package.rav1e]
+opt-level = 3
+
+[profile.dev.package.ravif]
+opt-level = 3
+
+[profile.dev.package.fdk-aac-rs-aacenc]
+opt-level = 3
+
+[profile.dev.package.fdk-aac-rs-fdk]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+

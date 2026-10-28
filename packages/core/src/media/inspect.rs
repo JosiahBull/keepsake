@@ -2,20 +2,21 @@
 //!
 //! Three checks, each of which alone would be easy to fool. The declared type must be on
 //! the allowlist. The file's signature must name the same format. Then the whole file is
-//! decoded by a pure-Rust decoder for that format, within limits on dimensions, frames,
-//! duration and memory. A renamed file, a truncated one, or something else wearing a
-//! valid header fails here, before anything reaches the database.
-use std::io::Cursor;
+//! decoded for that format, within limits on dimensions, frames, duration and memory. A
+//! renamed file, a truncated one, or something else wearing a valid header fails here,
+//! before anything is stored. What decoding produced is handed to the renderer.
+use std::{io::Cursor, sync::LazyLock};
 
-use image::{AnimationDecoder, ImageDecoder, ImageFormat};
+use image::{AnimationDecoder, DynamicImage, ImageDecoder, ImageFormat};
 use symphonia::core::{
-    codecs::{CodecParameters, audio::AudioDecoderOptions, audio::well_known::CODEC_ID_OPUS},
+    codecs::{CodecParameters, audio::AudioDecoderOptions, registry::CodecRegistry},
     errors::Error as AudioError,
     formats::{FormatOptions, TrackType, probe::Hint},
     io::MediaSourceStream,
     meta::MetadataOptions,
     units::Timestamp,
 };
+use symphonia_adapter_libopus::OpusDecoder;
 
 use super::{MAX_MEDIA_BYTES, MediaKind, invalid};
 
@@ -226,8 +227,30 @@ pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// Decide whether `bytes` may be stored as `declared`. CPU-bound: call off the async runtime.
-pub fn inspect(declared: &str, bytes: &[u8]) -> anyhow::Result<Inspection> {
+/// What decoding produced, for the renderer: never stored as it is.
+pub(crate) enum Content {
+    /// A single image, already turned the way its EXIF orientation says.
+    Still(DynamicImage),
+    /// Several frames. Served as uploaded: no encoder here writes animated AVIF.
+    Animation,
+    Audio(Pcm),
+}
+
+/// Interleaved 16-bit samples, at most two channels, at most 48 kHz.
+pub(crate) struct Pcm {
+    pub rate: u32,
+    pub channels: u16,
+    pub samples: Vec<i16>,
+}
+
+impl Pcm {
+    pub fn frames(&self) -> u64 {
+        (self.samples.len() / usize::from(self.channels)) as u64
+    }
+}
+
+/// The supported format of an upload and checks that need no decoding.
+fn format_of(declared: &str, bytes: &[u8]) -> anyhow::Result<&'static Format> {
     if bytes.is_empty() {
         return Err(invalid("The file is empty"));
     }
@@ -249,24 +272,49 @@ pub fn inspect(declared: &str, bytes: &[u8]) -> anyhow::Result<Inspection> {
             format.article, format.label
         )));
     }
+    Ok(format)
+}
+
+/// Size, type and signature only: enough to refuse a file before hashing or decoding it.
+pub(crate) fn precheck(declared: &str, bytes: &[u8]) -> anyhow::Result<()> {
+    format_of(declared, bytes).map(|_| ())
+}
+
+/// Decide whether `bytes` may be stored as `declared`. CPU-bound: call off the async runtime.
+pub fn inspect(declared: &str, bytes: &[u8]) -> anyhow::Result<Inspection> {
+    decode(declared, bytes).map(|(inspection, _)| inspection)
+}
+
+/// [`inspect`], keeping what was decoded.
+pub(crate) fn decode(declared: &str, bytes: &[u8]) -> anyhow::Result<(Inspection, Content)> {
+    let format = format_of(declared, bytes)?;
     match format.decoder {
         Decoder::Image(image_format) => {
-            let (width, height) = inspect_image(image_format, format.label, bytes)?;
-            Ok(Inspection {
-                kind: MediaKind::Image,
-                content_type: format.content_type,
-                width: Some(width.into()),
-                height: Some(height.into()),
-                duration_ms: None,
-            })
+            let ((width, height), content) = decode_image(image_format, format.label, bytes)?;
+            Ok((
+                Inspection {
+                    kind: MediaKind::Image,
+                    content_type: format.content_type,
+                    width: Some(width.into()),
+                    height: Some(height.into()),
+                    duration_ms: None,
+                },
+                content,
+            ))
         }
-        Decoder::Audio(container) => Ok(Inspection {
-            kind: MediaKind::Audio,
-            content_type: format.content_type,
-            width: None,
-            height: None,
-            duration_ms: inspect_audio(container, format, bytes)?,
-        }),
+        Decoder::Audio(container) => {
+            let (duration_ms, pcm) = decode_audio(container, format, bytes)?;
+            Ok((
+                Inspection {
+                    kind: MediaKind::Audio,
+                    content_type: format.content_type,
+                    width: None,
+                    height: None,
+                    duration_ms,
+                },
+                Content::Audio(pcm),
+            ))
+        }
     }
 }
 
@@ -287,53 +335,98 @@ fn image_error(label: &str) -> impl Fn(image::ImageError) -> anyhow::Error + '_ 
     }
 }
 
-fn inspect_image(format: ImageFormat, label: &str, bytes: &[u8]) -> anyhow::Result<(u32, u32)> {
-    let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
-    reader.limits(image_limits());
-    let image = reader.decode().map_err(image_error(label))?;
+fn decode_image(
+    format: ImageFormat,
+    label: &str,
+    bytes: &[u8],
+) -> anyhow::Result<((u32, u32), Content)> {
+    let fail = image_error(label);
+    let mut decoder = image::ImageReader::with_format(Cursor::new(bytes), format)
+        .into_decoder()
+        .map_err(&fail)?;
+    decoder.set_limits(image_limits()).map_err(&fail)?;
+    // Phones store photos sideways and say so in EXIF; the served file has no EXIF.
+    let orientation = decoder.orientation().map_err(&fail)?;
+    let mut image = DynamicImage::from_decoder(decoder).map_err(&fail)?;
+    image.apply_orientation(orientation);
     let dimensions = (image.width(), image.height());
-    drop(image);
-    // A good first frame must not vouch for the rest of an animation.
-    match format {
-        ImageFormat::Gif => frames(
-            image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(image_error(label))?,
-            label,
-        )?,
+    // A good first frame must not vouch for the rest of an animation. Each decoder gets
+    // the same limits before its frames are read.
+    let frames = match format {
+        ImageFormat::Gif => {
+            let mut decoder =
+                image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
+            decoder.set_limits(image_limits()).map_err(&fail)?;
+            count_frames(decoder.into_frames(), label)?
+        }
         ImageFormat::WebP => {
-            let decoder = image::codecs::webp::WebPDecoder::new(Cursor::new(bytes))
-                .map_err(image_error(label))?;
+            let mut decoder =
+                image::codecs::webp::WebPDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
+            decoder.set_limits(image_limits()).map_err(&fail)?;
             if decoder.has_animation() {
-                frames(decoder, label)?;
+                count_frames(decoder.into_frames(), label)?
+            } else {
+                1
             }
         }
-        _ => {}
-    }
-    Ok(dimensions)
+        ImageFormat::Png => {
+            let mut decoder =
+                image::codecs::png::PngDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
+            decoder.set_limits(image_limits()).map_err(&fail)?;
+            if decoder.is_apng().map_err(&fail)? {
+                count_frames(decoder.apng().map_err(&fail)?.into_frames(), label)?
+            } else {
+                1
+            }
+        }
+        _ => 1,
+    };
+    let content = if frames > 1 {
+        Content::Animation
+    } else {
+        Content::Still(image)
+    };
+    Ok((dimensions, content))
 }
 
-fn frames<'a, D: AnimationDecoder<'a> + ImageDecoder>(
-    mut decoder: D,
-    label: &str,
-) -> anyhow::Result<()> {
-    decoder
-        .set_limits(image_limits())
-        .map_err(image_error(label))?;
-    for (index, frame) in decoder.into_frames().enumerate() {
-        if index >= MAX_FRAMES {
+fn count_frames(frames: image::Frames<'_>, label: &str) -> anyhow::Result<usize> {
+    let mut count = 0;
+    for frame in frames {
+        if count >= MAX_FRAMES {
             return Err(invalid(format!(
                 "Animations must have at most {MAX_FRAMES} frames."
             )));
         }
         frame.map_err(image_error(label))?;
+        count += 1;
     }
-    Ok(())
+    Ok(count)
 }
 
+/// Symphonia's decoders plus the reference Opus decoder.
+static CODECS: LazyLock<CodecRegistry> = LazyLock::new(|| {
+    let mut registry = CodecRegistry::new();
+    symphonia::default::register_enabled_codecs(&mut registry);
+    registry.register_audio_decoder::<OpusDecoder>();
+    registry
+});
+
 /// Demux every packet of the clip's audio track and decode each one. Returns the
-/// measured duration, or `None` when the stream does not say how long its packets are.
-fn inspect_audio(container: &str, format: &Format, bytes: &[u8]) -> anyhow::Result<Option<i64>> {
+/// measured duration, or `None` when the stream does not say how long its packets are,
+/// and the decoded samples.
+fn decode_audio(
+    container: &str,
+    format: &Format,
+    bytes: &[u8],
+) -> anyhow::Result<(Option<i64>, Pcm)> {
     let label = format.label;
     let damaged = || invalid(format!("The {label} is damaged or incomplete."));
+    let too_long = || {
+        invalid(format!(
+            "Audio clips must be {} minutes or shorter.",
+            MAX_AUDIO_MS / 60_000
+        ))
+    };
     let source = MediaSourceStream::new(Box::new(Cursor::new(bytes.to_vec())), Default::default());
     let mut reader = symphonia::default::get_probe()
         .probe(
@@ -378,18 +471,13 @@ fn inspect_audio(container: &str, format: &Format, bytes: &[u8]) -> anyhow::Resu
     {
         return Err(damaged());
     }
-    let mut decoder = match symphonia::default::get_codecs()
+    let mut decoder = CODECS
         .make_audio_decoder(&params, &AudioDecoderOptions::default())
-    {
-        Ok(decoder) => Some(decoder),
-        // No pure-Rust Opus decoder exists here; its container is still fully demuxed.
-        Err(_) if params.codec == CODEC_ID_OPUS && matches!(container, "ogg" | "matroska") => None,
-        Err(_) => {
-            return Err(invalid(format!(
-                "The {label} uses an audio codec Keepsake cannot check."
-            )));
-        }
-    };
+        .map_err(|_| {
+            invalid(format!(
+                "The {label} uses an audio codec Keepsake cannot decode."
+            ))
+        })?;
 
     let milliseconds = |units: u64| {
         time_base
@@ -397,6 +485,8 @@ fn inspect_audio(container: &str, format: &Format, bytes: &[u8]) -> anyhow::Resu
             .map(|time| time.as_millis())
     };
     let (mut packets, mut decoded, mut errors, mut units) = (0usize, 0usize, 0usize, 0u64);
+    let mut pcm: Option<Pcm> = None;
+    let mut interleaved = Vec::new();
     loop {
         let packet = match reader.next_packet() {
             Ok(Some(packet)) => packet,
@@ -410,33 +500,83 @@ fn inspect_audio(container: &str, format: &Format, bytes: &[u8]) -> anyhow::Resu
         units = units.saturating_add(packet.dur.get());
         // Stop before decoding anything past the limit.
         if milliseconds(units).is_some_and(|ms| ms > i128::from(MAX_AUDIO_MS)) {
-            return Err(invalid(format!(
-                "Audio clips must be {} minutes or shorter.",
-                MAX_AUDIO_MS / 60_000
-            )));
+            return Err(too_long());
         }
-        if let Some(decoder) = decoder.as_mut() {
-            match decoder.decode(&packet) {
-                Ok(buffer) if buffer.frames() > 0 => decoded += 1,
-                Ok(_) => {}
-                Err(AudioError::DecodeError(_)) => errors += 1,
-                Err(_) => return Err(damaged()),
+        let buffer = match decoder.decode(&packet) {
+            Ok(buffer) => buffer,
+            Err(AudioError::DecodeError(_)) => {
+                errors += 1;
+                continue;
             }
+            Err(_) => return Err(damaged()),
+        };
+        if buffer.frames() == 0 {
+            continue;
+        }
+        decoded += 1;
+        let rate = buffer.spec().rate();
+        let channels = buffer.spec().channels().count();
+        if channels == 0 || channels > 8 {
+            return Err(damaged());
+        }
+        let kept = channels.min(2);
+        let pcm = pcm.get_or_insert_with(|| Pcm {
+            rate,
+            channels: kept as u16,
+            samples: Vec::new(),
+        });
+        if pcm.rate != rate || usize::from(pcm.channels) != kept {
+            return Err(damaged());
+        }
+        interleaved.clear();
+        buffer.copy_to_vec_interleaved::<i16>(&mut interleaved);
+        // Priming and padding the container marks for removal are not part of the clip.
+        let frames = interleaved.len() / channels;
+        let start = (packet.trim_start.get() as usize).min(frames);
+        let end = frames
+            .saturating_sub(packet.trim_end.get() as usize)
+            .max(start);
+        for frame in interleaved[start * channels..end * channels].chunks_exact(channels) {
+            pcm.samples.extend_from_slice(&frame[..kept]);
         }
     }
-    if packets == 0 || (decoder.is_some() && (decoded == 0 || errors > TOLERATED_AUDIO_ERRORS)) {
+    if packets == 0 || decoded == 0 || errors > TOLERATED_AUDIO_ERRORS {
         return Err(damaged());
     }
+    let pcm = pcm.ok_or_else(damaged)?;
     let measured = milliseconds(units)
         .filter(|ms| *ms > 0)
-        .or_else(|| declared_frames.and_then(milliseconds));
+        .or_else(|| declared_frames.and_then(milliseconds))
+        .or_else(|| Some(i128::from(pcm.frames() as u32) * 1000 / i128::from(pcm.rate)));
     if measured.is_some_and(|ms| ms > i128::from(MAX_AUDIO_MS)) {
-        return Err(invalid(format!(
-            "Audio clips must be {} minutes or shorter.",
-            MAX_AUDIO_MS / 60_000
-        )));
+        return Err(too_long());
     }
-    Ok(measured.map(|ms| ms as i64))
+    Ok((measured.map(|ms| ms as i64), downsample(pcm)))
+}
+
+/// Halve or quarter rates above 48 kHz by averaging neighbouring frames. Higher rates hold
+/// nothing a listener hears, and AAC is served at 48 kHz at most.
+fn downsample(pcm: Pcm) -> Pcm {
+    let factor = match pcm.rate {
+        88_200 | 96_000 => 2,
+        176_400 | 192_000 => 4,
+        _ => return pcm,
+    };
+    let channels = usize::from(pcm.channels);
+    let mut samples = Vec::with_capacity(pcm.samples.len() / factor);
+    for group in pcm.samples.chunks_exact(channels * factor) {
+        for channel in 0..channels {
+            let sum: i32 = (0..factor)
+                .map(|frame| i32::from(group[frame * channels + channel]))
+                .sum();
+            samples.push((sum / factor as i32) as i16);
+        }
+    }
+    Pcm {
+        rate: pcm.rate / factor as u32,
+        channels: pcm.channels,
+        samples,
+    }
 }
 
 #[cfg(test)]

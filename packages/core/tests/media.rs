@@ -47,13 +47,14 @@ async fn questions_keep_their_images_and_clips_in_order_across_reads() {
     let clip = media::upload(&pool, 1, "audio/wav", files::wav(300, 1))
         .await
         .unwrap();
+    // Served as AVIF and AAC in MP4, whatever was uploaded.
     assert_eq!(
         (image.kind, image.content_type.as_str()),
-        (MediaKind::Image, "image/png")
+        (MediaKind::Image, "image/avif")
     );
     assert_eq!(
-        (clip.kind, clip.content_type.as_str()),
-        (MediaKind::Audio, "audio/wav")
+        (clip.kind, clip.content_type.as_str(), clip.duration_ms),
+        (MediaKind::Audio, "audio/mp4", Some(300))
     );
     assert_eq!(
         media::upload(&pool, 1, "image/png", png(1))
@@ -93,15 +94,40 @@ async fn questions_keep_their_images_and_clips_in_order_across_reads() {
         .await
         .unwrap();
     assert_eq!(order(&page.items[0].media), expected);
-    let file = media::read(&pool, 1, image.media_id)
+    let file = media::locate(&pool, 1, image.media_id)
         .await
         .unwrap()
         .unwrap();
+    assert_eq!(file.content_type, "image/avif");
+    assert!(file.path.starts_with(directory.path().join("media/images")));
     assert_eq!(
-        (file.content_type.as_str(), file.data),
-        ("image/png", png(1))
+        std::fs::read(&file.path).unwrap().len() as i64,
+        file.byte_size
     );
+    // Only what is served is kept: no upload, no blob in SQLite, nothing left in tmp/.
+    assert_eq!(files_in(&directory.path().join("media")), 2);
+    assert_eq!(files_in(&directory.path().join("tmp")), 0);
     pool.close().await;
+}
+
+fn files_in(directory: &std::path::Path) -> usize {
+    walk(directory).len()
+}
+
+fn walk(directory: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return Vec::new();
+    };
+    entries
+        .flat_map(|entry| {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path)
+            } else {
+                vec![path]
+            }
+        })
+        .collect()
 }
 
 #[tokio::test]
@@ -127,6 +153,8 @@ async fn uploads_are_checked_before_they_are_stored() {
         .await
         .unwrap();
     assert_eq!(stored, 0);
+    assert_eq!(files_in(&directory.path().join("media")), 0);
+    assert_eq!(files_in(&directory.path().join("tmp")), 0);
 
     let image = media::upload(&pool, 1, "image/png", png(2)).await.unwrap();
     for (attached, message) in [
@@ -166,7 +194,7 @@ async fn another_profile_can_neither_read_nor_attach_an_upload() {
     .unwrap();
     let image = media::upload(&pool, 1, "image/png", png(3)).await.unwrap();
     assert!(
-        media::read(&pool, guest.id, image.media_id)
+        media::locate(&pool, guest.id, image.media_id)
             .await
             .unwrap()
             .is_none()
@@ -231,12 +259,21 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
     assert_eq!(copy.media.len(), 1);
     assert_ne!(copy.media[0].media_id, image.media_id);
     assert_eq!(copy.media[0].alt, "A dark bird");
-    let bytes = media::read(&pool, guest.id, copy.media[0].media_id)
-        .await
-        .unwrap()
-        .unwrap()
-        .data;
-    assert_eq!(bytes, png(4));
+    // Files are named by their contents, so the copy shares the sender's file.
+    let path = |profile, id| {
+        let pool = pool.clone();
+        async move {
+            media::locate(&pool, profile, id)
+                .await
+                .unwrap()
+                .unwrap()
+                .path
+        }
+    };
+    assert_eq!(
+        path(guest.id, copy.media[0].media_id).await,
+        path(1, image.media_id).await
+    );
     pool.close().await;
 }
 
@@ -253,15 +290,13 @@ async fn uploads_never_attached_are_removed_after_a_day() {
     .await
     .unwrap();
     let insert = |seed: u8, created_at: String| {
-        let bytes = png(seed);
         sqlx::query_scalar::<_, i64>(
-            "INSERT INTO media(profile_id, kind, content_type, sha256, byte_size, width, height,
-               data, created_at)
-             VALUES(1, 'image', 'image/png', ?, ?, 4, 3, ?, ?) RETURNING id",
+            "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+               byte_size, width, height, created_at)
+             VALUES(1, 'image', 'image/avif', ?, ?, 10, 4, 3, ?) RETURNING id",
         )
         .bind(format!("{seed:0>64}"))
-        .bind(bytes.len() as i64)
-        .bind(bytes)
+        .bind(format!("{seed:0>64}"))
         .bind(created_at)
     };
     let abandoned = insert(7, "2026-01-01T00:00:00.000Z".into())
@@ -279,6 +314,46 @@ async fn uploads_never_attached_are_removed_after_a_day() {
         .unwrap();
     assert!(!remaining.contains(&abandoned));
     assert_eq!(remaining, [attached.media_id, in_progress, new.media_id]);
+    pool.close().await;
+}
+
+#[tokio::test]
+async fn housekeeping_empties_tmp_and_removes_only_old_unreferenced_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let pool = pool(&directory).await;
+    let kept = media::upload(&pool, 1, "image/png", png(9)).await.unwrap();
+    let kept = media::locate(&pool, 1, kept.media_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .path;
+    let images = directory.path().join("media/images");
+    let aged = |name: &str, hours: u64| {
+        let path = images.join(name);
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_modified(
+            std::time::SystemTime::now() - std::time::Duration::from_secs(hours * 3600),
+        )
+        .unwrap();
+        path
+    };
+    let orphan = aged(&format!("{}.avif", "a".repeat(64)), 2);
+    let just_written = aged(&format!("{}.avif", "b".repeat(64)), 0);
+    let not_ours = aged("notes.txt", 2);
+    let tmp = directory.path().join("tmp");
+    std::fs::create_dir_all(tmp.join("nested")).unwrap();
+    std::fs::write(tmp.join("interrupted.upload"), b"half a file").unwrap();
+
+    let tidied = media::housekeeping(&pool).await.unwrap();
+    assert_eq!((tidied.tmp_removed, tidied.orphans_removed), (2, 1));
+    assert!(kept.is_file());
+    assert!(!orphan.exists());
+    assert!(
+        just_written.is_file(),
+        "a file may be moments ahead of its row"
+    );
+    assert!(not_ours.is_file());
+    assert_eq!(files_in(&tmp), 0);
     pool.close().await;
 }
 
@@ -313,25 +388,29 @@ async fn the_same_words_asked_of_different_pictures_can_be_matched() {
 }
 
 #[tokio::test]
-async fn the_schema_refuses_what_inspection_would_have_refused() {
+async fn the_schema_refuses_what_rendering_would_never_produce() {
     let directory = tempfile::tempdir().unwrap();
     let pool = pool(&directory).await;
     for (kind, content_type, width, duration_ms) in [
+        ("image", "image/jpeg", Some(4), None),
         ("image", "image/svg+xml", Some(4), None),
         ("image", "text/html", Some(4), None),
-        ("audio", "image/png", None, Some(10)),
-        ("image", "audio/wav", Some(4), None),
-        ("image", "image/png", None, None),
-        ("image", "image/png", Some(4097), None),
-        ("audio", "audio/wav", None, Some(300_001)),
+        ("audio", "audio/wav", None, Some(10)),
+        ("audio", "audio/mpeg", None, Some(10)),
+        ("image", "audio/mp4", Some(4), None),
+        ("image", "image/avif", None, None),
+        ("image", "image/avif", Some(4097), None),
+        ("audio", "audio/mp4", None, None),
+        ("audio", "audio/mp4", None, Some(300_001)),
     ] {
         let inserted = sqlx::query(
-            "INSERT INTO media(profile_id, kind, content_type, sha256, byte_size, width, height,
-               duration_ms, data)
-             VALUES(1, ?, ?, ?, 1, ?, ?, ?, x'00')",
+            "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+               byte_size, width, height, duration_ms)
+             VALUES(1, ?, ?, ?, ?, 1, ?, ?, ?)",
         )
         .bind(kind)
         .bind(content_type)
+        .bind("0".repeat(64))
         .bind("0".repeat(64))
         .bind(width)
         .bind(width)

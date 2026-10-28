@@ -26,6 +26,13 @@ fn main() -> anyhow::Result<()> {
 async fn serve(config: Config, shutdown: CancellationToken) -> anyhow::Result<()> {
     tracing::info!("starting keepsake");
     let pool = db::connect(&config.database_url).await?;
+    // Work left in tmp/ by a previous run is incomplete by definition.
+    let tidied = keepsake_core::media::housekeeping(&pool).await?;
+    tracing::info!(
+        tmp_removed = tidied.tmp_removed,
+        orphans_removed = tidied.orphans_removed,
+        "media directory tidied"
+    );
     let result = async {
         if shutdown.is_cancelled() {
             return Ok(());

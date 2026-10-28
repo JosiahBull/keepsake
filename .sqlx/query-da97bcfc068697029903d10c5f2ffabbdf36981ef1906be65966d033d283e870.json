@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT DISTINCT file_sha256 FROM media",
+  "describe": {
+    "columns": [
+      {
+        "name": "file_sha256",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "file_sha256"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "da97bcfc068697029903d10c5f2ffabbdf36981ef1906be65966d033d283e870"
+}

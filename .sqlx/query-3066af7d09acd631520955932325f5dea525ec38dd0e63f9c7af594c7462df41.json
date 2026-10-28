@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", kind, content_type, byte_size, width, height, duration_ms\n         FROM media WHERE profile_id=? AND sha256=?",
+  "query": "SELECT id AS \"id!\", kind, content_type, byte_size, width, height, duration_ms\n         FROM media WHERE profile_id=? AND upload_sha256=?",
   "describe": {
     "columns": [
       {
@@ -94,5 +94,5 @@
       true
     ]
   },
-  "hash": "c4dc81c95a6b0d3c64e712afea5fa43a1b75408806510cb9d896b5cdf4251cca"
+  "hash": "3066af7d09acd631520955932325f5dea525ec38dd0e63f9c7af594c7462df41"
 }
