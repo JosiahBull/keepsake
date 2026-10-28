@@ -47,19 +47,102 @@ pub fn sideways_jpeg(width: u32, height: u32) -> Vec<u8> {
     [&jpeg[..2], &segment, &jpeg[2..]].concat()
 }
 
-/// A two-frame animation, to show later frames are decoded too.
-pub fn animated_gif() -> Vec<u8> {
-    let mut out = Vec::new();
-    {
-        let mut encoder = image::codecs::gif::GifEncoder::new(&mut out);
-        for seed in [10, 200] {
-            let frame = image::RgbaImage::from_fn(16, 16, |x, y| {
-                image::Rgba([seed, x as u8 * 16, y as u8 * 16, 255])
-            });
-            encoder.encode_frame(image::Frame::new(frame)).unwrap();
+/// A GIF's signature and header: refused whatever follows.
+pub const GIF: &[u8] = b"GIF89a\x01\x00\x01\x00\x00\x00\x00;";
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for byte in bytes {
+        crc ^= u32::from(*byte);
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
         }
     }
-    out
+    !crc
+}
+
+fn png_chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
+    let body = [&kind[..], data].concat();
+    [
+        &(data.len() as u32).to_be_bytes()[..],
+        &body,
+        &crc32(&body).to_be_bytes(),
+    ]
+    .concat()
+}
+
+/// A two-frame animated PNG: a real PNG with APNG's control and frame chunks added.
+pub fn animated_png() -> Vec<u8> {
+    let (width, height) = (4u32, 3u32);
+    let png = image(ImageFormat::Png, width, height, 9);
+    // The encoder writes the signature, IHDR, then IDAT; find IDAT's data.
+    let idat = png.windows(4).position(|window| window == b"IDAT").unwrap();
+    let length = u32::from_be_bytes(png[idat - 4..idat].try_into().unwrap()) as usize;
+    let data = &png[idat + 4..idat + 4 + length];
+    let control = |sequence: u32| {
+        let mut fctl = sequence.to_be_bytes().to_vec();
+        for value in [width, height, 0, 0] {
+            fctl.extend_from_slice(&value.to_be_bytes());
+        }
+        fctl.extend_from_slice(&[0, 1, 0, 10, 0, 0]); // 1/10 s; no disposal or blending
+        png_chunk(b"fcTL", &fctl)
+    };
+    let actl = [&2u32.to_be_bytes()[..], &0u32.to_be_bytes()].concat();
+    [
+        png[..idat - 4].to_vec(),
+        png_chunk(b"acTL", &actl),
+        control(0),
+        png_chunk(b"IDAT", data),
+        control(1),
+        png_chunk(b"fdAT", &[&2u32.to_be_bytes()[..], data].concat()),
+        png_chunk(b"IEND", &[]),
+    ]
+    .concat()
+}
+
+fn riff_chunk(kind: &[u8; 4], data: &[u8]) -> Vec<u8> {
+    let mut chunk = [&kind[..], &(data.len() as u32).to_le_bytes(), data].concat();
+    if data.len() % 2 == 1 {
+        chunk.push(0);
+    }
+    chunk
+}
+
+fn u24(value: u32) -> [u8; 3] {
+    let bytes = value.to_le_bytes();
+    [bytes[0], bytes[1], bytes[2]]
+}
+
+/// A two-frame animated WebP: a real lossless frame, twice, in WebP's animation chunks.
+pub fn animated_webp() -> Vec<u8> {
+    let (width, height) = (4u32, 3u32);
+    let still = image(ImageFormat::WebP, width, height, 9);
+    let frame = &still[12..]; // the VP8L chunk, after "RIFF", size and "WEBP"
+    let mut vp8x = vec![0x02, 0, 0, 0]; // animation flag
+    vp8x.extend(u24(width - 1));
+    vp8x.extend(u24(height - 1));
+    let anim = [0u8, 0, 0, 0, 0, 0]; // background colour, loop forever
+    let anmf = || {
+        let mut header = Vec::new();
+        for value in [0, 0, width - 1, height - 1, 100] {
+            header.extend(u24(value));
+        }
+        header.push(0);
+        riff_chunk(b"ANMF", &[&header[..], frame].concat())
+    };
+    let body = [
+        b"WEBP".to_vec(),
+        riff_chunk(b"VP8X", &vp8x),
+        riff_chunk(b"ANIM", &anim),
+        anmf(),
+        anmf(),
+    ]
+    .concat();
+    [&b"RIFF"[..], &(body.len() as u32).to_le_bytes(), &body].concat()
 }
 
 /// 16-bit mono PCM at 16 kHz.

@@ -123,6 +123,27 @@ test("a file that is not what it claims to be is refused and nothing is saved", 
   expect(library.total).toBe(0);
 });
 
+test("a GIF is turned away before it is uploaded", async ({ page }) => {
+  const uploads: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.endsWith("/media")) {
+      uploads.push(request.url());
+    }
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add a fact", exact: true }).click();
+  await page.getByLabel("Images and audio").setInputFiles({
+    name: "dance.gif",
+    mimeType: "image/gif",
+    buffer: Buffer.from("GIF89a\x01\x00\x01\x00\x00\x00\x00;", "binary"),
+  });
+  await expect(page.getByRole("alert")).toHaveText(
+    "dance.gif is not a supported file. Use a JPEG, PNG or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip.",
+  );
+  await expect(page.getByRole("button", { name: "Remove dance.gif", exact: true })).toHaveCount(0);
+  expect(uploads).toEqual([]);
+});
+
 test("matching shows each question's picture, so identical wording stays distinct", async ({ page, app }) => {
   for (const [index, bird] of ["Kererū", "Tūī", "Pīwakawaka"].entries()) {
     const upload = await app.request.post("/api/profiles/1/media", {

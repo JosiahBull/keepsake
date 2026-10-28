@@ -36,10 +36,10 @@ fn too_large() -> ApiError {
 #[utoipa::path(post, path = "/api/media",
     request_body(content = inline(FileBytes), content_type = "application/octet-stream",
         description = "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. \
-            It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, \
+            It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, \
             or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. \
-            Still images are stored as AVIF, at most 2048 pixels on the long edge; \
-            animations as uploaded; clips as AAC in MP4."),
+            Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as \
+            AAC in MP4."),
     responses(
         (status = 201, body = MediaUpload), (status = 400, body = ErrorBody),
         (status = 409, body = ErrorBody), (status = 413, body = ErrorBody),

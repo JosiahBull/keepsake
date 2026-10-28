@@ -64,8 +64,7 @@ impl MediaKind {
 }
 
 /// A stored file, before or after it is attached to a question. Describes what is
-/// served: AVIF for still images, the uploaded GIF, WebP or PNG for animations, and AAC
-/// in MP4 for clips.
+/// served: AVIF for images and AAC in MP4 for clips.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct MediaUpload {
     pub media_id: i64,
@@ -158,8 +157,8 @@ pub async fn upload(
         let _permit = PROCESSING.acquire().await?;
         let (declared_type, files) = (declared_type.to_owned(), files.clone());
         tokio::task::spawn_blocking(move || -> anyhow::Result<Placed> {
-            let (inspection, content) = inspect::decode(&declared_type, &bytes)?;
-            let rendered = render::render(inspection, content, &bytes)?;
+            let (_, content) = inspect::decode(&declared_type, &bytes)?;
+            let rendered = render::render(content)?;
             let file_sha256 = files.place(rendered.kind, rendered.content_type, &rendered.data)?;
             Ok(Placed {
                 kind: rendered.kind,

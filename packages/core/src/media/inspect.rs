@@ -7,7 +7,7 @@
 //! before anything is stored. What decoding produced is handed to the renderer.
 use std::{io::Cursor, sync::LazyLock};
 
-use image::{AnimationDecoder, DynamicImage, ImageDecoder, ImageFormat};
+use image::{DynamicImage, ImageDecoder, ImageFormat};
 use symphonia::core::{
     codecs::{CodecParameters, audio::AudioDecoderOptions, registry::CodecRegistry},
     errors::Error as AudioError,
@@ -24,8 +24,6 @@ use super::{MAX_MEDIA_BYTES, MediaKind, invalid};
 pub const MAX_IMAGE_SIDE: u32 = 4096;
 /// Clips longer than this are refused. Measured from the stream, not its header.
 pub const MAX_AUDIO_MS: i64 = 5 * 60 * 1000;
-/// Frames decoded from one animated GIF or WebP before it is refused.
-const MAX_FRAMES: usize = 200;
 /// Decoder working memory per image. A 4096 × 4096 RGBA frame is 64 MiB.
 const MAX_DECODE_BYTES: u64 = 128 * 1024 * 1024;
 /// Decode errors tolerated in a clip whose other packets decode, as some encoders
@@ -34,7 +32,7 @@ const TOLERATED_AUDIO_ERRORS: usize = 2;
 
 /// What an unsupported upload is told it can use instead.
 pub const SUPPORTED_FORMATS: &str =
-    "Use a JPEG, PNG, GIF or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip";
+    "Use a JPEG, PNG or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Decoder {
@@ -51,7 +49,7 @@ struct Format {
     decoder: Decoder,
 }
 
-const FORMATS: [Format; 11] = [
+const FORMATS: [Format; 10] = [
     Format {
         content_type: "image/jpeg",
         label: "JPEG image",
@@ -63,12 +61,6 @@ const FORMATS: [Format; 11] = [
         label: "PNG image",
         article: "a",
         decoder: Decoder::Image(ImageFormat::Png),
-    },
-    Format {
-        content_type: "image/gif",
-        label: "GIF image",
-        article: "a",
-        decoder: Decoder::Image(ImageFormat::Gif),
     },
     Format {
         content_type: "image/webp",
@@ -142,7 +134,6 @@ pub fn canonical_type(declared: &str) -> Option<&'static str> {
     Some(match essence.as_str() {
         "image/jpeg" | "image/jpg" | "image/pjpeg" => "image/jpeg",
         "image/png" => "image/png",
-        "image/gif" => "image/gif",
         "image/webp" => "image/webp",
         "audio/mpeg" | "audio/mp3" | "audio/mpeg3" | "audio/x-mpeg" | "audio/x-mp3" => "audio/mpeg",
         "audio/aac" | "audio/x-aac" | "audio/aacp" => "audio/aac",
@@ -161,7 +152,6 @@ pub fn type_for_extension(extension: &str) -> Option<&'static str> {
     Some(match extension.to_ascii_lowercase().as_str() {
         "jpg" | "jpeg" => "image/jpeg",
         "png" => "image/png",
-        "gif" => "image/gif",
         "webp" => "image/webp",
         "mp3" => "audio/mpeg",
         "aac" => "audio/aac",
@@ -184,9 +174,6 @@ pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
     }
     if at(0, b"\x89PNG\r\n\x1A\n") {
         return Some("image/png");
-    }
-    if at(0, b"GIF87a") || at(0, b"GIF89a") {
-        return Some("image/gif");
     }
     if at(0, b"RIFF") && at(8, b"WEBP") {
         return Some("image/webp");
@@ -231,8 +218,6 @@ pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
 pub(crate) enum Content {
     /// A single image, already turned the way its EXIF orientation says.
     Still(DynamicImage),
-    /// Several frames. Served as uploaded: no encoder here writes animated AVIF.
-    Animation,
     Audio(Pcm),
 }
 
@@ -290,7 +275,7 @@ pub(crate) fn decode(declared: &str, bytes: &[u8]) -> anyhow::Result<(Inspection
     let format = format_of(declared, bytes)?;
     match format.decoder {
         Decoder::Image(image_format) => {
-            let ((width, height), content) = decode_image(image_format, format.label, bytes)?;
+            let ((width, height), image) = decode_image(image_format, format.label, bytes)?;
             Ok((
                 Inspection {
                     kind: MediaKind::Image,
@@ -299,7 +284,7 @@ pub(crate) fn decode(declared: &str, bytes: &[u8]) -> anyhow::Result<(Inspection
                     height: Some(height.into()),
                     duration_ms: None,
                 },
-                content,
+                Content::Still(image),
             ))
         }
         Decoder::Audio(container) => {
@@ -339,8 +324,25 @@ fn decode_image(
     format: ImageFormat,
     label: &str,
     bytes: &[u8],
-) -> anyhow::Result<((u32, u32), Content)> {
+) -> anyhow::Result<((u32, u32), DynamicImage)> {
     let fail = image_error(label);
+    // Every image is served as a still AVIF, and nothing here writes animated AVIF.
+    // Refused before any pixels are decoded, rather than cut to its first frame.
+    let animated = match format {
+        ImageFormat::WebP => image::codecs::webp::WebPDecoder::new(Cursor::new(bytes))
+            .map_err(&fail)?
+            .has_animation(),
+        ImageFormat::Png => image::codecs::png::PngDecoder::new(Cursor::new(bytes))
+            .map_err(&fail)?
+            .is_apng()
+            .map_err(&fail)?,
+        _ => false,
+    };
+    if animated {
+        return Err(invalid(
+            "Animated images are not supported. Choose a still image.",
+        ));
+    }
     let mut decoder = image::ImageReader::with_format(Cursor::new(bytes), format)
         .into_decoder()
         .map_err(&fail)?;
@@ -350,57 +352,7 @@ fn decode_image(
     let mut image = DynamicImage::from_decoder(decoder).map_err(&fail)?;
     image.apply_orientation(orientation);
     let dimensions = (image.width(), image.height());
-    // A good first frame must not vouch for the rest of an animation. Each decoder gets
-    // the same limits before its frames are read.
-    let frames = match format {
-        ImageFormat::Gif => {
-            let mut decoder =
-                image::codecs::gif::GifDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
-            decoder.set_limits(image_limits()).map_err(&fail)?;
-            count_frames(decoder.into_frames(), label)?
-        }
-        ImageFormat::WebP => {
-            let mut decoder =
-                image::codecs::webp::WebPDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
-            decoder.set_limits(image_limits()).map_err(&fail)?;
-            if decoder.has_animation() {
-                count_frames(decoder.into_frames(), label)?
-            } else {
-                1
-            }
-        }
-        ImageFormat::Png => {
-            let mut decoder =
-                image::codecs::png::PngDecoder::new(Cursor::new(bytes)).map_err(&fail)?;
-            decoder.set_limits(image_limits()).map_err(&fail)?;
-            if decoder.is_apng().map_err(&fail)? {
-                count_frames(decoder.apng().map_err(&fail)?.into_frames(), label)?
-            } else {
-                1
-            }
-        }
-        _ => 1,
-    };
-    let content = if frames > 1 {
-        Content::Animation
-    } else {
-        Content::Still(image)
-    };
-    Ok((dimensions, content))
-}
-
-fn count_frames(frames: image::Frames<'_>, label: &str) -> anyhow::Result<usize> {
-    let mut count = 0;
-    for frame in frames {
-        if count >= MAX_FRAMES {
-            return Err(invalid(format!(
-                "Animations must have at most {MAX_FRAMES} frames."
-            )));
-        }
-        frame.map_err(image_error(label))?;
-        count += 1;
-    }
-    Ok(count)
+    Ok((dimensions, image))
 }
 
 /// Symphonia's decoders plus the reference Opus decoder.
@@ -588,7 +540,7 @@ mod tests {
         for (bytes, expected) in [
             (b"\xFF\xD8\xFF\xE0".as_slice(), Some("image/jpeg")),
             (b"\x89PNG\r\n\x1A\n", Some("image/png")),
-            (b"GIF89a", Some("image/gif")),
+            (b"GIF89a", None),
             (b"RIFF\0\0\0\0WEBPVP8 ", Some("image/webp")),
             (b"RIFF\0\0\0\0WAVEfmt ", Some("audio/wav")),
             (b"OggS\0", Some("audio/ogg")),

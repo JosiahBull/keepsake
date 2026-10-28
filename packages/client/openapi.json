@@ -474,7 +474,7 @@
         ],
         "operationId": "upload",
         "requestBody": {
-          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4.",
+          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4.",
           "content": {
             "application/octet-stream": {
               "schema": {
@@ -1558,7 +1558,7 @@
         ],
         "operationId": "profile_upload",
         "requestBody": {
-          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4.",
+          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4.",
           "content": {
             "application/octet-stream": {
               "schema": {
@@ -4320,7 +4320,7 @@
       },
       "MediaUpload": {
         "type": "object",
-        "description": "A stored file, before or after it is attached to a question. Describes what is\nserved: AVIF for still images, the uploaded GIF, WebP or PNG for animations, and AAC\nin MP4 for clips.",
+        "description": "A stored file, before or after it is attached to a question. Describes what is\nserved: AVIF for images and AAC in MP4 for clips.",
         "required": [
           "media_id",
           "kind",

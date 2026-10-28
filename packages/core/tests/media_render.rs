@@ -49,11 +49,6 @@ async fn still_images_become_upright_avif_no_larger_than_2048_pixels() {
             files::image(ImageFormat::WebP, 30, 20, 1),
             (30, 20),
         ),
-        (
-            "image/gif",
-            files::image(ImageFormat::Gif, 12, 9, 1),
-            (12, 9),
-        ),
         ("image/png", files::translucent_png(), (8, 8)),
         (
             "image/png",
@@ -72,14 +67,6 @@ async fn still_images_become_upright_avif_no_larger_than_2048_pixels() {
         );
         assert_eq!(upload.byte_size, data.len() as i64);
     }
-}
-
-#[tokio::test]
-async fn animations_are_served_as_uploaded() {
-    let gif = files::animated_gif();
-    let (upload, data) = stored("image/gif", gif.clone()).await;
-    assert_eq!(upload.content_type, "image/gif");
-    assert_eq!(data, gif);
 }
 
 #[tokio::test]
