@@ -15,7 +15,7 @@ pub use storage::{
     approve_practice, approve_practice_for, export_events, export_events_for, settings,
     settings_for, target, target_for, update_settings, update_settings_for,
 };
-pub(crate) use storage::{map_practices, register_fact};
+pub(crate) use storage::{forget_fact, map_practices, register_fact};
 
 pub(super) const RETRY_SECONDS: i64 = 600;
 

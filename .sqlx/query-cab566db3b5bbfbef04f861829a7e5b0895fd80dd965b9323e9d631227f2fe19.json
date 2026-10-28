@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE fact_shares SET status='withdrawn', resolved_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')\n         WHERE sender_id=? AND source_fact_id=? AND status='pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cab566db3b5bbfbef04f861829a7e5b0895fd80dd965b9323e9d631227f2fe19"
+}

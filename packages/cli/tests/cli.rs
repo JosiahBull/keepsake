@@ -106,6 +106,29 @@ fn capture_from_any_directory_and_read_back() {
 }
 
 #[test]
+fn delete_prints_what_it_removed_and_cannot_repeat() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("facts.db");
+    support::prepare(&db);
+    let saved = json(&cli(
+        &db,
+        &["add", "--prompt", "Remember?", "--answer", "Yes"],
+    ));
+    let id = saved["id"].to_string();
+    let deleted = json(&cli(&db, &["delete", &id]));
+    assert_eq!(
+        (&deleted["id"], &deleted["answer"]),
+        (&saved["id"], &saved["answer"])
+    );
+    for arguments in [["show", &id], ["delete", &id]] {
+        let output = cli(&db, &arguments);
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr).contains("not found"));
+    }
+    assert_eq!(json(&cli(&db, &["list"]))["total"], 0);
+}
+
+#[test]
 fn standalone_default_database_is_relative_to_the_calling_directory() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_keepsake"))

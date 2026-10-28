@@ -469,6 +469,27 @@ pub(crate) async fn attach(
     Ok(())
 }
 
+/// Detach a question's media as its fact is deleted, and remove the records no other
+/// question uses, so they are no longer served. Their files go at the next [`housekeeping`].
+pub(crate) async fn detach(connection: &mut SqliteConnection, fact_id: i64) -> anyhow::Result<()> {
+    let detached = sqlx::query_scalar!(
+        "DELETE FROM fact_media WHERE fact_id=? RETURNING media_id",
+        fact_id
+    )
+    .fetch_all(&mut *connection)
+    .await?;
+    for media_id in detached {
+        sqlx::query!(
+            "DELETE FROM media
+             WHERE id=? AND NOT EXISTS (SELECT 1 FROM fact_media WHERE media_id=media.id)",
+            media_id
+        )
+        .execute(&mut *connection)
+        .await?;
+    }
+    Ok(())
+}
+
 /// Give a recipient their own record of a sender's file. Files are named by their
 /// contents, so both records share one file; nothing is copied.
 pub(crate) async fn copy(

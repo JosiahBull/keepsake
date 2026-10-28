@@ -70,6 +70,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts_api::sample,
         facts_api::create,
         facts_api::get,
+        facts_api::delete,
         facts_api::add_practices,
         facts_api::review,
         facts_api::reviews,
@@ -261,7 +262,7 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/facts", get(facts_api::list).post(facts_api::create))
         .route("/practice", get(facts_api::practice))
         .route("/facts/sample", get(facts_api::sample))
-        .route("/facts/{id}", get(facts_api::get))
+        .route("/facts/{id}", get(facts_api::get).delete(facts_api::delete))
         .route("/facts/{id}/practices", post(facts_api::add_practices))
         .route("/facts/{id}/reviews", get(facts_api::reviews))
         .route("/reviews", post(facts_api::review))

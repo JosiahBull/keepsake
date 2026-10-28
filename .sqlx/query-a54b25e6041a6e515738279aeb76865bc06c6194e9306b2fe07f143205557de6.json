@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE fact_shares SET accepted_fact_id=NULL WHERE accepted_fact_id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "a54b25e6041a6e515738279aeb76865bc06c6194e9306b2fe07f143205557de6"
+}
