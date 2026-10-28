@@ -3,6 +3,10 @@ use support as db;
 #[path = "support/media_files.rs"]
 mod files;
 
+fn format(declared: &str) -> media::UploadFormat {
+    media::UploadFormat::from_content_type(declared).unwrap()
+}
+
 use keepsake_core::{
     backup,
     facts::{self, NewFact, NewReview, ReviewMethod, ReviewOutcome},
@@ -110,10 +114,10 @@ async fn backups_carry_media_files_and_restore_them_into_a_directory_of_their_ow
     let source = live.join("keepsake.db");
     let url = format!("sqlite:{}", source.display());
     let pool = db::connect(&url).await.unwrap();
-    let image = media::upload(&pool, 1, "image/png", files::png(1))
+    let image = media::upload(&pool, 1, format("image/png"), files::png(1))
         .await
         .unwrap();
-    let clip = media::upload(&pool, 1, "audio/wav", files::wav(200, 1))
+    let clip = media::upload(&pool, 1, format("audio/wav"), files::wav(200, 1))
         .await
         .unwrap();
     let attach = |media_id| NewQuestionMedia {

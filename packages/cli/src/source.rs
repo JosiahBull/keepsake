@@ -215,7 +215,11 @@ fn collect_text(element: ElementRef<'_>, output: &mut String, depth: usize) -> a
                     collect_text(child, output, depth + 1)?;
                 }
             }
-            _ => {}
+            Node::Document
+            | Node::Fragment
+            | Node::Doctype(_)
+            | Node::Comment(_)
+            | Node::ProcessingInstruction(_) => {}
         }
     }
     if block {

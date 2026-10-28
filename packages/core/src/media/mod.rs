@@ -14,13 +14,13 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc, time::Duration};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::{SqliteConnection, SqlitePool};
+use strum::EnumIter;
 use tokio::sync::Semaphore;
 use utoipa::ToSchema;
 
 pub use files::MediaFiles;
 pub use inspect::{
-    Inspection, MAX_AUDIO_MS, MAX_IMAGE_SIDE, SUPPORTED_FORMATS, canonical_type, inspect, sniff,
-    type_for_extension,
+    Inspection, MAX_AUDIO, MAX_IMAGE_SIDE, SUPPORTED_FORMATS, UploadFormat, inspect,
 };
 pub use render::MAX_SERVED_SIDE;
 
@@ -39,7 +39,7 @@ const ORPHAN_AGE: Duration = Duration::from_secs(60 * 60);
 /// process, and the AVIF encoder already uses every core.
 static PROCESSING: Semaphore = Semaphore::const_new(2);
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema, EnumIter)]
 #[serde(rename_all = "snake_case")]
 pub enum MediaKind {
     Image,
@@ -50,6 +50,29 @@ impl MediaKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Image => "image",
+            Self::Audio => "audio",
+        }
+    }
+
+    /// The one format each kind is served in, whatever was uploaded.
+    pub const fn served_type(self) -> &'static str {
+        match self {
+            Self::Image => "image/avif",
+            Self::Audio => "audio/mp4",
+        }
+    }
+
+    pub(crate) const fn extension(self) -> &'static str {
+        match self {
+            Self::Image => "avif",
+            Self::Audio => "m4a",
+        }
+    }
+
+    /// The directory under `media/` its files live in.
+    pub(crate) const fn directory(self) -> &'static str {
+        match self {
+            Self::Image => "images",
             Self::Audio => "audio",
         }
     }
@@ -104,7 +127,8 @@ pub struct QuestionMedia {
 /// Where a served file is, and what it is.
 pub struct StoredFile {
     pub path: PathBuf,
-    pub content_type: String,
+    pub kind: MediaKind,
+    pub content_type: &'static str,
     pub byte_size: i64,
 }
 
@@ -120,16 +144,14 @@ fn invalid(message: impl Into<String>) -> anyhow::Error {
 }
 
 /// [`inspect`] off the async runtime, sharing the limit on concurrent decodes.
-pub async fn check(declared_type: &str, bytes: Arc<[u8]>) -> anyhow::Result<Inspection> {
+pub async fn check(format: UploadFormat, bytes: Arc<[u8]>) -> anyhow::Result<Inspection> {
     let _permit = PROCESSING.acquire().await?;
-    let declared_type = declared_type.to_owned();
-    tokio::task::spawn_blocking(move || inspect(&declared_type, &bytes)).await?
+    tokio::task::spawn_blocking(move || inspect(format, &bytes)).await?
 }
 
-/// What was written to disk, before a row describes it.
+/// What was written to disk, in the columns that will describe it.
 struct Placed {
     kind: MediaKind,
-    content_type: &'static str,
     file_sha256: String,
     byte_size: i64,
     width: Option<i64>,
@@ -137,37 +159,43 @@ struct Placed {
     duration_ms: Option<i64>,
 }
 
-/// Check an upload as `declared_type`, write it in the format it is served in, and
-/// record it for this profile. An identical earlier upload is reused, not processed again.
+/// Check an upload as `format`, write it in the format its kind is served in, and record
+/// it for this profile. An identical earlier upload is reused, not processed again.
 pub async fn upload(
     pool: &SqlitePool,
     profile_id: i64,
-    declared_type: &str,
+    format: UploadFormat,
     bytes: Vec<u8>,
 ) -> anyhow::Result<MediaUpload> {
-    inspect::precheck(declared_type, &bytes)?;
+    inspect::precheck(format, &bytes)?;
     let files = MediaFiles::for_pool(pool);
     let upload_sha256 = sha256_hex(&bytes);
     if let Some((existing, path)) = held(pool, &files, profile_id, &upload_sha256).await?
-        && path.is_file()
+        && tokio::fs::metadata(&path)
+            .await
+            .is_ok_and(|metadata| metadata.is_file())
     {
         return Ok(existing);
     }
     let placed = {
         let _permit = PROCESSING.acquire().await?;
-        let (declared_type, files) = (declared_type.to_owned(), files.clone());
+        let files = files.clone();
         tokio::task::spawn_blocking(move || -> anyhow::Result<Placed> {
-            let (_, content) = inspect::decode(&declared_type, &bytes)?;
-            let rendered = render::render(content)?;
-            let file_sha256 = files.place(rendered.kind, rendered.content_type, &rendered.data)?;
+            let (_, content) = inspect::decode(format, &bytes)?;
+            let render::Rendered {
+                kind,
+                width,
+                height,
+                duration,
+                data,
+            } = render::render(content)?;
             Ok(Placed {
-                kind: rendered.kind,
-                content_type: rendered.content_type,
-                file_sha256,
-                byte_size: rendered.data.len() as i64,
-                width: rendered.width,
-                height: rendered.height,
-                duration_ms: rendered.duration_ms,
+                file_sha256: files.place(kind, &data)?,
+                kind,
+                byte_size: data.len() as i64,
+                width: width.map(i64::from),
+                height: height.map(i64::from),
+                duration_ms: duration.map(|length| length.as_millis() as i64),
             })
         })
         .await??
@@ -188,12 +216,11 @@ pub async fn upload(
                 ensure_room(connection, profile_id, placed.byte_size).await?;
                 let kind = placed.kind.as_str();
                 sqlx::query!(
-                    "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+                    "INSERT INTO media(profile_id, kind, upload_sha256, file_sha256,
                        byte_size, width, height, duration_ms)
-                     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                     VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
                     profile_id,
                     kind,
-                    placed.content_type,
                     upload_sha256,
                     placed.file_sha256,
                     placed.byte_size,
@@ -253,7 +280,7 @@ async fn held(
         return Ok(None);
     };
     let upload = stored(&mut connection, profile_id, upload_sha256).await?;
-    let path = files.path(upload.kind, &file_sha256, &upload.content_type);
+    let path = files.path(upload.kind, &file_sha256);
     Ok(Some((upload, path)))
 }
 
@@ -283,17 +310,18 @@ async fn stored(
     upload_sha256: &str,
 ) -> anyhow::Result<MediaUpload> {
     let row = sqlx::query!(
-        "SELECT id AS \"id!\", kind, content_type, byte_size, width, height, duration_ms
+        "SELECT id AS \"id!\", kind, byte_size, width, height, duration_ms
          FROM media WHERE profile_id=? AND upload_sha256=?",
         profile_id,
         upload_sha256
     )
     .fetch_one(connection)
     .await?;
+    let kind = MediaKind::parse(&row.kind)?;
     Ok(MediaUpload {
         media_id: row.id,
-        kind: MediaKind::parse(&row.kind)?,
-        content_type: row.content_type,
+        kind,
+        content_type: kind.served_type().to_owned(),
         byte_size: row.byte_size,
         width: row.width,
         height: row.height,
@@ -310,7 +338,7 @@ pub async fn locate(
     let mut connection = pool.acquire().await?;
     crate::profiles::require(&mut connection, profile_id).await?;
     let Some(row) = sqlx::query!(
-        "SELECT kind, content_type, file_sha256, byte_size FROM media WHERE id=? AND profile_id=?",
+        "SELECT kind, file_sha256, byte_size FROM media WHERE id=? AND profile_id=?",
         media_id,
         profile_id
     )
@@ -319,14 +347,11 @@ pub async fn locate(
     else {
         return Ok(None);
     };
-    let path = MediaFiles::for_pool(pool).path(
-        MediaKind::parse(&row.kind)?,
-        &row.file_sha256,
-        &row.content_type,
-    );
+    let kind = MediaKind::parse(&row.kind)?;
     Ok(Some(StoredFile {
-        path,
-        content_type: row.content_type,
+        path: MediaFiles::for_pool(pool).path(kind, &row.file_sha256),
+        kind,
+        content_type: kind.served_type(),
         byte_size: row.byte_size,
     }))
 }
@@ -364,8 +389,7 @@ pub(crate) async fn for_fact(
     fact_id: i64,
 ) -> anyhow::Result<Vec<QuestionMedia>> {
     sqlx::query!(
-        "SELECT m.id AS \"id!\", m.kind, m.content_type, m.byte_size,
-           m.width, m.height, m.duration_ms, fm.alt
+        "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt
          FROM fact_media fm JOIN media m ON m.id=fm.media_id
          WHERE fm.fact_id=? ORDER BY fm.position",
         fact_id
@@ -374,10 +398,11 @@ pub(crate) async fn for_fact(
     .await?
     .into_iter()
     .map(|row| {
+        let kind = MediaKind::parse(&row.kind)?;
         Ok(QuestionMedia {
             media_id: row.id,
-            kind: MediaKind::parse(&row.kind)?,
-            content_type: row.content_type,
+            kind,
+            content_type: kind.served_type().to_owned(),
             byte_size: row.byte_size,
             width: row.width,
             height: row.height,
@@ -467,10 +492,9 @@ pub(crate) async fn copy(
     {
         ensure_room(connection, to_profile, source.byte_size).await?;
         sqlx::query!(
-            "INSERT INTO media(profile_id, kind, content_type, upload_sha256, file_sha256,
+            "INSERT INTO media(profile_id, kind, upload_sha256, file_sha256,
                byte_size, width, height, duration_ms)
-             SELECT ?, kind, content_type, upload_sha256, file_sha256, byte_size, width, height,
-               duration_ms
+             SELECT ?, kind, upload_sha256, file_sha256, byte_size, width, height, duration_ms
              FROM media WHERE id=?",
             to_profile,
             media_id

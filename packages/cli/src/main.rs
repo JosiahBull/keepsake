@@ -7,7 +7,7 @@ use keepsake_cli::{
 use keepsake_core::{
     backup, db,
     facts::{self, Fact, NewFact},
-    media::{self, NewQuestionMedia},
+    media::{self, NewQuestionMedia, UploadFormat},
     paging,
 };
 use std::{io::Read, path::PathBuf};
@@ -453,9 +453,9 @@ async fn add_facts(
         );
     }
     let pool = db::connect(&database_url).await?;
-    for ((declared, bytes), path) in files.into_iter().zip(&add.media) {
+    for ((format, bytes), path) in files.into_iter().zip(&add.media) {
         // An upload left unattached by a failed save is removed after a day.
-        let upload = media::upload(&pool, actor, declared, bytes)
+        let upload = media::upload(&pool, actor, format, bytes)
             .await
             .with_context(|| format!("store {}", path.display()))?;
         proposed[0].media.push(NewQuestionMedia {
@@ -485,13 +485,26 @@ async fn draft_practices(
     options: AgentOptions,
     file: Option<PathBuf>,
 ) -> anyhow::Result<NewFact> {
-    let id = fact.id;
+    // The agent drafts new variants of the fact's text; its existing variants and media
+    // are not sent.
+    let Fact {
+        id,
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
+        created_at: _,
+        practices: _,
+        shared_by: _,
+        media: _,
+    } = fact;
     let mut draft = NewFact {
-        prompt: fact.prompt,
-        answer: fact.answer,
-        context: fact.context,
-        source: fact.source,
-        tags: fact.tags,
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
         practices: Vec::new(),
         media: vec![],
     };
@@ -540,13 +553,13 @@ fn read_fact(path: PathBuf) -> anyhow::Result<NewFact> {
     facts.pop().context("fact JSON was empty")
 }
 
-/// A file's declared type, from its extension, and its bytes. The type is checked
-/// against the contents when the file is stored.
-fn read_media(path: &std::path::Path) -> anyhow::Result<(&'static str, Vec<u8>)> {
-    let declared = path
+/// The format a file's extension claims, and its bytes. The claim is checked against the
+/// contents when the file is stored.
+fn read_media(path: &std::path::Path) -> anyhow::Result<(UploadFormat, Vec<u8>)> {
+    let format = path
         .extension()
         .and_then(|extension| extension.to_str())
-        .and_then(media::type_for_extension)
+        .and_then(UploadFormat::from_extension)
         .with_context(|| {
             format!(
                 "{} has no supported extension. {}.",
@@ -562,7 +575,7 @@ fn read_media(path: &std::path::Path) -> anyhow::Result<(&'static str, Vec<u8>)>
     if bytes.len() > media::MAX_MEDIA_BYTES {
         bail!("{} is larger than 5 MiB", path.display());
     }
-    Ok((declared, bytes))
+    Ok((format, bytes))
 }
 
 fn read_input(path: PathBuf) -> anyhow::Result<(Vec<NewFact>, bool)> {

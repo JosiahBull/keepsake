@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT kind, content_type, file_sha256, byte_size FROM media WHERE id=? AND profile_id=?",
+  "query": "SELECT kind, file_sha256, byte_size FROM media WHERE id=? AND profile_id=?",
   "describe": {
     "columns": [
       {
@@ -15,19 +15,8 @@
         }
       },
       {
-        "name": "content_type",
-        "ordinal": 1,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "media",
-            "name": "content_type"
-          }
-        }
-      },
-      {
         "name": "file_sha256",
-        "ordinal": 2,
+        "ordinal": 1,
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -38,7 +27,7 @@
       },
       {
         "name": "byte_size",
-        "ordinal": 3,
+        "ordinal": 2,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -54,9 +43,8 @@
     "nullable": [
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "9c64ca463439ee2790edcbf638f5a7e3f04b25cea565e4076bde949cbc36fde8"
+  "hash": "3aacd8b95ee6d9966d19bc6950bdd6b65d070bc2ae32a48e75b0b890857d7ec2"
 }

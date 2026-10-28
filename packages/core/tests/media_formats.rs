@@ -3,14 +3,19 @@
 mod files;
 
 use image::ImageFormat;
-use keepsake_core::media::{Inspection, MediaKind, inspect};
+use keepsake_core::media::{Inspection, MediaKind, UploadFormat, inspect};
+
+/// A declared MIME type parsed as callers parse it, then the upload inspected.
+fn inspected(declared: &str, bytes: &[u8]) -> anyhow::Result<Inspection> {
+    inspect(UploadFormat::parse_content_type(declared)?, bytes)
+}
 
 fn accepted(declared: &str, bytes: &[u8]) -> Inspection {
-    inspect(declared, bytes).unwrap_or_else(|error| panic!("{declared}: {error}"))
+    inspected(declared, bytes).unwrap_or_else(|error| panic!("{declared}: {error}"))
 }
 
 fn refused(declared: &str, bytes: &[u8]) -> String {
-    match inspect(declared, bytes) {
+    match inspected(declared, bytes) {
         Ok(inspection) => panic!("{declared} was accepted: {inspection:?}"),
         Err(error) => error.to_string(),
     }
@@ -24,10 +29,13 @@ fn every_supported_image_decodes_with_its_dimensions() {
         ("image/webp", ImageFormat::WebP),
     ] {
         let inspection = accepted(declared, &files::image(format, 40, 30, 7));
-        assert_eq!(inspection.kind, MediaKind::Image);
-        assert_eq!(inspection.content_type, declared);
+        assert_eq!(inspection.format.kind(), MediaKind::Image);
+        assert_eq!(
+            Some(inspection.format),
+            UploadFormat::from_content_type(declared)
+        );
         assert_eq!((inspection.width, inspection.height), (Some(40), Some(30)));
-        assert_eq!(inspection.duration_ms, None);
+        assert_eq!(inspection.duration, None);
     }
 }
 
@@ -61,11 +69,12 @@ fn every_supported_clip_is_decoded_or_demuxed_and_timed() {
         ("audio/webm;codecs=opus", files::webm_opus(10), 200),
     ] {
         let inspection = accepted(declared, &bytes);
-        assert_eq!(inspection.kind, MediaKind::Audio, "{declared}");
+        assert_eq!(inspection.format.kind(), MediaKind::Audio, "{declared}");
         assert_eq!((inspection.width, inspection.height), (None, None));
         let measured = inspection
-            .duration_ms
-            .unwrap_or_else(|| panic!("{declared} has no duration"));
+            .duration
+            .unwrap_or_else(|| panic!("{declared} has no duration"))
+            .as_millis() as i64;
         // Packet durations include encoder priming and padding to whole frames: AAC adds
         // 2112 samples, 132 ms at 16 kHz. Within 200 ms of the source is the same clip.
         assert!(

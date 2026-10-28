@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", kind, content_type, byte_size, width, height, duration_ms\n         FROM media WHERE profile_id=? AND upload_sha256=?",
+  "query": "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt\n         FROM fact_media fm JOIN media m ON m.id=fm.media_id\n         WHERE fm.fact_id=? ORDER BY fm.position",
   "describe": {
     "columns": [
       {
@@ -26,19 +26,8 @@
         }
       },
       {
-        "name": "content_type",
-        "ordinal": 2,
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "media",
-            "name": "content_type"
-          }
-        }
-      },
-      {
         "name": "byte_size",
-        "ordinal": 3,
+        "ordinal": 2,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -49,7 +38,7 @@
       },
       {
         "name": "width",
-        "ordinal": 4,
+        "ordinal": 3,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -60,7 +49,7 @@
       },
       {
         "name": "height",
-        "ordinal": 5,
+        "ordinal": 4,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -71,7 +60,7 @@
       },
       {
         "name": "duration_ms",
-        "ordinal": 6,
+        "ordinal": 5,
         "type_info": "Integer",
         "origin": {
           "Table": {
@@ -79,20 +68,31 @@
             "name": "duration_ms"
           }
         }
+      },
+      {
+        "name": "alt",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "fact_media",
+            "name": "alt"
+          }
+        }
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 1
     },
     "nullable": [
       false,
       false,
       false,
-      false,
       true,
       true,
-      true
+      true,
+      false
     ]
   },
-  "hash": "3066af7d09acd631520955932325f5dea525ec38dd0e63f9c7af594c7462df41"
+  "hash": "60cf98eb01215ef1fae7b4098d9978d2b378c80760aa754739ca636197fb77ab"
 }

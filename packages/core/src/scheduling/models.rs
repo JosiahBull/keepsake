@@ -88,12 +88,62 @@ pub enum EventKind {
     Exposure,
 }
 
+impl EventKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Attempt => "attempt",
+            Self::Exposure => "exposure",
+        }
+    }
+
+    /// A rated attempt at recall, rather than feedback that showed the answer.
+    pub(crate) const fn is_attempt(self) -> bool {
+        match self {
+            Self::Attempt => true,
+            Self::Exposure => false,
+        }
+    }
+
+    pub(crate) const fn is_exposure(self) -> bool {
+        match self {
+            Self::Attempt => false,
+            Self::Exposure => true,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StudyContext {
     Scheduled,
     Supplementary,
     Audit,
+}
+
+impl StudyContext {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Scheduled => "scheduled",
+            Self::Supplementary => "supplementary",
+            Self::Audit => "audit",
+        }
+    }
+
+    /// Practice from the due queue: it must be due, and it spends the day's new items.
+    pub(crate) const fn is_scheduled(self) -> bool {
+        match self {
+            Self::Scheduled => true,
+            Self::Supplementary | Self::Audit => false,
+        }
+    }
+
+    /// Practice whose unaided attempts count as recall evidence.
+    pub(crate) const fn assesses_recall(self) -> bool {
+        match self {
+            Self::Scheduled | Self::Audit => true,
+            Self::Supplementary => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

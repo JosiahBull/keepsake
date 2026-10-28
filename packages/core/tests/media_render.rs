@@ -5,13 +5,14 @@ use support as db;
 mod files;
 
 use image::ImageFormat;
-use keepsake_core::media::{self, MediaUpload, inspect};
+use keepsake_core::media::{self, MediaUpload, UploadFormat, inspect};
 
 async fn stored(declared: &str, bytes: Vec<u8>) -> (MediaUpload, Vec<u8>) {
     let directory = tempfile::tempdir().unwrap();
     let url = format!("sqlite:{}", directory.path().join("render.db").display());
     let pool = db::connect(&url).await.unwrap();
-    let upload = media::upload(&pool, 1, declared, bytes)
+    let format = media::UploadFormat::from_content_type(declared).unwrap();
+    let upload = media::upload(&pool, 1, format, bytes)
         .await
         .unwrap_or_else(|error| panic!("{declared}: {error}"));
     let path = media::locate(&pool, 1, upload.media_id)
@@ -107,10 +108,11 @@ async fn every_clip_becomes_aac_in_an_mp4_with_its_index_first() {
         // the priming and the padded last frame: at most three AAC frames more.
         let mdhd = find(&data, b"mdhd").unwrap();
         let rate = i64::from(u32_at(&data, mdhd + 16));
-        let reread = inspect("audio/mp4", &data)
+        let reread = inspect(UploadFormat::M4a, &data)
             .unwrap_or_else(|error| panic!("{declared} rendition: {error}"))
-            .duration_ms
-            .unwrap();
+            .duration
+            .unwrap()
+            .as_millis() as i64;
         assert!(
             (0..=3 * 1024 * 1000 / rate + 1).contains(&(reread - measured)),
             "{declared}: rendition decodes to {reread} ms, source {measured} ms"

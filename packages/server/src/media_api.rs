@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use http_body_util::BodyExt;
-use keepsake_core::media::{self, MediaFiles, MediaUpload};
+use keepsake_core::media::{self, MediaFiles, MediaUpload, UploadFormat};
 use sqlx::SqlitePool;
 use tokio::io::AsyncWriteExt;
 use tower::ServiceExt;
@@ -60,8 +60,8 @@ pub async fn upload(
                 StatusCode::BAD_REQUEST,
                 "Send the file's type in the Content-Type header",
             )
-        })?
-        .to_owned();
+        })?;
+    let format = UploadFormat::parse_content_type(declared).map_err(ApiError::internal)?;
     if headers
         .get(header::CONTENT_LENGTH)
         .and_then(|value| value.to_str().ok()?.parse::<usize>().ok())
@@ -70,7 +70,7 @@ pub async fn upload(
         return Err(too_large());
     }
     let bytes = receive(&pool, body).await?;
-    let saved = media::upload(&pool, profile_id, &declared, bytes)
+    let saved = media::upload(&pool, profile_id, format, bytes)
         .await
         .map_err(ApiError::internal)?;
     Ok((StatusCode::CREATED, Json(saved)))
@@ -82,6 +82,7 @@ async fn receive(pool: &SqlitePool, mut body: Body) -> Result<Vec<u8>, ApiError>
     let storage = |error: std::io::Error| ApiError::internal(error.into());
     let (file, path) = MediaFiles::for_pool(pool)
         .partial_upload()
+        .await
         .map_err(storage)?
         .into_parts();
     let mut file = tokio::fs::File::from_std(file);
@@ -135,8 +136,7 @@ pub async fn download(
     if response.status().is_success() {
         response.headers_mut().insert(
             header::CONTENT_TYPE,
-            HeaderValue::from_str(&file.content_type)
-                .map_err(|error| ApiError::internal(error.into()))?,
+            HeaderValue::from_static(file.content_type),
         );
         response.extensions_mut().insert(Immutable);
     }

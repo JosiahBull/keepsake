@@ -52,7 +52,7 @@ pub async fn create(source_url: &str, destination: &Path) -> anyhow::Result<Snap
 pub async fn restore(source: &Path, destination: &Path) -> anyhow::Result<Snapshot> {
     let target = MediaFiles::for_database(&std::path::absolute(destination)?);
     ensure!(
-        !target.media().exists(),
+        !tokio::fs::try_exists(target.media()).await?,
         "restore into a directory without a media folder; {} already exists",
         target.media().display()
     );
@@ -157,8 +157,8 @@ async fn snapshot(
     )
     .fetch_one(&mut snapshot)
     .await?;
-    let files: Vec<(String, String, String)> = if has_media {
-        sqlx::query_as("SELECT DISTINCT kind, content_type, file_sha256 FROM media")
+    let files: Vec<(String, String)> = if has_media {
+        sqlx::query_as("SELECT DISTINCT kind, file_sha256 FROM media")
             .fetch_all(&mut snapshot)
             .await?
     } else {
@@ -184,34 +184,40 @@ async fn snapshot(
             (target.root().to_path_buf(), target.media())
         }
     };
-    let staged = if files.is_empty() {
-        None
-    } else {
-        let staged = tempfile::TempDir::new_in(&staging)?;
-        for (kind, content_type, sha256) in &files {
-            let relative = MediaFiles::relative(MediaKind::parse(kind)?, sha256, content_type);
-            let source = match &media {
-                Media::Backup(live) => live.media().join(&relative),
-                Media::Restore(backup) => backup.join(&relative),
-            };
-            copy_verified(&source, &staged.path().join(&relative), sha256)?;
-        }
-        Some(staged)
-    };
+    // Copying and verifying can cover a gigabyte of media: keep it off the runtime.
+    let media_count = report.media;
+    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+        let staged = if files.is_empty() {
+            None
+        } else {
+            let staged = tempfile::TempDir::new_in(&staging)?;
+            for (kind, sha256) in &files {
+                let relative = MediaFiles::relative(MediaKind::parse(kind)?, sha256);
+                let source = match &media {
+                    Media::Backup(live) => live.media().join(&relative),
+                    Media::Restore(backup) => backup.join(&relative),
+                };
+                copy_verified(&source, &staged.path().join(&relative), sha256)?;
+            }
+            Some(staged)
+        };
 
-    temporary.as_file().sync_all()?;
-    if let Some(staged) = staged {
-        std::fs::rename(staged.keep(), &published)
-            .with_context(|| format!("publish media files at {}", published.display()))?;
-    }
-    if let Err(error) = temporary.persist_noclobber(&destination) {
-        if report.media > 0 {
-            let _ = std::fs::remove_dir_all(&published);
+        temporary.as_file().sync_all()?;
+        if let Some(staged) = staged {
+            std::fs::rename(staged.keep(), &published)
+                .with_context(|| format!("publish media files at {}", published.display()))?;
         }
-        return Err(error).context("publish snapshot without overwriting destination");
-    }
-    #[cfg(unix)]
-    std::fs::File::open(destination.parent().context("missing parent")?)?.sync_all()?;
+        if let Err(error) = temporary.persist_noclobber(&destination) {
+            if media_count > 0 {
+                let _ = std::fs::remove_dir_all(&published);
+            }
+            return Err(error).context("publish snapshot without overwriting destination");
+        }
+        #[cfg(unix)]
+        std::fs::File::open(destination.parent().context("missing parent")?)?.sync_all()?;
+        Ok(())
+    })
+    .await??;
     Ok(report)
 }
 

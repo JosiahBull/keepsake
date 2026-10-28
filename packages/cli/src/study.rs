@@ -96,7 +96,9 @@ pub(crate) async fn run(
     // Parse input before opening SQLite so malformed files cannot create a library.
     let submission = match &command {
         StudyCommand::Submit { file } => Some(read_submission(file)?),
-        _ => None,
+        StudyCommand::Settings(_) | StudyCommand::Approve { .. } | StudyCommand::Events { .. } => {
+            None
+        }
     };
     let pool = db::connect(database).await?;
     let actor = crate::profiles::resolve(&pool, profile).await?;

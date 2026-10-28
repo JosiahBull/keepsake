@@ -1,4 +1,6 @@
 mod support;
+
+use strum::IntoEnumIterator;
 use support as db;
 
 use chrono::DateTime;
@@ -236,42 +238,42 @@ async fn creating_a_fact_and_its_recall_target_is_atomic() {
 }
 
 #[tokio::test]
-async fn five_generated_variants_share_one_obligation_and_require_recall_approval() {
+async fn every_kind_of_generated_variant_shares_one_obligation_and_requires_recall_approval() {
     let (_directory, pool) = temporary_pool().await;
     let saved = facts::create(&pool, fact(1)).await.unwrap();
     let before = scheduling::target(&pool, saved.id).await.unwrap().unwrap();
-    let variants = [
-        PracticeKind::Flashcard,
-        PracticeKind::Cloze,
-        PracticeKind::MultipleChoice,
-        PracticeKind::Explain,
-        PracticeKind::Apply,
-    ]
-    .into_iter()
-    .map(|kind| NewPractice {
-        kind,
-        prompt: if kind == PracticeKind::Cloze {
-            "Recall this: ___".into()
-        } else {
-            format!("Alternate {kind} question")
-        },
-        answer: saved.answer.clone(),
-        choices: if kind == PracticeKind::MultipleChoice {
-            vec![
-                saved.answer.clone(),
-                "A plausible but incorrect alternative".into(),
-            ]
-        } else {
-            vec![]
-        },
-        explanation: "Generated and initially unverified".into(),
-    })
-    .collect();
+    let variants = PracticeKind::iter()
+        .map(|kind| {
+            let alternate = format!("Alternate {kind} question");
+            let (prompt, choices) = match kind {
+                PracticeKind::Cloze => ("Recall this: ___".into(), vec![]),
+                PracticeKind::MultipleChoice => (
+                    alternate,
+                    vec![
+                        saved.answer.clone(),
+                        "A plausible but incorrect alternative".into(),
+                    ],
+                ),
+                PracticeKind::Flashcard | PracticeKind::Explain | PracticeKind::Apply => {
+                    (alternate, vec![])
+                }
+            };
+            NewPractice {
+                kind,
+                prompt,
+                answer: saved.answer.clone(),
+                choices,
+                explanation: "Generated and initially unverified".into(),
+            }
+        })
+        .collect();
     let updated = facts::add_practices(&pool, saved.id, variants)
         .await
         .unwrap();
-    assert_eq!(updated.practices.len(), 6);
-    assert_eq!(counts(&pool).await, (1, 6, 1, 1));
+    // One of every kind, plus the canonical flashcard the fact started with.
+    let practices = PracticeKind::iter().count() + 1;
+    assert_eq!(updated.practices.len(), practices);
+    assert_eq!(counts(&pool).await, (1, practices as i64, 1, 1));
     assert_eq!(
         serde_json::to_value(scheduling::target(&pool, saved.id).await.unwrap()).unwrap(),
         serde_json::to_value(Some(&before)).unwrap()

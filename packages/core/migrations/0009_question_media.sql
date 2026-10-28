@@ -6,13 +6,8 @@
 CREATE TABLE media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
+    -- Each kind is served in one format: AVIF for images, AAC in MP4 for clips.
     kind TEXT NOT NULL CHECK (kind IN ('image', 'audio')),
-    -- What is served: AVIF for images and AAC in MP4 for clips. Nothing else can be
-    -- stored by any route.
-    content_type TEXT NOT NULL CHECK (
-        (kind = 'image' AND content_type = 'image/avif')
-        OR (kind = 'audio' AND content_type = 'audio/mp4')
-    ),
     -- The upload's hash, so the same file uploaded again is not processed again.
     upload_sha256 TEXT NOT NULL CHECK (length(upload_sha256) = 64),
     -- The served file's hash, which names it on disk.
