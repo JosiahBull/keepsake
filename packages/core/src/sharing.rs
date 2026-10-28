@@ -165,8 +165,13 @@ async fn snapshot_fact(
             height: _,
             duration_ms: _,
             alt,
+            ai_generated,
         } = media;
-        NewQuestionMedia { media_id, alt }
+        NewQuestionMedia {
+            media_id,
+            alt,
+            ai_generated,
+        }
     };
     let snapshot = NewFact {
         prompt,

@@ -35,6 +35,7 @@ fn attach(media_id: i64, alt: &str) -> NewQuestionMedia {
     NewQuestionMedia {
         media_id,
         alt: alt.into(),
+        ai_generated: false,
     }
 }
 
@@ -249,11 +250,15 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
         fact(
             "Which bird is this?",
             "Tūī",
-            vec![attach(image.media_id, "A dark bird")],
+            vec![NewQuestionMedia {
+                ai_generated: true,
+                ..attach(image.media_id, "A dark bird")
+            }],
         ),
     )
     .await
     .unwrap();
+    assert!(source.media[0].ai_generated);
     let share = sharing::send(
         &pool,
         1,
@@ -274,6 +279,7 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
     assert_eq!(copy.media.len(), 1);
     assert_ne!(copy.media[0].media_id, image.media_id);
     assert_eq!(copy.media[0].alt, "A dark bird");
+    assert!(copy.media[0].ai_generated, "the copy is still labelled");
     // Files are named by their contents, so the copy shares the sender's file.
     let path = |profile, id| {
         let pool = pool.clone();
@@ -290,6 +296,24 @@ async fn accepting_a_share_gives_the_recipient_their_own_copy_of_its_media() {
         path(1, image.media_id).await
     );
     pool.close().await;
+}
+
+#[test]
+fn snapshots_mention_generated_media_only_when_it_is() {
+    // Pending offers made before the flag existed keep matching new offers of the same fact.
+    let photographed = serde_json::to_value(attach(1, "A dark bird")).unwrap();
+    assert_eq!(
+        photographed,
+        serde_json::json!({"media_id": 1, "alt": "A dark bird"})
+    );
+    let generated = NewQuestionMedia {
+        ai_generated: true,
+        ..attach(1, "A dark bird")
+    };
+    assert_eq!(
+        serde_json::to_value(generated).unwrap()["ai_generated"],
+        true
+    );
 }
 
 #[tokio::test]

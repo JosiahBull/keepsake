@@ -10,6 +10,7 @@ DELETE FROM schedule_states;
 DELETE FROM learning_targets;
 DELETE FROM practices;
 DELETE FROM fact_media;
+DELETE FROM default_list_items;
 DELETE FROM facts;
 DELETE FROM media;
 DELETE FROM scheduler_settings;

@@ -69,6 +69,10 @@ pub struct DraftMedia {
     /// For an image: what it shows, for screen readers, without giving away the answer.
     #[serde(default)]
     pub description: String,
+    /// True when a generative model made the file. Keepsake labels it wherever the
+    /// question is asked.
+    #[serde(default)]
+    pub ai_generated: bool,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -204,6 +208,7 @@ impl KeepsakeMcp {
                     data_base64,
                     content_type,
                     description,
+                    ai_generated,
                 } = item;
                 let at = |error: String| {
                     refused(format!("Fact {number}, media {}: {error}", position + 1))
@@ -215,19 +220,20 @@ impl KeepsakeMcp {
                 media::check(format, bytes.clone().into())
                     .await
                     .map_err(|error| at(error.to_string()))?;
-                files.push((format, bytes, description));
+                files.push((format, bytes, description, ai_generated));
             }
             drafts.push((fact, files));
         }
 
         let mut proposed = Vec::with_capacity(drafts.len());
         for (mut fact, files) in drafts {
-            for (format, bytes, description) in files {
+            for (format, bytes, description, ai_generated) in files {
                 // An upload left unattached by a failed save is removed after a day.
                 let upload = media::upload(&self.pool, self.profile.id, format, bytes).await?;
                 fact.media.push(NewQuestionMedia {
                     media_id: upload.media_id,
                     alt: description,
+                    ai_generated,
                 });
             }
             proposed.push(fact);

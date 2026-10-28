@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO fact_media(fact_id, position, media_id, alt, ai_generated)\n             VALUES(?, ?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "daedbd02224c2e75fc91d3cc9bae6c796ca0b345df2165934963a204b16df215"
+}

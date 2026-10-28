@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(\n           SELECT 1 FROM default_list_items WHERE profile_id=? AND list=? AND item=?\n         ) AS \"added!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "added!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1f5f407ebddbe05c257ab3c8f9a877ef4f179024db1a1971b95c01e64fcf27f2"
+}

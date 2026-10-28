@@ -103,6 +103,36 @@ test("a question keeps its image and clip from the form through to practice", as
   await expect(stage.getByLabel("Question audio", { exact: true })).toBeVisible();
 });
 
+test("an image made by AI is labelled wherever its question is shown", async ({ page, app }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Add a fact", exact: true }).click();
+  await page.getByRole("textbox", { name: "Question", exact: true }).fill("Which bird is drawn here?");
+  await page.getByRole("textbox", { name: "Answer", exact: true }).fill("Kākāpō");
+  await page.getByLabel("Images and audio").setInputFiles({
+    name: "kakapo.png",
+    mimeType: "image/png",
+    buffer: png(20, 14),
+  });
+  await page.getByRole("textbox", { name: /^Describe the image/ }).fill("A mossy green parrot");
+  await page.getByRole("checkbox", { name: /^Made by AI/ }).check();
+  await page.getByRole("button", { name: "Save fact", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Fact saved." })).toBeVisible();
+
+  const library = (await (await app.request.get("/api/profiles/1/facts")).json()) as FactPage;
+  expect(library.items[0].media).toMatchObject([{ kind: "image", ai_generated: true }]);
+
+  const row = page.getByRole("article").filter({ hasText: "Which bird is drawn here?" });
+  await expect(row.getByText("1 AI-generated image", { exact: true })).toBeVisible();
+  await row.getByRole("heading", { name: "Which bird is drawn here?", exact: true }).click();
+  await expect(row.getByRole("img", { name: "A mossy green parrot", exact: true })).toBeVisible();
+  await expect(row.getByText("AI-generated image", { exact: true })).toBeVisible();
+
+  await startExtraPractice(page);
+  const stage = page.getByRole("region", { name: "Flashcards", exact: true });
+  await expect(stage.getByRole("img", { name: "A mossy green parrot", exact: true })).toBeVisible();
+  await expect(stage.getByText("AI-generated image", { exact: true })).toBeVisible();
+});
+
 test("a file that is not what it claims to be is refused and nothing is saved", async ({ page, app }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();

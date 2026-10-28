@@ -48,7 +48,9 @@ WORKDIR /app
 COPY --from=backend --chown=root:root --chmod=0555 /app/target/release/keepsake-server /usr/local/bin/keepsake-server
 COPY --from=backend --chown=root:root --chmod=0555 /app/target/release/keepsake /usr/local/bin/keepsake
 COPY --from=frontend --chown=root:root /app/packages/web/dist /app/web
-ENV DATABASE_URL=sqlite:/data/keepsake.db BIND_ADDR=0.0.0.0:8080 WEB_DIR=/app/web RUST_LOG=info
+COPY --chown=root:root default-lists /app/default-lists
+ENV DATABASE_URL=sqlite:/data/keepsake.db BIND_ADDR=0.0.0.0:8080 WEB_DIR=/app/web \
+    DEFAULT_LISTS_DIR=/app/default-lists RUST_LOG=info
 USER keepsake
 VOLUME ["/data"]
 EXPOSE 8080

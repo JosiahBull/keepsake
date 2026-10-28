@@ -902,6 +902,11 @@ export interface components {
         };
         /** @description An upload to attach to a new fact's question, in display order. */
         NewQuestionMedia: {
+            /**
+             * @description Made by a generative model rather than photographed or recorded. Omitted when
+             *     false, so share snapshots of other questions are unchanged.
+             */
+            ai_generated?: boolean;
             /** @description Describes an image for screen readers without giving away the answer. */
             alt?: string;
             /** Format: int64 */
@@ -953,6 +958,8 @@ export interface components {
         };
         /** @description An image or clip shown with a question. Fetch its bytes from `/media/{media_id}`. */
         QuestionMedia: {
+            /** @description Made by a generative model; shown as such wherever the question is asked. */
+            ai_generated: boolean;
             alt: string;
             /** Format: int64 */
             byte_size: number;

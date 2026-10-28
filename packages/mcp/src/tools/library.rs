@@ -228,13 +228,21 @@ impl KeepsakeMcp {
                         item.kind.as_str().into(),
                         item.content_type.clone(),
                         measured(item),
+                        if item.ai_generated { "yes" } else { "no" }.into(),
                         item.alt.clone(),
                     ]
                 })
                 .collect();
             out.push_str("\nAsked with the question (view_media shows each):\n");
             out.push_str(&table(
-                &["media_id", "kind", "type", "size", "description"],
+                &[
+                    "media_id",
+                    "kind",
+                    "type",
+                    "size",
+                    "ai_generated",
+                    "description",
+                ],
                 &rows,
             ));
             out.push('\n');

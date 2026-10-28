@@ -109,6 +109,10 @@ pub struct NewQuestionMedia {
     /// Describes an image for screen readers without giving away the answer.
     #[serde(default)]
     pub alt: String,
+    /// Made by a generative model rather than photographed or recorded. Omitted when
+    /// false, so share snapshots of other questions are unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub ai_generated: bool,
 }
 
 /// An image or clip shown with a question. Fetch its bytes from `/media/{media_id}`.
@@ -122,6 +126,8 @@ pub struct QuestionMedia {
     pub height: Option<i64>,
     pub duration_ms: Option<i64>,
     pub alt: String,
+    /// Made by a generative model; shown as such wherever the question is asked.
+    pub ai_generated: bool,
 }
 
 /// Where a served file is, and what it is.
@@ -389,7 +395,8 @@ pub(crate) async fn for_fact(
     fact_id: i64,
 ) -> anyhow::Result<Vec<QuestionMedia>> {
     sqlx::query!(
-        "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt
+        "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt,
+           fm.ai_generated AS \"ai_generated: bool\"
          FROM fact_media fm JOIN media m ON m.id=fm.media_id
          WHERE fm.fact_id=? ORDER BY fm.position",
         fact_id
@@ -408,6 +415,7 @@ pub(crate) async fn for_fact(
             height: row.height,
             duration_ms: row.duration_ms,
             alt: row.alt,
+            ai_generated: row.ai_generated,
         })
     })
     .collect()
@@ -457,11 +465,13 @@ pub(crate) async fn attach(
         }
         let position = position as i64;
         sqlx::query!(
-            "INSERT INTO fact_media(fact_id, position, media_id, alt) VALUES(?, ?, ?, ?)",
+            "INSERT INTO fact_media(fact_id, position, media_id, alt, ai_generated)
+             VALUES(?, ?, ?, ?, ?)",
             fact_id,
             position,
             item.media_id,
-            item.alt
+            item.alt,
+            item.ai_generated
         )
         .execute(&mut *connection)
         .await?;

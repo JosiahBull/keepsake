@@ -26,6 +26,15 @@ Other profiles and existing study settings are preserved.
 Missing default facts and pending offers are added once. Existing wording and
 practice variants are retained; reopening does not duplicate facts or offers.
 
+Josiah and Ansam also each receive the [default lists](../default-lists/README.md), which
+ask with photos and recordings: New Zealand native birds by sight and call, with their sex
+and age where these differ, and plants common in New Zealand. The server adds them when
+`DEFAULT_LISTS_DIR` is set, as it is in the container and `pnpm dev`, to fresh and
+upgraded databases alike. Each library receives each item once, as its own fact with a
+fresh schedule; images and clips are stored once and shared between the two libraries.
+A member is found by name or handle, so a renamed profile still receives new items. Other
+profiles receive nothing, though Josiah and Ansam can share these facts like any other.
+
 Each newly created additional profile starts empty with default study settings:
 
 ```sh

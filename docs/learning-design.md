@@ -67,6 +67,41 @@ The research does not establish that a picture or a sound improves retention of 
 or that recall from a picture transfers to recall from words. If you need both, keep a
 text-only fact as well.
 
+## Identify birds and plants
+
+Josiah and Ansam each start with two lists asked through pictures and sound: New Zealand
+native birds, by sight and by call, and plants common in New Zealand. Their design applies
+the saved research where it can, and goes beyond it where noted.
+
+- **Name it before seeing the answer.** Every card asks for the bird or plant by name, and
+  that free recall is the scheduled target. This follows the research's strongest finding,
+  retrieval with corrective feedback, and its advice to answer in the form you need:
+  naming a bird you see or hear, not picking it from a list.
+- **Feedback that separates look-alikes.** Each card's context gives the cues that tell
+  the species apart, especially from those it is most often mistaken for, so a wrong
+  answer is corrected with the distinction rather than only the name.
+- **Practise confusable species together.** Multiple choice offers species a learner
+  could confuse, and the lists tag groups such as forest birds, parrots or coastal birds,
+  so matching draws its round from one group. The research supports interleaving related
+  categories when they are confusable; its evidence is task dependent and does not
+  include identifying species.
+- **More than one route to a species.** Common birds and plants appear in more than one
+  photo, and many birds also by call. This applies the research's promising evidence for
+  varied retrieval cues, which it measured with word meanings over up to 24 hours, not with
+  pictures or sounds. Each card keeps its own schedule, because recognising a bird by its
+  call does not show you would know it by sight.
+- **Sex and age where they differ.** When males and females, or young and adults, look or
+  sound different, a card asks for the species and its sex or age. Both forms appear, so
+  the answer is not always the unusual one. This is a design proposal; the research does
+  not study it.
+
+A wrong identification teaches the wrong thing, so the lists prefer photographs and
+recordings whose identification could be checked against New Zealand references, such as
+NZ Birds Online and the NZ Plant Conservation Network. An image made by a generative model
+is used only where no suitable photograph was found. It is labelled as AI-generated
+wherever it is shown, and carries a visible watermark, because it can be wrong in ways a
+photograph is not.
+
 ## Keep sounds neutral about ratings
 
 Every rating makes the same sound. A rewarding sound for Good or Easy would reward the

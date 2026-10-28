@@ -4477,6 +4477,10 @@
           "media_id"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "Made by a generative model rather than photographed or recorded. Omitted when\nfalse, so share snapshots of other questions are unchanged."
+          },
           "alt": {
             "type": "string",
             "description": "Describes an image for screen readers without giving away the answer."
@@ -4653,9 +4657,14 @@
           "kind",
           "content_type",
           "byte_size",
-          "alt"
+          "alt",
+          "ai_generated"
         ],
         "properties": {
+          "ai_generated": {
+            "type": "boolean",
+            "description": "Made by a generative model; shown as such wherever the question is asked."
+          },
           "alt": {
             "type": "string"
           },

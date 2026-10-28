@@ -461,6 +461,7 @@ async fn add_facts(
         proposed[0].media.push(NewQuestionMedia {
             media_id: upload.media_id,
             alt: String::new(),
+            ai_generated: false,
         });
     }
     let mut saved = facts::create_many_for(&pool, actor, proposed).await?;

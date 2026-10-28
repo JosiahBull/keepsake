@@ -2,6 +2,7 @@
 pub mod agent_access;
 pub mod backup;
 pub mod db;
+pub mod default_lists;
 pub mod facts;
 mod matching;
 pub mod media;

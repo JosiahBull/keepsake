@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt\n         FROM fact_media fm JOIN media m ON m.id=fm.media_id\n         WHERE fm.fact_id=? ORDER BY fm.position",
+  "query": "SELECT m.id AS \"id!\", m.kind, m.byte_size, m.width, m.height, m.duration_ms, fm.alt,\n           fm.ai_generated AS \"ai_generated: bool\"\n         FROM fact_media fm JOIN media m ON m.id=fm.media_id\n         WHERE fm.fact_id=? ORDER BY fm.position",
   "describe": {
     "columns": [
       {
@@ -79,6 +79,17 @@
             "name": "alt"
           }
         }
+      },
+      {
+        "name": "ai_generated: bool",
+        "ordinal": 7,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "fact_media",
+            "name": "ai_generated"
+          }
+        }
       }
     ],
     "parameters": {
@@ -91,8 +102,9 @@
       true,
       true,
       true,
+      false,
       false
     ]
   },
-  "hash": "60cf98eb01215ef1fae7b4098d9978d2b378c80760aa754739ca636197fb77ab"
+  "hash": "1d823ea8df93bf6fa4e9107b23cd6a8cd7f201d0d4de05e1218cfae7d128fece"
 }

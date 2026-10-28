@@ -77,6 +77,7 @@
     file: Blob;
     preview: string;
     alt: string;
+    aiGenerated: boolean;
     upload?: MediaUpload;
   };
 
@@ -449,6 +450,7 @@
         file: blob,
         preview: URL.createObjectURL(blob),
         alt: "",
+        aiGenerated: false,
       });
     }
   }
@@ -478,13 +480,23 @@
   }
 
   function describeMedia(media: Media[]): string {
-    const count = (kind: Media["kind"], one: string, many: string) => {
-      const total = media.filter((item) => item.kind === kind).length;
-      return total ? `${total} ${total === 1 ? one : many}` : "";
+    const count = (
+      kind: Media["kind"],
+      generated: boolean,
+      one: string,
+      many: string,
+    ) => {
+      const total = media.filter(
+        (item) => item.kind === kind && item.ai_generated === generated,
+      ).length;
+      const noun = total === 1 ? one : many;
+      return total ? `${total} ${generated ? `AI-generated ${noun}` : noun}` : "";
     };
     return [
-      count("image", "image", "images"),
-      count("audio", "audio clip", "audio clips"),
+      count("image", false, "image", "images"),
+      count("image", true, "image", "images"),
+      count("audio", false, "audio clip", "audio clips"),
+      count("audio", true, "audio clip", "audio clips"),
     ]
       .filter(Boolean)
       .join(", ");
@@ -511,7 +523,11 @@
       const media = [];
       for (const attachment of attachments) {
         const upload = await uploadAttachment(attachment);
-        media.push({ media_id: upload.media_id, alt: attachment.alt.trim() });
+        media.push({
+          media_id: upload.media_id,
+          alt: attachment.alt.trim(),
+          ai_generated: attachment.aiGenerated,
+        });
       }
 
       unwrap(
@@ -1238,6 +1254,10 @@
                     aria-label={attachment.name}
                   ></audio>
                 {/if}
+                <label class="generated-choice">
+                  <input type="checkbox" bind:checked={attachment.aiGenerated} />
+                  Made by AI
+                </label>
                 <button
                   type="button"
                   class="text-button"
@@ -2138,6 +2158,18 @@
 
   .attachment label {
     width: 100%;
+  }
+
+  .attachment .generated-choice {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .generated-choice input {
+    width: auto;
+    margin: 0;
+    accent-color: #244c44;
   }
 
   .media-note {

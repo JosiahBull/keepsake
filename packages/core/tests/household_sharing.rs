@@ -30,11 +30,16 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
             "0005_profiles.sql",
             include_str!("../migrations/0005_profiles.sql"),
         ),
-        // Repository code used to build the fixture reads question media. Adding
-        // that schema early still leaves household seeding to run afterwards.
+        // Repository code used to build the fixture reads question media, including
+        // whether each is AI-generated. Adding that schema early still leaves household
+        // seeding to run afterwards.
         (
             "0009_question_media.sql",
             include_str!("../migrations/0009_question_media.sql"),
+        ),
+        (
+            "0011_default_lists.sql",
+            include_str!("../migrations/0011_default_lists.sql"),
         ),
     ] {
         std::fs::write(migrations.join(name), contents).unwrap();

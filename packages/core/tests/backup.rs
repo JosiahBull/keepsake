@@ -123,6 +123,7 @@ async fn backups_carry_media_files_and_restore_them_into_a_directory_of_their_ow
     let attach = |media_id| NewQuestionMedia {
         media_id,
         alt: String::new(),
+        ai_generated: false,
     };
     let saved = facts::create(
         &pool,

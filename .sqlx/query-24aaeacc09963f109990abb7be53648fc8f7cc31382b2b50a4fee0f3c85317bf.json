@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\" FROM profiles WHERE lower(trim(name)) = ? OR handle = ?\n         ORDER BY lower(trim(name)) = ? DESC, id LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "24aaeacc09963f109990abb7be53648fc8f7cc31382b2b50a4fee0f3c85317bf"
+}

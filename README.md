@@ -17,6 +17,10 @@ A question asked with a picture and an audio clip:
 
 ![Scheduled recall of a question with a picture of an apple and an audio clip](docs/screenshots/question-media-practice.png)
 
+A card from the default bird list, asking for the species and its sex:
+
+![A female hihi photo, its answer, the cues that tell males and females apart, and the photo's credit](docs/screenshots/default-list-bird.png)
+
 Matching questions and answers from the same topic:
 
 ![A matching round with four food and drink words from one te reo Māori topic bank](docs/screenshots/matching.png)
@@ -102,6 +106,10 @@ The clip's index comes before its audio, and the server answers byte ranges, so 
 and scrubbing start at once. AVIF needs Safari 16 or a current Chrome, Edge or Firefox.
 Describe an image for screen readers without giving away the answer.
 
+Tick **Made by AI** for an image or clip a generative model made. Keepsake labels it
+AI-generated wherever its question is shown, and the label stays with shared copies.
+Agents set `ai_generated` on media they add over MCP.
+
 Media files live beside the database, in the same directory: `media/images/` and
 `media/audio/`, named by the hash of their contents. Uploads arrive in `tmp/`, which the
 server empties when it starts; it also removes media files that nothing references.
@@ -124,6 +132,18 @@ Each profile has a separate fact library, recall history, timezone, and study bu
 Josiah and Ansam are created automatically. On a fresh database, Josiah starts with
 40 Rust/Linux facts and Ansam with 60 household te reo Māori facts. Ansam’s vocabulary
 also appears as 60 pending offers in Josiah’s inbox; accepting creates independent copies.
+
+Both also receive two [default lists](default-lists/README.md) asked with photos and
+recordings, on fresh and existing databases alike:
+
+| List | Cards | Covers |
+| --- | --- | --- |
+| New Zealand birds | 191 | 47 native species by sight and 34 by call, with sex and age where they differ |
+| Plants common in New Zealand | 131 | 44 native plants by whole plant, leaf, flower, fruit or bark, with juvenile forms and male and female plants |
+
+Every image and clip is credited and is Creative Commons or public domain. New cards
+arrive at the profile's daily limit for new facts, five by default, so the lists take
+about two months to introduce in full.
 The header switcher changes the active profile; each browser tab keeps its own selection.
 Profiles use no passwords: anyone who can access the app can switch between them.
 
@@ -402,6 +422,7 @@ Node is only needed to build the frontend.
 | `KEEPSAKE_PROFILE` | Sole profile when unambiguous | CLI library owner; overridden by `--profile` |
 | `BIND_ADDR` | `127.0.0.1:8080` | HTTP listening address |
 | `WEB_DIR` | `packages/web/dist` | Built frontend directory |
+| `DEFAULT_LISTS_DIR` | none; `pnpm dev` and the container use `default-lists` | [Default lists](default-lists/README.md) to add to Josiah's and Ansam's libraries |
 | `RUST_LOG` | `info` | Server log filter |
 | `SHUTDOWN_GRACE_SECS` | `10` | Shutdown budget for HTTP draining and database closure |
 | `HEADER_READ_TIMEOUT_SECS` | `15` | Deadline for receiving an HTTP request head |
@@ -428,6 +449,9 @@ database does not reference.
 An explicitly configured `WEB_DIR` must contain a readable `index.html`; startup fails
 before opening SQLite when it is missing. With `WEB_DIR` unset, the development API can
 start before the frontend is built. [`.env.example`](.env.example) lists the defaults.
+Startup also fails before opening SQLite if a list in `DEFAULT_LISTS_DIR` is malformed or
+names a missing file. Their images and clips are converted after the server starts
+listening: under a minute for both lists on a recent laptop, longer on a small server.
 Duration settings accept 1–3600 seconds; connection and request counts accept 1–16384;
 the body-size setting accepts 1–16777216 bytes. Invalid settings fail startup.
 

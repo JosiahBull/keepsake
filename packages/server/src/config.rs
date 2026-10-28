@@ -7,6 +7,8 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     pub database_url: String,
     pub web_dir: PathBuf,
+    /// The household's default lists, added to Josiah's and Ansam's libraries. None adds none.
+    pub default_lists: Option<PathBuf>,
     pub shutdown_grace: Duration,
     pub http: HttpConfig,
     pub limits: Limits,
@@ -63,6 +65,13 @@ impl Config {
             database_url: std::env::var("DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite:data/keepsake.db".into()),
             web_dir,
+            default_lists: match std::env::var_os("DEFAULT_LISTS_DIR") {
+                Some(directory) => {
+                    ensure!(!directory.is_empty(), "DEFAULT_LISTS_DIR must not be empty");
+                    Some(PathBuf::from(directory))
+                }
+                None => None,
+            },
             shutdown_grace: seconds_from_env("SHUTDOWN_GRACE_SECS", 10)?,
             http: HttpConfig {
                 max_connections: count_from_env("MAX_CONNECTIONS", 128, 16_384)?,

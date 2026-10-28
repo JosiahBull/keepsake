@@ -307,7 +307,7 @@ async fn writing_saves_checked_facts_with_media_and_refuses_bad_drafts_whole() {
 
     let shown = call(&app, "default", "get_fact", json!({"fact_id": stored.id})).await;
     assert!(
-        text(&shown).contains("| image | image/avif | 1×1 px | A dark bird |"),
+        text(&shown).contains("| image | image/avif | 1×1 px | no | A dark bird |"),
         "{shown}"
     );
     let image = call(

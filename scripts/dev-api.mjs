@@ -28,6 +28,9 @@ const TARGET_DIR = process.env.CARGO_TARGET_DIR
   ? path.resolve(ROOT, process.env.CARGO_TARGET_DIR)
   : path.join(ROOT, "target");
 const BIN_PATH = path.join(TARGET_DIR, "debug", BIN);
+// The server adds the household's default lists from this checkout, unless the shell names
+// another directory.
+process.env.DEFAULT_LISTS_DIR ??= path.join(ROOT, "default-lists");
 
 // Coalesce the burst of events one save produces — and the hundreds a `git checkout` does.
 const DEBOUNCE_MS = 200;

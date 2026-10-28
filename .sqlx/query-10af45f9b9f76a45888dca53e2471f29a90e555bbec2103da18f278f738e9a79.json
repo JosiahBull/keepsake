@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO default_list_items(profile_id, list, item, fact_id)\n                     VALUES(?, ?, ?, ?)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": []
+  },
+  "hash": "10af45f9b9f76a45888dca53e2471f29a90e555bbec2103da18f278f738e9a79"
+}
