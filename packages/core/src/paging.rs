@@ -386,6 +386,28 @@ pub async fn sample_for(
     crate::matching::sample(pool, profile_id, query).await
 }
 
+#[derive(Debug, Deserialize, Serialize, ToSchema, sqlx::FromRow)]
+pub struct TagCount {
+    pub tag: String,
+    pub facts: i64,
+}
+
+/// Every tag in this library with how many facts carry it, most used first.
+pub async fn tags_for(pool: &SqlitePool, profile_id: i64) -> anyhow::Result<Vec<TagCount>> {
+    crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
+    // A runtime query: SQLx cannot describe a grouped json_each column at compile time.
+    Ok(sqlx::query_as(
+        "SELECT tag.value AS tag, count(DISTINCT f.id) AS facts
+         FROM facts f, json_each(f.tags) tag
+         WHERE f.profile_id = ? AND tag.type = 'text'
+         GROUP BY tag.value ORDER BY facts DESC, tag.value
+         LIMIT 500",
+    )
+    .bind(profile_id)
+    .fetch_all(pool)
+    .await?)
+}
+
 pub async fn fact_exists_for(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<bool> {
     crate::profiles::require(&mut *pool.acquire().await?, profile_id).await?;
     Ok(

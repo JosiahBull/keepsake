@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import type { components } from "@keepsake/client";
   import { json, errorMessage, type Profile } from "./profiles";
+  import AgentAccess from "./AgentAccess.svelte";
   import Reminders from "./Reminders.svelte";
   import { play, setSoundsOn, soundsOn } from "./sounds";
 
@@ -198,6 +199,7 @@
         />Play sounds on this device</label
       >
     </section>
+    <AgentAccess {profile} />
   {:else}<button class="quiet" onclick={load}>Try again</button>{/if}
 </section>
 

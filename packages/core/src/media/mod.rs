@@ -108,6 +108,13 @@ fn invalid(message: impl Into<String>) -> anyhow::Error {
     StudyError::Invalid(message.into()).into()
 }
 
+/// [`inspect`] off the async runtime, sharing the limit on concurrent decodes.
+pub async fn check(declared_type: &str, bytes: Arc<[u8]>) -> anyhow::Result<Inspection> {
+    let _permit = INSPECTIONS.acquire().await?;
+    let declared_type = declared_type.to_owned();
+    tokio::task::spawn_blocking(move || inspect(&declared_type, &bytes)).await?
+}
+
 /// Store a file for this profile after [`inspect`] accepts it as `declared_type`,
 /// reusing an identical earlier upload.
 pub async fn upload(
@@ -117,11 +124,7 @@ pub async fn upload(
     bytes: Vec<u8>,
 ) -> anyhow::Result<MediaUpload> {
     let bytes: Arc<[u8]> = bytes.into();
-    let inspection = {
-        let _permit = INSPECTIONS.acquire().await?;
-        let (declared_type, bytes) = (declared_type.to_owned(), bytes.clone());
-        tokio::task::spawn_blocking(move || inspect(&declared_type, &bytes)).await??
-    };
+    let inspection = check(declared_type, bytes.clone()).await?;
     crate::db::write_transaction(pool, move |connection| {
         let bytes = bytes.clone();
         Box::pin(async move {

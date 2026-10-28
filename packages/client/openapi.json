@@ -888,6 +888,126 @@
         }
       }
     },
+    "/api/profiles/{profile_id}/agent-access": {
+      "get": {
+        "tags": [
+          "agent_access_api"
+        ],
+        "operationId": "get_agent_access",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAccess"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "agent_access_api"
+        ],
+        "operationId": "update_agent_access",
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentAccessUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAccess"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profiles/{profile_id}/facts": {
       "parameters": [
         {
@@ -3901,6 +4021,41 @@
   },
   "components": {
     "schemas": {
+      "AgentAccess": {
+        "type": "object",
+        "description": "Agent access as the settings page needs it. Two of the three fields are facts about\nhow the server was started, which no stored row can hold: without them the page\ncould not explain why a choice does nothing.",
+        "required": [
+          "mode",
+          "ceiling",
+          "effective"
+        ],
+        "properties": {
+          "ceiling": {
+            "$ref": "#/components/schemas/McpMode",
+            "description": "The most this server allows, from `KEEPSAKE_MCP`. `off` means agent access is\nunavailable here, whatever is chosen."
+          },
+          "effective": {
+            "$ref": "#/components/schemas/McpMode",
+            "description": "What is served: `mode` limited to `ceiling`."
+          },
+          "mode": {
+            "$ref": "#/components/schemas/McpMode",
+            "description": "What this profile has chosen."
+          }
+        }
+      },
+      "AgentAccessUpdate": {
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/McpMode"
+          }
+        },
+        "additionalProperties": false
+      },
       "DeviceEndpoint": {
         "type": "object",
         "required": [
@@ -4146,6 +4301,15 @@
             "type": "string"
           }
         }
+      },
+      "McpMode": {
+        "type": "string",
+        "description": "Ordered from least to most capable: `min` with a ceiling can only lower it.",
+        "enum": [
+          "off",
+          "read",
+          "write"
+        ]
       },
       "MediaKind": {
         "type": "string",

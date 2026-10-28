@@ -44,6 +44,8 @@ export class TestApp {
   constructor(
     private readonly directory: string,
     private readonly householdDefaults = false,
+    // Extra server environment for a test, such as KEEPSAKE_MCP.
+    private readonly settings: Record<string, string> = {},
   ) {
     this.databasePath = path.join(directory, "library.sqlite3");
     const binaries = process.env.KEEPSAKE_E2E_BIN_DIR;
@@ -63,6 +65,7 @@ export class TestApp {
       BIND_ADDR: "127.0.0.1:0",
       RUST_LOG: "info",
       SHUTDOWN_GRACE_SECS: "2",
+      ...this.settings,
     };
   }
 
@@ -183,12 +186,18 @@ export class TestApp {
   }
 }
 
-export const test = base.extend<{ app: TestApp; profileSetup: boolean; householdDefaults: boolean }>({
+export const test = base.extend<{
+  app: TestApp;
+  profileSetup: boolean;
+  householdDefaults: boolean;
+  serverSettings: Record<string, string>;
+}>({
   profileSetup: [true, { option: true }],
   householdDefaults: [false, { option: true }],
-  app: async ({ profileSetup, householdDefaults }, use, testInfo) => {
+  serverSettings: [{}, { option: true }],
+  app: async ({ profileSetup, householdDefaults, serverSettings }, use, testInfo) => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "keepsake-browser-"));
-    const app = new TestApp(directory, householdDefaults);
+    const app = new TestApp(directory, householdDefaults, serverSettings);
     try {
       await app.start();
       if (profileSetup) {

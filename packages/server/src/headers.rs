@@ -16,7 +16,8 @@ const SECURITY_HEADERS: &[(&str, &str)] = &[
 
 pub(crate) async fn response_headers(request: Request, next: Next) -> Response {
     let path = request.uri().path();
-    let api = path == "/api" || path.starts_with("/api/");
+    // MCP answers carry library content too, so they are never cached.
+    let api = path == "/api" || path.starts_with("/api/") || path.starts_with("/mcp/");
     let fingerprinted_asset = path.starts_with("/assets/");
     let mut response = next.run(request).await;
     let failed = response.status().is_client_error() || response.status().is_server_error();

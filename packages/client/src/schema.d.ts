@@ -180,6 +180,22 @@ export interface paths {
         patch: operations["rename_profile"];
         trace?: never;
     };
+    "/api/profiles/{profile_id}/agent-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_agent_access"];
+        put: operations["update_agent_access"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/facts": {
         parameters: {
             query?: never;
@@ -744,6 +760,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Agent access as the settings page needs it. Two of the three fields are facts about
+         *     how the server was started, which no stored row can hold: without them the page
+         *     could not explain why a choice does nothing.
+         */
+        AgentAccess: {
+            /**
+             * @description The most this server allows, from `KEEPSAKE_MCP`. `off` means agent access is
+             *     unavailable here, whatever is chosen.
+             */
+            ceiling: components["schemas"]["McpMode"];
+            /** @description What is served: `mode` limited to `ceiling`. */
+            effective: components["schemas"]["McpMode"];
+            /** @description What this profile has chosen. */
+            mode: components["schemas"]["McpMode"];
+        };
+        AgentAccessUpdate: {
+            mode: components["schemas"]["McpMode"];
+        };
         DeviceEndpoint: {
             endpoint: string;
         };
@@ -805,6 +840,11 @@ export interface components {
         Health: {
             status: string;
         };
+        /**
+         * @description Ordered from least to most capable: `min` with a ceiling can only lower it.
+         * @enum {string}
+         */
+        McpMode: "off" | "read" | "write";
         /** @enum {string} */
         MediaKind: "image" | "audio";
         /** @description A stored file, before or after it is attached to a question. */
@@ -1816,6 +1856,92 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_agent_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAccess"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_agent_access: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentAccessUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentAccess"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

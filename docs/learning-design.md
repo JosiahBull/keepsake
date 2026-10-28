@@ -98,6 +98,12 @@ establish. A structural validator can reject malformed choices; it cannot prove
 their meaning or factual accuracy. AI should help the learner attempt retrieval
 and understand feedback rather than supplying the answer before the attempt.
 
+Agents connected over [MCP](mcp.md) follow the same rules. They can add facts and
+variants, which arrive unverified, but cannot approve a variant or record a review: the
+learner still attempts each answer and rates their own recall. This applies the research's
+proposal of AI as questioner and feedback assistant; the research does not test an agent
+integration.
+
 ## Assess retention across time
 
 The [scheduler](scheduling.md) uses a pinned Rust FSRS implementation and one recall
