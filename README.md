@@ -352,6 +352,15 @@ pnpm skills:install
 
 The skill launcher works from any directory. Set `KEEPSAKE_REPO` if the checkout moves.
 
+## Connect an agent (MCP)
+
+An agent such as Claude Code can search a profile's library over the Model Context
+Protocol and, if allowed, add facts and practice variants. Everything it reads goes to its
+model provider, so this is off unless the server sets `KEEPSAKE_MCP` to `read` or `write`
+and the profile then chooses its own access in Profile settings, which shows the address
+and the command to connect. Agents cannot record reviews, approve variants, share or change
+settings. See [Agent access](docs/mcp.md) for the rules, tools and network checks.
+
 ## Develop
 
 Install Rust, Node 24 or newer, and pnpm 11. From the repository root:
@@ -402,6 +411,8 @@ Node is only needed to build the frontend.
 | `MAX_IN_FLIGHT` | `32` | Concurrent requests; excess requests receive 503 with `Retry-After` |
 | `MAX_BODY_BYTES` | `524288` | Request-body size limit in bytes; media uploads have a fixed 5 MiB limit |
 | `PUSH_CONTACT` | `https://github.com/JosiahBull/keepsake` | `mailto:` or `https:` contact sent to push services with each reminder |
+| `KEEPSAKE_MCP` | `off` | Most agent access any profile may choose: `off`, `read` or `write`. See [Agent access](docs/mcp.md) |
+| `KEEPSAKE_MCP_ALLOWED_HOSTS` | none | Comma-separated host names MCP clients may use besides loopback |
 
 Run the server from the repository root with its defaults. `.env` files are not loaded
 automatically. Embedded, append-only migrations run on startup. SQLite uses WAL, foreign
@@ -452,6 +463,7 @@ copying its data directory: WAL files can contain committed data outside the mai
 - `packages/server`: HTTP routes and static website serving
 - `packages/cli`: standalone `keepsake-cli` package, source imports and agent integration
 - `packages/core`: shared fact types, validation and SQLite repositories
+- `packages/mcp`: MCP tools for agents, mounted by the server
 - `packages/core/migrations`: append-only SQL migrations embedded in both binaries
 - `skills/keepsake-add-facts`: reusable capture workflow
 

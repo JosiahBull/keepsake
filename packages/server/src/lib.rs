@@ -1,4 +1,5 @@
 pub use keepsake_core::{db, facts};
+mod agent_access_api;
 pub mod config;
 mod context;
 mod facts_api;
@@ -21,8 +22,9 @@ use axum::{
     extract::{DefaultBodyLimit, State},
     http::StatusCode,
     middleware::{from_fn, from_fn_with_state},
-    routing::{get, post, put},
+    routing::{any, get, post, put},
 };
+use keepsake_mcp::{McpConfig, McpMode};
 use notifications::Notifier;
 use profile_schema::ProfilePaths;
 use serde::Serialize;
@@ -97,7 +99,9 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         notifications_api::update,
         notifications_api::register,
         notifications_api::remove,
-        notifications_api::test
+        notifications_api::test,
+        agent_access_api::get,
+        agent_access_api::update
     ),
     components(schemas(
         Health,
@@ -148,7 +152,10 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::reminders::ReminderUpdate,
         keepsake_core::reminders::NewDevice,
         keepsake_core::reminders::DeviceKeys,
-        keepsake_core::reminders::DeviceEndpoint
+        keepsake_core::reminders::DeviceEndpoint,
+        keepsake_core::agent_access::McpMode,
+        agent_access_api::AgentAccess,
+        agent_access_api::AgentAccessUpdate
     )),
     modifiers(&ProfilePaths)
 )]
@@ -170,6 +177,17 @@ pub fn router_with(
     limits: limits::Limits,
     notifier: Arc<Notifier>,
 ) -> Router {
+    router_with_mcp(pool, web_dir, limits, notifier, McpConfig::default())
+}
+
+/// The full application, with the MCP endpoint mounted when `mcp.ceiling` allows it.
+pub fn router_with_mcp(
+    pool: SqlitePool,
+    web_dir: &Path,
+    limits: limits::Limits,
+    notifier: Arc<Notifier>,
+    mcp: McpConfig,
+) -> Router {
     let scoped = content_routes()
         .route("/shares", get(shares_api::list).post(shares_api::send))
         .route("/shares/accept-batch", post(shares_api::accept_batch))
@@ -184,7 +202,11 @@ pub fn router_with(
             "/reminders/devices",
             put(notifications_api::register).delete(notifications_api::remove),
         )
-        .route("/reminders/test", post(notifications_api::test));
+        .route("/reminders/test", post(notifications_api::test))
+        .route(
+            "/agent-access",
+            get(agent_access_api::get).put(agent_access_api::update),
+        );
     let api = content_routes()
         .route("/health", get(health))
         .route("/push/key", get(notifications_api::key))
@@ -199,14 +221,28 @@ pub fn router_with(
         .nest("/profiles/{profile_id}", scoped)
         .route("/openapi.json", get(|| async { Json(ApiDoc::openapi()) }))
         .fallback(|| async { StatusCode::NOT_FOUND });
-    let app = Router::new()
+    let mut app = Router::new()
         .nest("/api", api)
-        .route("/api", get(|| async { StatusCode::NOT_FOUND }))
+        .route("/api", get(|| async { StatusCode::NOT_FOUND }));
+    // A ceiling of off, the default, is the only thing that makes /mcp not a route at all.
+    // Otherwise it stays mounted and each profile's own setting decides what it serves.
+    match mcp.ceiling {
+        McpMode::Off => {}
+        McpMode::Read | McpMode::Write => {
+            tracing::info!(
+                ceiling = mcp.ceiling.as_str(),
+                "mcp endpoints mounted at /mcp/PROFILE; each serves at most its profile's setting"
+            );
+            app = app.route("/mcp/{profile}", any(agent_access_api::endpoint));
+        }
+    }
+    let app = app
         .fallback_service(
             ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
         )
         .with_state(pool)
         .layer(Extension(notifier))
+        .layer(Extension(Arc::new(mcp)))
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))
         // Audio is already compressed, and a gzipped body could not answer byte ranges.
         .layer(

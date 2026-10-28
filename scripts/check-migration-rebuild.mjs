@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const temporary = mkdtempSync(join(tmpdir(), "keepsake-migration-rebuild-"));
 
 try {
-  for (const name of ["Cargo.toml", "Cargo.lock", ".cargo", ".sqlx", "packages/core", "packages/server", "packages/cli"]) {
+  for (const name of ["Cargo.toml", "Cargo.lock", ".cargo", ".sqlx", "packages/core", "packages/server", "packages/mcp", "packages/cli"]) {
     if (existsSync(join(root, name))) cpSync(join(root, name), join(temporary, name), { recursive: true });
   }
   const examples = join(temporary, "packages/core/examples");

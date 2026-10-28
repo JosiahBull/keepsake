@@ -1,5 +1,6 @@
 use crate::{http::HttpConfig, limits::Limits};
 use anyhow::{Context, ensure};
+use keepsake_mcp::{McpConfig, McpMode};
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 pub struct Config {
@@ -10,6 +11,7 @@ pub struct Config {
     pub http: HttpConfig,
     pub limits: Limits,
     pub push: PushConfig,
+    pub mcp: McpConfig,
 }
 
 #[derive(Clone, Debug)]
@@ -89,8 +91,52 @@ impl Config {
                 },
                 allow_insecure_endpoints: false,
             },
+            mcp: McpConfig {
+                ceiling: mcp_ceiling()?,
+                allowed_hosts: mcp_allowed_hosts()?,
+            },
         })
     }
+}
+
+/// `KEEPSAKE_MCP`: the most agent access any profile may choose. Unset means off.
+///
+/// An unrecognised value stops startup instead of falling back. Both guesses are wrong:
+/// a typo for `write` that silently serves nothing is a confusing afternoon, and one that
+/// fell back the other way would give an agent access nobody chose.
+fn mcp_ceiling() -> anyhow::Result<McpMode> {
+    match std::env::var("KEEPSAKE_MCP") {
+        Ok(value) => value
+            .parse()
+            .map_err(|error: String| anyhow::anyhow!("KEEPSAKE_MCP: {error}")),
+        Err(std::env::VarError::NotPresent) => Ok(McpMode::Off),
+        Err(error) => Err(error).context("read KEEPSAKE_MCP"),
+    }
+}
+
+/// `KEEPSAKE_MCP_ALLOWED_HOSTS`: comma-separated `Host` values accepted besides loopback,
+/// such as `keepsake.example.com`. Anything else is refused, to defeat DNS rebinding.
+fn mcp_allowed_hosts() -> anyhow::Result<Vec<String>> {
+    let value = match std::env::var("KEEPSAKE_MCP_ALLOWED_HOSTS") {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => return Ok(Vec::new()),
+        Err(error) => return Err(error).context("read KEEPSAKE_MCP_ALLOWED_HOSTS"),
+    };
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|host| !host.is_empty())
+        .map(|host| {
+            ensure!(
+                host.len() <= 255
+                    && host
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':' | '[' | ']')),
+                "KEEPSAKE_MCP_ALLOWED_HOSTS entries must be host names or host:port, such as keepsake.example.com"
+            );
+            Ok(host.to_ascii_lowercase())
+        })
+        .collect()
 }
 
 fn count_from_env(name: &str, default: usize, maximum: usize) -> anyhow::Result<usize> {

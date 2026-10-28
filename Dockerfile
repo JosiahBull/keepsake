@@ -11,6 +11,7 @@ COPY .cargo .cargo
 COPY .sqlx .sqlx
 COPY packages/core packages/core
 COPY packages/server packages/server
+COPY packages/mcp packages/mcp
 COPY packages/cli packages/cli
 RUN mkdir -p packages/client && cargo run --locked --package keepsake-server --bin gen-openapi
 
@@ -35,6 +36,7 @@ COPY .cargo .cargo
 COPY .sqlx .sqlx
 COPY packages/core packages/core
 COPY packages/server packages/server
+COPY packages/mcp packages/mcp
 COPY packages/cli packages/cli
 RUN cargo build --locked --release --package keepsake-server --bin keepsake-server --package keepsake-cli --bin keepsake
 

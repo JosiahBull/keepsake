@@ -1,0 +1,94 @@
+[
+  {
+    "name": "add_facts",
+    "tier": "write",
+    "description": "Save 1 to 20 new facts to this library, all together or none. Each has a question and answer, and may have context, a source, tags, practice variants and up to 4 images or clips (base64) asked with the question. Check facts against their source first, and record the source.",
+    "read_only": false,
+    "destructive": false,
+    "idempotent": false,
+    "arguments": [
+      "facts"
+    ],
+    "required": [
+      "facts"
+    ]
+  },
+  {
+    "name": "add_practices",
+    "tier": "write",
+    "description": "Add 1 to 32 practice variants to an existing fact: flashcard, multiple choice, cloze, explain or apply. They appear in extra practice; scheduled recall uses one only after the learner approves it.",
+    "read_only": false,
+    "destructive": false,
+    "idempotent": false,
+    "arguments": [
+      "fact_id",
+      "practices"
+    ],
+    "required": [
+      "fact_id",
+      "practices"
+    ]
+  },
+  {
+    "name": "get_fact",
+    "tier": "read",
+    "description": "One fact in full: question, answer, context, source, tags, the images and clips asked with its question, and its practice variants.",
+    "read_only": true,
+    "destructive": null,
+    "idempotent": true,
+    "arguments": [
+      "fact_id"
+    ],
+    "required": [
+      "fact_id"
+    ]
+  },
+  {
+    "name": "list_tags",
+    "tier": "read",
+    "description": "Every tag in this library with how many facts carry it, most used first. Reuse these tags when adding facts: matching practice draws related facts from one shared tag.",
+    "read_only": true,
+    "destructive": null,
+    "idempotent": true,
+    "arguments": [],
+    "required": []
+  },
+  {
+    "name": "search_facts",
+    "tier": "read",
+    "description": "Search this library's facts, newest first. Returns ids, questions, answers (cut at 160 characters), tags and media counts. Use get_fact for a fact's full text, context, source and practice variants.",
+    "read_only": true,
+    "destructive": null,
+    "idempotent": true,
+    "arguments": [
+      "before_id",
+      "limit",
+      "search"
+    ],
+    "required": []
+  },
+  {
+    "name": "study_overview",
+    "tier": "read",
+    "description": "What is ready to study now (due reviews and new facts within today's limit), whether today's study budget is spent, and the study settings. Reviews themselves happen in the Keepsake app.",
+    "read_only": true,
+    "destructive": null,
+    "idempotent": true,
+    "arguments": [],
+    "required": []
+  },
+  {
+    "name": "view_media",
+    "tier": "read",
+    "description": "Return an image or audio clip from a fact's question, by the media_id get_fact lists, as the learner is served it: AVIF for images, AAC in MP4 for clips.",
+    "read_only": true,
+    "destructive": null,
+    "idempotent": true,
+    "arguments": [
+      "media_id"
+    ],
+    "required": [
+      "media_id"
+    ]
+  }
+]

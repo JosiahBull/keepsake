@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT mcp_mode FROM profiles WHERE id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "mcp_mode",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "profiles",
+            "name": "mcp_mode"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "189549202023eaf8a3469f43e64345e030f4ad94296b686f031021c39dd9107a"
+}
