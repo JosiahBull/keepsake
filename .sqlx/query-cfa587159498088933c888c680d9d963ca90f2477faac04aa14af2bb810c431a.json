@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO media(profile_id, kind, upload_sha256, file_sha256,\n               byte_size, width, height, duration_ms)\n             SELECT ?, kind, upload_sha256, file_sha256, byte_size, width, height, duration_ms\n             FROM media WHERE id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cfa587159498088933c888c680d9d963ca90f2477faac04aa14af2bb810c431a"
+}

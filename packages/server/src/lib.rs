@@ -7,6 +7,7 @@ pub mod health;
 pub mod http;
 pub mod lifecycle;
 pub mod limits;
+mod media_api;
 pub mod notifications;
 mod notifications_api;
 mod profile_context;
@@ -28,7 +29,10 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use std::{path::Path, sync::Arc};
 use tower_http::{
-    compression::CompressionLayer,
+    compression::{
+        CompressionLayer,
+        predicate::{DefaultPredicate, NotForContentType, Predicate},
+    },
     services::{ServeDir, ServeFile},
 };
 use utoipa::{OpenApi, ToSchema};
@@ -67,6 +71,8 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts_api::add_practices,
         facts_api::review,
         facts_api::reviews,
+        media_api::upload,
+        media_api::download,
         study_api::queue,
         study_api::summary,
         study_api::submit,
@@ -104,6 +110,10 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         facts::Review,
         facts::ReviewMethod,
         facts::ReviewOutcome,
+        keepsake_core::media::MediaKind,
+        keepsake_core::media::MediaUpload,
+        keepsake_core::media::NewQuestionMedia,
+        keepsake_core::media::QuestionMedia,
         keepsake_core::paging::FactSummary,
         keepsake_core::paging::FactPage,
         keepsake_core::paging::ReviewPage,
@@ -198,7 +208,11 @@ pub fn router_with(
         .with_state(pool)
         .layer(Extension(notifier))
         .layer(DefaultBodyLimit::max(limits.max_body_bytes))
-        .layer(CompressionLayer::new())
+        // Audio is already compressed, and a gzipped body could not answer byte ranges.
+        .layer(
+            CompressionLayer::new()
+                .compress_when(DefaultPredicate::new().and(NotForContentType::const_new("audio/"))),
+        )
         .layer(from_fn_with_state(
             limits::Admission::new(limits),
             limits::admit,
@@ -215,6 +229,12 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/facts/{id}/practices", post(facts_api::add_practices))
         .route("/facts/{id}/reviews", get(facts_api::reviews))
         .route("/reviews", post(facts_api::review))
+        .route(
+            "/media",
+            // The upload streams into tmp/ and enforces the media limit itself.
+            post(media_api::upload).layer(DefaultBodyLimit::disable()),
+        )
+        .route("/media/{id}", get(media_api::download))
         .route("/study/queue", get(study_api::queue))
         .route("/study/summary", get(study_api::summary))
         .route(

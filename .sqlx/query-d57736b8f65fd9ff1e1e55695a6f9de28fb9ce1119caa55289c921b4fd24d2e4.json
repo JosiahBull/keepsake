@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT upload_sha256, byte_size FROM media WHERE id=? AND profile_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "upload_sha256",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "upload_sha256"
+          }
+        }
+      },
+      {
+        "name": "byte_size",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "byte_size"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "d57736b8f65fd9ff1e1e55695a6f9de28fb9ce1119caa55289c921b4fd24d2e4"
+}

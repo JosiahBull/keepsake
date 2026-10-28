@@ -9,10 +9,19 @@ anyhow.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 fsrs.workspace = true
+# Decoders that prove an upload is the format it claims, and the encoders that turn it into
+# what is served: AVIF through rav1e and AAC through a Rust port of FDK AAC, both pure Rust.
+fdk-aac-rs = { version = "=0.1.0", default-features = false, features = ["encoder"] }
+image = { version = "0.25", default-features = false, features = ["avif", "jpeg", "png", "rayon", "webp"] }
 serde.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"
+strum.workspace = true
 sqlx.workspace = true
+symphonia = { version = "0.6", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mkv", "mp3", "ogg", "pcm", "vorbis", "wav"] }
+# The reference Opus decoder (libopus, built with CMake), for clips browsers record.
+symphonia-adapter-libopus = "0.3"
 utoipa.workspace = true
 tempfile = "3"
-tokio.workspace = true
+tokio = { workspace = true, features = ["fs", "sync"] }
 uuid.workspace = true

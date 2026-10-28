@@ -19,6 +19,7 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 scraper = "0.24"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+strum = { version = "0.28", features = ["derive"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "process", "io-util", "time"] }
 tokio-util = { version = "0.7", features = ["rt"] }
@@ -31,3 +32,24 @@ uuid = { version = "1", features = ["v4"] }
 [profile.release]
 lto = "thin"
 strip = true
+
+# Image and audio encoders take seconds per file unoptimised, so development builds and
+# tests optimise them too.
+[profile.dev.package.rav1e]
+opt-level = 3
+
+[profile.dev.package.ravif]
+opt-level = 3
+
+[profile.dev.package.fdk-aac-rs-aacenc]
+opt-level = 3
+
+[profile.dev.package.fdk-aac-rs-fdk]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+

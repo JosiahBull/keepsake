@@ -3,6 +3,7 @@ pub mod backup;
 pub mod db;
 pub mod facts;
 mod matching;
+pub mod media;
 pub mod paging;
 pub mod profiles;
 pub mod reminders;

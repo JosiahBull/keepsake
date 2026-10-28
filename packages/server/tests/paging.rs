@@ -43,6 +43,7 @@ async fn exposes_page_cursors_global_samples_and_validated_bounds() {
                 source: format!("https://example.org/{index}"),
                 tags: vec!["topic".into()],
                 practices: vec![],
+                media: vec![],
             },
         )
         .await
@@ -104,6 +105,7 @@ async fn searches_te_reo_with_either_case_of_url_encoded_macrons() {
             source: String::new(),
             tags: vec![],
             practices: vec![],
+            media: vec![],
         },
     )
     .await

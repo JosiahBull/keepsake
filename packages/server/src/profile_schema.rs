@@ -14,9 +14,15 @@ impl Modify for ProfilePaths {
     fn modify(&self, api: &mut OpenApi) {
         let paths = api.paths.paths.clone();
         for (path, mut item) in paths {
-            if !["/api/facts", "/api/practice", "/api/reviews", "/api/study/"]
-                .iter()
-                .any(|prefix| path.starts_with(prefix))
+            if ![
+                "/api/facts",
+                "/api/practice",
+                "/api/reviews",
+                "/api/study/",
+                "/api/media",
+            ]
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
             {
                 continue;
             }

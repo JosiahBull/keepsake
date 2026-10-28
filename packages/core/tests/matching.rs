@@ -26,6 +26,7 @@ fn fact(prompt: &str, answer: &str, tags: &[&str]) -> NewFact {
         source: String::new(),
         tags: tags.iter().map(|tag| (*tag).into()).collect(),
         practices: vec![],
+        media: vec![],
     }
 }
 

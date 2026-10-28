@@ -33,6 +33,12 @@ async fn legacy() -> (tempfile::TempDir, std::path::PathBuf, SqlitePool) {
             "0005_profiles.sql",
             include_str!("../migrations/0005_profiles.sql"),
         ),
+        // Repository code used to build the fixture reads question media. Adding
+        // that schema early still leaves household seeding to run afterwards.
+        (
+            "0009_question_media.sql",
+            include_str!("../migrations/0009_question_media.sql"),
+        ),
     ] {
         std::fs::write(migrations.join(name), sql).unwrap();
     }
@@ -319,6 +325,7 @@ async fn existing_named_people_settings_and_unrelated_libraries_are_preserved() 
             source: KAI_SOURCE.into(),
             tags: vec!["te-reo".into()],
             practices: vec![],
+            media: vec![],
         },
     )
     .await
@@ -414,8 +421,13 @@ async fn failed_seed_transaction_restores_original_owners_and_immutability_guard
         1
     );
     assert_eq!(count(&pool, "SELECT count(*) FROM facts").await, 1);
+    // The fixture already holds 0009; the failed seed must stop the run after 0006.
     assert_eq!(
-        count(&pool, "SELECT max(version) FROM _sqlx_migrations").await,
+        count(
+            &pool,
+            "SELECT max(version) FROM _sqlx_migrations WHERE version < 9"
+        )
+        .await,
         6
     );
     assert!(

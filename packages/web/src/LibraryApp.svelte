@@ -5,6 +5,7 @@
   import type { Snippet } from "svelte";
   import AppShell from "./AppShell.svelte";
   import LibraryHeading from "./LibraryHeading.svelte";
+  import QuestionMedia from "./QuestionMedia.svelte";
   import { preloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
@@ -64,6 +65,45 @@
   type StudySubmission = components["schemas"]["StudySubmission"];
   type StudyResult = components["schemas"]["StudyResult"];
   type ExposureSubmission = components["schemas"]["ExposureSubmission"];
+  type MediaUpload = components["schemas"]["MediaUpload"];
+  type Media = components["schemas"]["QuestionMedia"];
+
+  /** A file chosen for a new question. It is uploaded when the fact is saved. */
+  type Attachment = {
+    key: number;
+    name: string;
+    kind: Media["kind"];
+    type: string;
+    file: Blob;
+    preview: string;
+    alt: string;
+    upload?: MediaUpload;
+  };
+
+  // The server decodes every upload and refuses anything else; these mirror its limits
+  // so a file it would refuse is caught before it is sent.
+  const MAX_ATTACHMENTS = 4;
+  const MAX_MEDIA_BYTES = 5 * 1024 * 1024;
+  const MEDIA_TYPES: Record<string, string> = {
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    mp3: "audio/mpeg",
+    aac: "audio/aac",
+    m4a: "audio/mp4",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    oga: "audio/ogg",
+    opus: "audio/ogg",
+    webm: "audio/webm",
+    flac: "audio/flac",
+  };
+  const SUPPORTED_MEDIA =
+    "Use a JPEG, PNG or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip.";
+  // The server serves at most 2048 px and refuses uploads over 4096 px; phone photos are
+  // larger than both.
+  const IMAGE_EDGE = 2048;
 
   const modes: { id: Method; name: string; instruction: string }[] = [
     {
@@ -132,6 +172,8 @@
   let context = $state(initialDraft?.context ?? "");
   let source = $state(initialDraft?.source ?? "");
   let tags = $state("");
+  let attachments = $state<Attachment[]>([]);
+  let attachmentKey = 0;
 
   // Saves reach the server in order. The learner waits only for a save that must
   // precede what is shown next, such as the exposure before an answer.
@@ -213,7 +255,8 @@
       answer.trim() ||
       context.trim() ||
       source.trim() ||
-      tags.trim(),
+      tags.trim() ||
+      attachments.length,
     );
   });
 
@@ -228,6 +271,8 @@
     else if (initialView === "matching") void startMatching();
     else void loadFacts();
     return () => {
+      for (const attachment of attachments)
+        URL.revokeObjectURL(attachment.preview);
       clearTimeout(searchTimer);
       controller.abort();
       libraryRequest += 1;
@@ -330,6 +375,121 @@
     }
   }
 
+  function mediaType(file: File): string | undefined {
+    const declared = file.type.split(";")[0].trim().toLowerCase();
+    if (Object.values(MEDIA_TYPES).includes(declared)) return declared;
+    if (declared === "audio/x-m4a") return "audio/mp4";
+    if (declared === "audio/x-wav" || declared === "audio/wave") return "audio/wav";
+    return MEDIA_TYPES[file.name.split(".").pop()?.toLowerCase() ?? ""];
+  }
+
+  /**
+   * Scale a large photo down and re-encode it as JPEG before uploading. The server turns
+   * it into AVIF, so this JPEG is a high-quality intermediate.
+   */
+  async function prepareImage(file: File, type: string): Promise<[Blob, string]> {
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch {
+      // The server explains a file the browser cannot read.
+      return [file, type];
+    }
+    const scale = Math.min(1, IMAGE_EDGE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size <= 1_500_000) {
+      bitmap.close();
+      return [file, type];
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) {
+      bitmap.close();
+      return [file, type];
+    }
+    // JPEG has no transparency.
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
+    );
+    return blob ? [blob, "image/jpeg"] : [file, type];
+  }
+
+  async function chooseMedia(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = "";
+    error = "";
+    for (const file of files) {
+      if (attachments.length >= MAX_ATTACHMENTS) {
+        error = `A question can have up to ${MAX_ATTACHMENTS} images or clips.`;
+        break;
+      }
+      const declared = mediaType(file);
+      if (!declared) {
+        error = `${file.name} is not a supported file. ${SUPPORTED_MEDIA}`;
+        continue;
+      }
+      const kind = declared.startsWith("image/") ? "image" : "audio";
+      const [blob, type] =
+        kind === "image" ? await prepareImage(file, declared) : [file, declared];
+      if (blob.size > MAX_MEDIA_BYTES) {
+        error = `${file.name} is larger than 5 MB.`;
+        continue;
+      }
+      attachments.push({
+        key: ++attachmentKey,
+        name: file.name,
+        kind,
+        type,
+        file: blob,
+        preview: URL.createObjectURL(blob),
+        alt: "",
+      });
+    }
+  }
+
+  function removeAttachment(key: number) {
+    const attachment = attachments.find((item) => item.key === key);
+    if (attachment) URL.revokeObjectURL(attachment.preview);
+    attachments = attachments.filter((item) => item.key !== key);
+  }
+
+  async function uploadAttachment(attachment: Attachment): Promise<MediaUpload> {
+    if (attachment.upload) return attachment.upload;
+    try {
+      const upload = unwrap(
+        await api.POST("/api/media", {
+          // The server checks the bytes against this declared type.
+          headers: { "content-type": attachment.type },
+          body: attachment.file as unknown as string,
+          bodySerializer: (body: unknown) => body as BodyInit,
+        }),
+      );
+      attachment.upload = upload;
+      return upload;
+    } catch (caught) {
+      throw new Error(`${attachment.name}: ${message(caught)}`);
+    }
+  }
+
+  function describeMedia(media: Media[]): string {
+    const count = (kind: Media["kind"], one: string, many: string) => {
+      const total = media.filter((item) => item.kind === kind).length;
+      return total ? `${total} ${total === 1 ? one : many}` : "";
+    };
+    return [
+      count("image", "image", "images"),
+      count("audio", "audio clip", "audio clips"),
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+
   async function addFact(event: SubmitEvent) {
     event.preventDefault();
     saving = true;
@@ -348,9 +508,16 @@
         }
       }
 
+      const media = [];
+      for (const attachment of attachments) {
+        const upload = await uploadAttachment(attachment);
+        media.push({ media_id: upload.media_id, alt: attachment.alt.trim() });
+      }
+
       unwrap(
         await api.POST("/api/facts", {
           body: {
+            media,
             prompt: prompt.trim(),
             answer: answer.trim(),
             context: context.trim(),
@@ -365,6 +532,9 @@
       );
 
       showAdd = false;
+      for (const attachment of attachments)
+        URL.revokeObjectURL(attachment.preview);
+      attachments = [];
       prompt = "";
       answer = "";
       context = "";
@@ -1040,6 +1210,44 @@
             <textarea bind:value={answer} required maxlength="20000" rows="3"
             ></textarea>
           </label>
+          <div class="media-field">
+            <label>
+              Images and audio
+              <span class="optional">optional · up to 4 · 5 MB each</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,audio/*"
+                multiple
+                disabled={attachments.length >= MAX_ATTACHMENTS || saving}
+                onchange={chooseMedia}
+              />
+            </label>
+            {#each attachments as attachment (attachment.key)}
+              <div class="attachment">
+                {#if attachment.kind === "image"}
+                  <img src={attachment.preview} alt="" />
+                  <label>
+                    Describe the image
+                    <span class="optional">for screen readers; do not give away the answer</span>
+                    <input bind:value={attachment.alt} maxlength="500" />
+                  </label>
+                {:else}
+                  <audio
+                    controls
+                    src={attachment.preview}
+                    aria-label={attachment.name}
+                  ></audio>
+                {/if}
+                <button
+                  type="button"
+                  class="text-button"
+                  disabled={saving}
+                  onclick={() => removeAttachment(attachment.key)}
+                  >Remove {attachment.name}</button
+                >
+              </div>
+            {/each}
+          </div>
           <details
             class="form-details"
             open={Boolean(initialDraft?.context || initialDraft?.source)}
@@ -1131,9 +1339,13 @@
             >
               <summary onclick={() => clearDisclosure(fact.id)}>
                 <h2>{fact.prompt}</h2>
+                {#if fact.media.length}<span class="media-note"
+                    >{describeMedia(fact.media)}</span
+                  >{/if}
               </summary>
               {#if disclosedFacts.includes(fact.id)}
                 <div class="fact-body">
+                  <QuestionMedia profileId={profileId} media={fact.media} />
                   <p class="answer-copy">{fact.answer}</p>
 
                   {#if fact.context}
@@ -1235,6 +1447,7 @@
             {selectedMode?.name} · {cursor + 1} of {queue.length}
           </p>
           <h2 class="question">{current.practice.prompt}</h2>
+          <QuestionMedia profileId={profileId} media={current.fact.media} />
 
           {#if mode === "multiple_choice"}
             {#if choicesReady}
@@ -1478,41 +1691,58 @@
             <h2>Questions</h2>
 
             {#each matchFacts as fact}
-              <button
-                class="match-tile"
-                class:selected={selectedPrompt === fact.id}
-                class:matched={matched.includes(fact.id)}
-                disabled={matched.includes(fact.id) || pendingMatch !== null}
-                onclick={() => choosePrompt(fact.id)}
-              >
-                {#if matched.includes(fact.id)}
-                  <span aria-label="Matched">✓</span>
-                {/if}
-                {fact.prompt}
-              </button>
+              <div class="match-item">
+                <button
+                  class="match-tile"
+                  class:selected={selectedPrompt === fact.id}
+                  class:matched={matched.includes(fact.id)}
+                  disabled={matched.includes(fact.id) || pendingMatch !== null}
+                  onclick={() => choosePrompt(fact.id)}
+                >
+                  {#if matched.includes(fact.id)}
+                    <span aria-label="Matched">✓</span>
+                  {/if}
+                  {fact.prompt}
+                  <QuestionMedia
+                    profileId={profileId}
+                    media={fact.media}
+                    only="image"
+                    compact
+                  />
+                </button>
+                <!-- A player cannot sit inside a button, so clips follow their tile. -->
+                <QuestionMedia
+                  profileId={profileId}
+                  media={fact.media}
+                  only="audio"
+                  compact
+                />
+              </div>
             {/each}
           </div>
           <div>
             <h2>Answers</h2>
 
             {#each matchAnswers as fact}
-              <button
-                class="match-tile"
-                class:wrong={selectedAnswer === fact.id &&
-                  selectedAnswer !== selectedPrompt}
-                class:selected={selectedAnswer === fact.id &&
-                  selectedAnswer === selectedPrompt}
-                class:matched={matched.includes(fact.id)}
-                disabled={matched.includes(fact.id) ||
-                  selectedPrompt === null ||
-                  pendingMatch !== null}
-                onclick={() => chooseAnswer(fact.id)}
-              >
-                {#if matched.includes(fact.id)}
-                  <span aria-label="Matched">✓</span>
-                {/if}
-                {fact.answer}
-              </button>
+              <div class="match-item">
+                <button
+                  class="match-tile"
+                  class:wrong={selectedAnswer === fact.id &&
+                    selectedAnswer !== selectedPrompt}
+                  class:selected={selectedAnswer === fact.id &&
+                    selectedAnswer === selectedPrompt}
+                  class:matched={matched.includes(fact.id)}
+                  disabled={matched.includes(fact.id) ||
+                    selectedPrompt === null ||
+                    pendingMatch !== null}
+                  onclick={() => chooseAnswer(fact.id)}
+                >
+                  {#if matched.includes(fact.id)}
+                    <span aria-label="Matched">✓</span>
+                  {/if}
+                  {fact.answer}
+                </button>
+              </div>
             {/each}
           </div>
         </div>
@@ -1858,6 +2088,64 @@
     margin-left: 0.4rem;
   }
 
+  .media-field {
+    display: grid;
+    gap: 0.8rem;
+  }
+
+  .media-field input[type="file"] {
+    display: block;
+    margin-top: 0.4rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #52685d;
+    /* iOS zooms into a focused field whose text is smaller than 16px. */
+    font-size: 1rem;
+    font-weight: 400;
+  }
+
+  .media-field input[type="file"]::file-selector-button {
+    font: inherit;
+    font-weight: 600;
+    color: #244c44;
+    background: transparent;
+    border: 1px solid #c0d0c7;
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem;
+    margin-right: 0.8rem;
+    cursor: pointer;
+  }
+
+  .attachment {
+    display: grid;
+    gap: 0.5rem;
+    justify-items: start;
+    padding: 0.8rem;
+    border: 1px solid #dbe5df;
+    border-radius: 8px;
+  }
+
+  .attachment img {
+    max-height: 8rem;
+    max-width: 100%;
+    border-radius: 6px;
+  }
+
+  .attachment audio {
+    width: min(100%, 26rem);
+  }
+
+  .attachment label {
+    width: 100%;
+  }
+
+  .media-note {
+    color: #64786c;
+    font-size: 0.82rem;
+    margin-left: 0.5rem;
+  }
+
   .form-pair {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2096,11 +2384,14 @@
     color: #52685d;
   }
 
+  .match-item {
+    margin-bottom: 0.75rem;
+  }
+
   .match-tile {
     display: block;
     width: 100%;
     padding: 1rem;
-    margin-bottom: 0.75rem;
     min-height: 95px;
     text-align: left;
     line-height: 1.5;

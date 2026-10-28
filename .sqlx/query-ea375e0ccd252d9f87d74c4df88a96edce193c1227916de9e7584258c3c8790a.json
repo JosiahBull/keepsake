@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM media\n         WHERE profile_id=? AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')\n           AND NOT EXISTS (SELECT 1 FROM fact_media WHERE media_id=media.id)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ea375e0ccd252d9f87d74c4df88a96edce193c1227916de9e7584258c3c8790a"
+}

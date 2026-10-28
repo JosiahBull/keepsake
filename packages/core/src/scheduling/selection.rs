@@ -75,22 +75,34 @@ pub async fn queue_at_for(
         )
         .fetch_one(&mut *transaction)
         .await?;
-        let practice = fact
-            .practices
+        let crate::facts::Fact {
+            id: fact_id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags,
+            created_at,
+            practices,
+            shared_by,
+            media,
+        } = fact;
+        let practice = practices
             .into_iter()
             .find(|practice| practice.id == practice_id)
             .context("scheduled practice missing")?;
         let transitions = transitions(&schedule, &settings, now)?;
         items.push(StudyQuestion {
             fact: crate::paging::FactSummary {
-                shared_by: fact.shared_by,
-                id: fact.id,
-                prompt: fact.prompt,
-                answer: fact.answer,
-                context: fact.context,
-                source: fact.source,
-                tags: fact.tags,
-                created_at: fact.created_at,
+                id: fact_id,
+                prompt,
+                answer,
+                context,
+                source,
+                tags,
+                created_at,
+                shared_by,
+                media,
             },
             practice,
             target_id: id,

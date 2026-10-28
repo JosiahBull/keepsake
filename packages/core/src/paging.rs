@@ -5,6 +5,7 @@ use sqlx::SqlitePool;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::facts::{FactRow, Practice, PracticeRow, Review};
+use crate::media::QuestionMedia;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct FactSummary {
@@ -17,21 +18,33 @@ pub struct FactSummary {
     pub created_at: String,
     #[serde(default)]
     pub shared_by: Option<String>,
+    /// Images and audio clips asked with the question, in display order.
+    pub media: Vec<QuestionMedia>,
 }
 
 impl TryFrom<FactRow> for FactSummary {
     type Error = anyhow::Error;
 
     fn try_from(row: FactRow) -> anyhow::Result<Self> {
+        let FactRow {
+            id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags,
+            created_at,
+        } = row;
         Ok(Self {
             shared_by: None,
-            id: row.id,
-            prompt: row.prompt,
-            answer: row.answer,
-            context: row.context,
-            source: row.source,
-            tags: serde_json::from_str(&row.tags)?,
-            created_at: row.created_at,
+            media: Vec::new(),
+            id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags: serde_json::from_str(&tags)?,
+            created_at,
         })
     }
 }
@@ -311,14 +324,23 @@ pub async fn reviews_for(
     let items = rows
         .into_iter()
         .map(|row| {
+            let ReviewRow {
+                id,
+                fact_id,
+                practice_id,
+                method,
+                outcome,
+                response_ms,
+                reviewed_at,
+            } = row;
             Ok(Review {
-                id: row.id,
-                fact_id: row.fact_id,
-                practice_id: row.practice_id,
-                method: serde_json::from_value(serde_json::Value::String(row.method))?,
-                outcome: serde_json::from_value(serde_json::Value::String(row.outcome))?,
-                response_ms: row.response_ms,
-                reviewed_at: row.reviewed_at,
+                id,
+                fact_id,
+                practice_id,
+                method: serde_json::from_value(serde_json::Value::String(method))?,
+                outcome: serde_json::from_value(serde_json::Value::String(outcome))?,
+                response_ms,
+                reviewed_at,
             })
         })
         .collect::<anyhow::Result<_>>()?;
@@ -426,7 +448,8 @@ pub(crate) async fn enrich_summary(
          WHERE s.accepted_fact_id=? AND s.status='accepted' LIMIT 1",
     )
     .bind(fact.id)
-    .fetch_optional(connection)
+    .fetch_optional(&mut *connection)
     .await?;
+    fact.media = crate::media::for_fact(connection, fact.id).await?;
     Ok(())
 }

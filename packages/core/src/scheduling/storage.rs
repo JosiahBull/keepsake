@@ -3,6 +3,8 @@ use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use chrono_tz::Tz;
 use sqlx::{SqliteConnection, SqlitePool};
 
+use crate::facts::{PracticeKind, ReviewMethod};
+
 use super::{
     models::{conflict, invalid},
     *,
@@ -184,7 +186,7 @@ pub async fn approve_practice_for(
             .await?
             .ok_or_else(|| StudyError::Missing("Practice not found".into()))?;
             invalid(
-                matches!(mapping.kind.as_str(), "flashcard" | "cloze"),
+                ReviewMethod::from(PracticeKind::parse(&mapping.kind)?).assesses_recall(),
                 "Only recall or cloze prompts can assess this recall target",
             )?;
             invalid(

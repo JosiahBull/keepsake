@@ -53,6 +53,7 @@ fn fact(prompt: &str, answer: &str) -> NewFact {
         source: "https://example.com/source".into(),
         tags: vec!["food".into()],
         practices: vec![],
+        media: vec![],
     }
 }
 async fn add(pool: &sqlx::SqlitePool, owner: i64, prompt: &str, answer: &str) -> facts::Fact {

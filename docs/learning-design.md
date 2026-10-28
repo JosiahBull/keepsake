@@ -46,6 +46,27 @@ points, speed, or random paraphrasing improve long-term retention. An enjoyable
 activity can support engagement while leaving delayed recall unchanged. Measure
 engagement, unaided recall, and application separately.
 
+## Ask with pictures and sound
+
+A question can show images or play audio clips: name a bird from its photo or its call,
+or recognise a te reo Māori word by ear. The saved research does not study images or
+audio in prompts, so this is a design proposal. It draws on two points the research does
+make. A response should resemble the ability you want, such as producing a foreign
+phrase. Varying retrieval cues helps access knowledge from different contexts, which the
+research rates as promising experimental evidence, measured over delays of up to 24 hours.
+It rates diagrams as conditional: useful when the representation shows spatial,
+structural or causal relationships.
+
+Media belongs to the question, never the answer. The learner still attempts an answer
+before revealing it, and scheduled recall records the same evidence as for a text
+question. An image description is read to screen-reader users, so it should say what is
+shown without naming the answer. Matching treats the same words asked of different
+pictures as different questions, so a bank of pictures can be matched by sight.
+
+The research does not establish that a picture or a sound improves retention of a fact,
+or that recall from a picture transfers to recall from words. If you need both, keep a
+text-only fact as well.
+
 ## Keep sounds neutral about ratings
 
 Every rating makes the same sound. A rewarding sound for Good or Easy would reward the

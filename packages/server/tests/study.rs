@@ -78,6 +78,7 @@ async fn library() -> (tempfile::TempDir, sqlx::SqlitePool, Router, facts::Fact)
                     explanation: String::new(),
                 },
             ],
+            media: vec![],
         },
     )
     .await

@@ -16,6 +16,7 @@ fn fact() -> NewFact {
         source: String::new(),
         tags: vec![],
         practices: vec![],
+        media: vec![],
     }
 }
 

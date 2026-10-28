@@ -100,6 +100,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/practice": {
         parameters: {
             query?: never;
@@ -230,6 +262,42 @@ export interface paths {
             cookie?: never;
         };
         get: operations["profile_reviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["profile_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/media/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["profile_download"];
         put?: never;
         post?: never;
         delete?: never;
@@ -703,6 +771,8 @@ export interface components {
             created_at: string;
             /** Format: int64 */
             id: number;
+            /** @description Images and audio clips asked with the question, in display order. */
+            media: components["schemas"]["QuestionMedia"][];
             practices: components["schemas"]["Practice"][];
             prompt: string;
             shared_by?: string | null;
@@ -725,6 +795,8 @@ export interface components {
             created_at: string;
             /** Format: int64 */
             id: number;
+            /** @description Images and audio clips asked with the question, in display order. */
+            media: components["schemas"]["QuestionMedia"][];
             prompt: string;
             shared_by?: string | null;
             source: string;
@@ -732,6 +804,32 @@ export interface components {
         };
         Health: {
             status: string;
+        };
+        /** @enum {string} */
+        MediaKind: "image" | "audio";
+        /**
+         * @description A stored file, before or after it is attached to a question. Describes what is
+         *     served: AVIF for images and AAC in MP4 for clips.
+         */
+        MediaUpload: {
+            /** Format: int64 */
+            byte_size: number;
+            content_type: string;
+            /**
+             * Format: int64
+             * @description Clips only.
+             */
+            duration_ms?: number | null;
+            /** Format: int64 */
+            height?: number | null;
+            kind: components["schemas"]["MediaKind"];
+            /** Format: int64 */
+            media_id: number;
+            /**
+             * Format: int64
+             * @description Images only.
+             */
+            width?: number | null;
         };
         /** @description The endpoint and keys of a browser's PushSubscription. */
         NewDevice: {
@@ -741,6 +839,11 @@ export interface components {
         NewFact: {
             answer: string;
             context?: string;
+            /**
+             * @description Uploaded images and audio clips asked with the question, in display order.
+             *     Omitted when empty, so share snapshots of text-only facts are unchanged.
+             */
+            media?: components["schemas"]["NewQuestionMedia"][];
             practices?: components["schemas"]["NewPractice"][];
             prompt: string;
             source?: string;
@@ -756,6 +859,13 @@ export interface components {
         NewProfile: {
             handle: string;
             name: string;
+        };
+        /** @description An upload to attach to a new fact's question, in display order. */
+        NewQuestionMedia: {
+            /** @description Describes an image for screen readers without giving away the answer. */
+            alt?: string;
+            /** Format: int64 */
+            media_id: number;
         };
         NewReview: {
             /** Format: int64 */
@@ -800,6 +910,22 @@ export interface components {
         PushKey: {
             /** @description The VAPID application server key, base64url-encoded. */
             public_key: string;
+        };
+        /** @description An image or clip shown with a question. Fetch its bytes from `/media/{media_id}`. */
+        QuestionMedia: {
+            alt: string;
+            /** Format: int64 */
+            byte_size: number;
+            content_type: string;
+            /** Format: int64 */
+            duration_ms?: number | null;
+            /** Format: int64 */
+            height?: number | null;
+            kind: components["schemas"]["MediaKind"];
+            /** Format: int64 */
+            media_id: number;
+            /** Format: int64 */
+            width?: number | null;
         };
         RatingIntervals: {
             /** Format: int64 */
@@ -1387,6 +1513,131 @@ export interface operations {
             };
         };
     };
+    upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4. */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUpload"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            416: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     practice: {
         parameters: {
             query?: {
@@ -1900,6 +2151,152 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    profile_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4. */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUpload"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Profile or item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    profile_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Invalid profile or request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            416: {
                 headers: {
                     [name: string]: unknown;
                 };

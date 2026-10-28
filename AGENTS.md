@@ -17,3 +17,26 @@ and preserve its evidence limitations. Verify time-sensitive software and benchm
 claims before presenting them as current. Explain how learning recommendations follow
 from the research; identify proposals that go beyond it.
 Do not start Docker or OrbStack. Develop and verify directly on the host.
+
+## Rust
+
+Match exhaustively, so a new variant or field is a compile error to resolve rather than
+a case silently mishandled:
+
+- Every `match` on an enum this workspace defines names every variant. Do not use a
+  `_` arm, `matches!` or `==` against a single variant to classify one: give the enum a
+  method with an exhaustive `match`, and call that.
+- When converting one struct into another, destructure the source and name every field,
+  binding the ones the target does not need to `_`. Do not use `..` to skip fields.
+- Enums from other crates follow the same rule, except those marked
+  `#[non_exhaustive]`, which require a wildcard. Wildcards are fine for strings, numbers
+  and bytes.
+
+Iterate over an enum's variants with strum's `EnumIter` (`Kind::iter()`), never a
+hand-written list, so a new variant joins every loop and test that covers them all.
+
+Model a closed set of values as an enum, not a string. Parse text into the enum where it
+enters (an HTTP header, a SQL column, a file name) and turn it back into text only where
+it leaves. Likewise hold lengths of time as `std::time::Duration`, converting to
+milliseconds or seconds only at the API or database.
+

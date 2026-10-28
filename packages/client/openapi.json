@@ -467,6 +467,174 @@
         }
       }
     },
+    "/api/media": {
+      "post": {
+        "tags": [
+          "media_api"
+        ],
+        "operationId": "upload",
+        "requestBody": {
+          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "A file's raw bytes, as the OpenAPI document describes them."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/{id}": {
+      "get": {
+        "tags": [
+          "media_api"
+        ],
+        "operationId": "download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A file's raw bytes, as the OpenAPI document describes them."
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A file's raw bytes, as the OpenAPI document describes them."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/practice": {
       "get": {
         "tags": [
@@ -1220,6 +1388,216 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/{profile_id}/media": {
+      "parameters": [
+        {
+          "name": "profile_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "media_api"
+        ],
+        "operationId": "profile_upload",
+        "requestBody": {
+          "description": "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: a still JPEG, PNG or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Images are stored as AVIF, at most 2048 pixels on the long edge, and clips as AAC in MP4.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "A file's raw bytes, as the OpenAPI document describes them."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaUpload"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile or item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/profiles/{profile_id}/media/{id}": {
+      "parameters": [
+        {
+          "name": "profile_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "media_api"
+        ],
+        "operationId": "profile_download",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A file's raw bytes, as the OpenAPI document describes them."
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "description": "A file's raw bytes, as the OpenAPI document describes them."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid profile or request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "416": {
             "description": "",
             "content": {
               "application/json": {
@@ -3615,7 +3993,8 @@
           "source",
           "tags",
           "created_at",
-          "practices"
+          "practices",
+          "media"
         ],
         "properties": {
           "answer": {
@@ -3630,6 +4009,13 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionMedia"
+            },
+            "description": "Images and audio clips asked with the question, in display order."
           },
           "practices": {
             "type": "array",
@@ -3706,7 +4092,8 @@
           "context",
           "source",
           "tags",
-          "created_at"
+          "created_at",
+          "media"
         ],
         "properties": {
           "answer": {
@@ -3721,6 +4108,13 @@
           "id": {
             "type": "integer",
             "format": "int64"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QuestionMedia"
+            },
+            "description": "Images and audio clips asked with the question, in display order."
           },
           "prompt": {
             "type": "string"
@@ -3753,6 +4147,62 @@
           }
         }
       },
+      "MediaKind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "audio"
+        ]
+      },
+      "MediaUpload": {
+        "type": "object",
+        "description": "A stored file, before or after it is attached to a question. Describes what is\nserved: AVIF for images and AAC in MP4 for clips.",
+        "required": [
+          "media_id",
+          "kind",
+          "content_type",
+          "byte_size"
+        ],
+        "properties": {
+          "byte_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Clips only."
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaKind"
+          },
+          "media_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Images only."
+          }
+        }
+      },
       "NewDevice": {
         "type": "object",
         "description": "The endpoint and keys of a browser's PushSubscription.",
@@ -3782,6 +4232,13 @@
           },
           "context": {
             "type": "string"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NewQuestionMedia"
+            },
+            "description": "Uploaded images and audio clips asked with the question, in display order.\nOmitted when empty, so share snapshots of text-only facts are unchanged."
           },
           "practices": {
             "type": "array",
@@ -3845,6 +4302,24 @@
           },
           "name": {
             "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewQuestionMedia": {
+        "type": "object",
+        "description": "An upload to attach to a new fact's question, in display order.",
+        "required": [
+          "media_id"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string",
+            "description": "Describes an image for screen readers without giving away the answer."
+          },
+          "media_id": {
+            "type": "integer",
+            "format": "int64"
           }
         },
         "additionalProperties": false
@@ -4003,6 +4478,57 @@
           "public_key": {
             "type": "string",
             "description": "The VAPID application server key, base64url-encoded."
+          }
+        }
+      },
+      "QuestionMedia": {
+        "type": "object",
+        "description": "An image or clip shown with a question. Fetch its bytes from `/media/{media_id}`.",
+        "required": [
+          "media_id",
+          "kind",
+          "content_type",
+          "byte_size",
+          "alt"
+        ],
+        "properties": {
+          "alt": {
+            "type": "string"
+          },
+          "byte_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "height": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MediaKind"
+          },
+          "media_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "width": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           }
         }
       },

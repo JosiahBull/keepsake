@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT EXISTS(SELECT 1 FROM media WHERE id=? AND profile_id=?) AS \"owned!: bool\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "owned!: bool",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6bdad05ae1f10f9aafd8b176ca31c0c557afe2030b2718ac7a014e45560f5670"
+}

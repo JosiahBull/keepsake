@@ -5,7 +5,8 @@ use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
-    facts::{NewFact, NewPractice},
+    facts::{Fact, NewFact, NewPractice, Practice},
+    media::{NewQuestionMedia, QuestionMedia},
     scheduling::StudyError,
 };
 
@@ -123,23 +124,58 @@ async fn snapshot_fact(
     let fact = crate::facts::load_id(connection, fact_id)
         .await?
         .context("owned fact missing")?;
+    // Every field is named, so a new one cannot be left out of offers unnoticed.
+    let Fact {
+        id: _,
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
+        created_at: _,
+        practices,
+        shared_by: _,
+        media,
+    } = fact;
+    let practice = |practice: Practice| {
+        let Practice {
+            id: _,
+            fact_id: _,
+            kind,
+            prompt,
+            answer,
+            choices,
+            explanation,
+        } = practice;
+        NewPractice {
+            kind,
+            prompt,
+            answer,
+            choices,
+            explanation,
+        }
+    };
+    let attached = |media: QuestionMedia| {
+        let QuestionMedia {
+            media_id,
+            kind: _,
+            content_type: _,
+            byte_size: _,
+            width: _,
+            height: _,
+            duration_ms: _,
+            alt,
+        } = media;
+        NewQuestionMedia { media_id, alt }
+    };
     let snapshot = NewFact {
-        prompt: fact.prompt,
-        answer: fact.answer,
-        context: fact.context,
-        source: fact.source,
-        tags: fact.tags,
-        practices: fact
-            .practices
-            .into_iter()
-            .map(|practice| NewPractice {
-                kind: practice.kind,
-                prompt: practice.prompt,
-                answer: practice.answer,
-                choices: practice.choices,
-                explanation: practice.explanation,
-            })
-            .collect(),
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
+        practices: practices.into_iter().map(practice).collect(),
+        media: media.into_iter().map(attached).collect(),
     };
     validate_snapshot(&snapshot)?;
     Ok(snapshot)
@@ -377,8 +413,13 @@ async fn accept_one(
     let json = sqlx::query_scalar!("SELECT snapshot_json FROM fact_shares WHERE id=?", id)
         .fetch_one(&mut *connection)
         .await?;
-    let snapshot: NewFact = serde_json::from_str(&json)?;
+    let mut snapshot: NewFact = serde_json::from_str(&json)?;
     validate_snapshot(&snapshot)?;
+    // The snapshot names the sender's files; the copy owns its own.
+    for media in &mut snapshot.media {
+        media.media_id =
+            crate::media::copy(connection, share.sender_id, media.media_id, profile_id).await?;
+    }
     let fact = crate::facts::insert_fact(connection, profile_id, snapshot).await?;
 
     // Approval is personal: only one canonical recall prompt starts eligible.
