@@ -54,6 +54,8 @@ on, with the command for Claude Code:
 claude mcp add --transport http keepsake-ansam http://127.0.0.1:8080/mcp/ansam
 ```
 
+![Agent access in profile settings, set to Read only, with the endpoint and the Claude Code command](screenshots/agent-access.png)
+
 An agent reaches only that profile's library; there is no profile argument to get wrong.
 Handles never change, so the address stays valid.
 
