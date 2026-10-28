@@ -102,7 +102,8 @@
   };
   const SUPPORTED_MEDIA =
     "Use a JPEG, PNG, GIF or WebP image, or an MP3, M4A, AAC, WAV, Ogg, WebM or FLAC clip.";
-  // Phone photos are far larger than a question needs; the server refuses over 4096 px.
+  // The server serves at most 2048 px and refuses uploads over 4096 px; phone photos are
+  // larger than both.
   const IMAGE_EDGE = 2048;
 
   const modes: { id: Method; name: string; instruction: string }[] = [
@@ -383,7 +384,10 @@
     return MEDIA_TYPES[file.name.split(".").pop()?.toLowerCase() ?? ""];
   }
 
-  /** Scale a large photo down and re-encode it as JPEG. GIFs keep their animation. */
+  /**
+   * Scale a large photo down and re-encode it as JPEG before uploading. The server turns
+   * it into AVIF, so this JPEG is a high-quality intermediate. GIFs keep their animation.
+   */
   async function prepareImage(file: File, type: string): Promise<[Blob, string]> {
     if (type === "image/gif") return [file, type];
     let bitmap: ImageBitmap;
@@ -412,7 +416,7 @@
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", 0.85),
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
     );
     return blob ? [blob, "image/jpeg"] : [file, type];
   }

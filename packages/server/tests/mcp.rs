@@ -307,7 +307,7 @@ async fn writing_saves_checked_facts_with_media_and_refuses_bad_drafts_whole() {
 
     let shown = call(&app, "default", "get_fact", json!({"fact_id": stored.id})).await;
     assert!(
-        text(&shown).contains("| image | image/png | 1×1 px | A dark bird |"),
+        text(&shown).contains("| image | image/avif | 1×1 px | A dark bird |"),
         "{shown}"
     );
     let image = call(
@@ -317,9 +317,14 @@ async fn writing_saves_checked_facts_with_media_and_refuses_bad_drafts_whole() {
         json!({"media_id": stored.media[0].media_id}),
     )
     .await;
+    // Returned as the learner is served it.
     assert_eq!(image["result"]["content"][0]["type"], "image");
-    assert_eq!(image["result"]["content"][0]["mimeType"], "image/png");
-    assert_eq!(image["result"]["content"][0]["data"], png);
+    assert_eq!(image["result"]["content"][0]["mimeType"], "image/avif");
+    let served = {
+        use base64ct::{Base64, Encoding};
+        Base64::decode_vec(image["result"]["content"][0]["data"].as_str().unwrap()).unwrap()
+    };
+    assert_eq!(&served[4..12], b"ftypavif");
 
     let added = call(
         &app,

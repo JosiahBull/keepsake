@@ -24,7 +24,7 @@ pub(crate) async fn sample(
     let rows = sqlx::query!(
         "WITH normalized AS (
            SELECT id, (prompt || coalesce(char(31) || (
-             SELECT group_concat(m.sha256, ',' ORDER BY fm.position)
+             SELECT group_concat(m.file_sha256, ',' ORDER BY fm.position)
              FROM fact_media fm JOIN media m ON m.id = fm.media_id WHERE fm.fact_id = facts.id
            ), '')) COLLATE NOCASE AS prompt_key, answer COLLATE NOCASE AS answer_key
            FROM facts WHERE profile_id = ?

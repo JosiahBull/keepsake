@@ -1,12 +1,16 @@
 use axum::{
     Json,
-    body::{Body, Bytes},
-    extract::{Path, State},
+    body::Body,
+    extract::{Path, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use keepsake_core::media::{self, MediaUpload};
+use http_body_util::BodyExt;
+use keepsake_core::media::{self, MediaFiles, MediaUpload};
 use sqlx::SqlitePool;
+use tokio::io::AsyncWriteExt;
+use tower::ServiceExt;
+use tower_http::services::ServeFile;
 
 use crate::{
     facts_api::{ApiError, ErrorBody},
@@ -17,28 +21,35 @@ use crate::{
 #[derive(Clone, Copy)]
 pub(crate) struct Immutable;
 
-/// Room for the largest file plus nothing else; uploads are a raw body, not a form.
-pub(crate) const UPLOAD_LIMIT: usize = media::MAX_MEDIA_BYTES;
-
 /// A file's raw bytes, as the OpenAPI document describes them.
 #[derive(utoipa::ToSchema)]
 #[schema(value_type = String, format = Binary)]
 pub struct FileBytes(#[allow(dead_code)] Vec<u8>);
 
+fn too_large() -> ApiError {
+    ApiError::new(
+        StatusCode::PAYLOAD_TOO_LARGE,
+        "Files must be 5 MiB or smaller",
+    )
+}
+
 #[utoipa::path(post, path = "/api/media",
     request_body(content = inline(FileBytes), content_type = "application/octet-stream",
         description = "The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. \
-            The file must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, \
-            or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB."),
+            It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, \
+            or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. \
+            Still images are stored as AVIF, at most 2048 pixels on the long edge; \
+            animations as uploaded; clips as AAC in MP4."),
     responses(
         (status = 201, body = MediaUpload), (status = 400, body = ErrorBody),
-        (status = 409, body = ErrorBody), (status = 413, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+        (status = 409, body = ErrorBody), (status = 413, body = ErrorBody),
+        (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
     ))]
 pub async fn upload(
     State(pool): State<SqlitePool>,
     Actor(profile_id): Actor,
     headers: HeaderMap,
-    body: Bytes,
+    body: Body,
 ) -> Result<(StatusCode, Json<MediaUpload>), ApiError> {
     // The declared type is checked against the bytes, never trusted on its own.
     let declared = headers
@@ -49,11 +60,49 @@ pub async fn upload(
                 StatusCode::BAD_REQUEST,
                 "Send the file's type in the Content-Type header",
             )
-        })?;
-    let saved = media::upload(&pool, profile_id, declared, body.to_vec())
+        })?
+        .to_owned();
+    if headers
+        .get(header::CONTENT_LENGTH)
+        .and_then(|value| value.to_str().ok()?.parse::<usize>().ok())
+        .is_some_and(|length| length > media::MAX_MEDIA_BYTES)
+    {
+        return Err(too_large());
+    }
+    let bytes = receive(&pool, body).await?;
+    let saved = media::upload(&pool, profile_id, &declared, bytes)
         .await
         .map_err(ApiError::internal)?;
     Ok((StatusCode::CREATED, Json(saved)))
+}
+
+/// Write the body into `tmp/` as it arrives, refusing it once it passes the size limit.
+/// The partial file is removed when this returns, whatever happens.
+async fn receive(pool: &SqlitePool, mut body: Body) -> Result<Vec<u8>, ApiError> {
+    let storage = |error: std::io::Error| ApiError::internal(error.into());
+    let (file, path) = MediaFiles::for_pool(pool)
+        .partial_upload()
+        .map_err(storage)?
+        .into_parts();
+    let mut file = tokio::fs::File::from_std(file);
+    let mut received = 0usize;
+    while let Some(frame) = body.frame().await {
+        let frame = frame
+            .map_err(|_| ApiError::new(StatusCode::BAD_REQUEST, "The upload was interrupted"))?;
+        let Ok(chunk) = frame.into_data() else {
+            continue;
+        };
+        received += chunk.len();
+        if received > media::MAX_MEDIA_BYTES {
+            return Err(too_large());
+        }
+        file.write_all(&chunk).await.map_err(storage)?;
+    }
+    file.flush().await.map_err(storage)?;
+    drop(file);
+    let bytes = tokio::fs::read(&path).await.map_err(storage)?;
+    drop(path);
+    Ok(bytes)
 }
 
 #[utoipa::path(get, path = "/api/media/{id}", params(("id" = i64, Path)), responses(
@@ -66,117 +115,30 @@ pub async fn download(
     State(pool): State<SqlitePool>,
     Actor(profile_id): Actor,
     Path(ItemPath { id }): Path<ItemPath>,
-    headers: HeaderMap,
+    request: Request,
 ) -> Result<Response, ApiError> {
-    let file = media::read(&pool, profile_id, id)
+    let file = media::locate(&pool, profile_id, id)
         .await
         .map_err(ApiError::internal)?
         .ok_or_else(|| ApiError::new(StatusCode::NOT_FOUND, "Media not found"))?;
-    let length = file.data.len();
-    // Safari plays audio only from servers that answer byte ranges.
-    let range = headers
-        .get(header::RANGE)
-        .and_then(|value| value.to_str().ok())
-        .map(|value| byte_range(value, length));
-    let (status, body, content_range) = match range {
-        Some(Range::Satisfiable(start, end)) => (
-            StatusCode::PARTIAL_CONTENT,
-            file.data[start..=end].to_vec(),
-            Some(format!("bytes {start}-{end}/{length}")),
-        ),
-        Some(Range::Unsatisfiable) => {
-            let mut response =
-                ApiError::new(StatusCode::RANGE_NOT_SATISFIABLE, "Range not satisfiable")
-                    .into_response();
-            response.headers_mut().insert(
-                header::CONTENT_RANGE,
-                HeaderValue::from_str(&format!("bytes */{length}")).expect("ASCII header"),
-            );
-            return Ok(response);
-        }
-        Some(Range::Ignored) | None => (StatusCode::OK, file.data, None),
+    if !tokio::fs::try_exists(&file.path).await.unwrap_or(false) {
+        return Err(ApiError::internal(anyhow::anyhow!(
+            "media file {} is missing",
+            file.path.display()
+        )));
+    }
+    // ServeFile answers byte ranges, which Safari needs to play audio, and streams the file.
+    let mut response = match ServeFile::new(&file.path).oneshot(request).await {
+        Ok(response) => response.map(Body::new),
+        Err(never) => match never {},
     };
-    let mut response = (status, Body::from(body)).into_response();
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_str(&file.content_type)
-            .map_err(|error| ApiError::internal(error.into()))?,
-    );
-    headers.insert(header::ACCEPT_RANGES, HeaderValue::from_static("bytes"));
-    if let Some(content_range) = content_range {
-        headers.insert(
-            header::CONTENT_RANGE,
-            HeaderValue::from_str(&content_range).expect("ASCII header"),
+    if response.status().is_success() {
+        response.headers_mut().insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_str(&file.content_type)
+                .map_err(|error| ApiError::internal(error.into()))?,
         );
+        response.extensions_mut().insert(Immutable);
     }
-    response.extensions_mut().insert(Immutable);
-    Ok(response)
-}
-
-#[derive(Debug, PartialEq)]
-enum Range {
-    /// Inclusive byte offsets.
-    Satisfiable(usize, usize),
-    Unsatisfiable,
-    /// Multiple ranges or another unit: the whole file is a valid answer.
-    Ignored,
-}
-
-fn byte_range(value: &str, length: usize) -> Range {
-    let Some(spec) = value.trim().strip_prefix("bytes=") else {
-        return Range::Ignored;
-    };
-    if spec.contains(',') {
-        return Range::Ignored;
-    }
-    let Some((start, end)) = spec.trim().split_once('-') else {
-        return Range::Ignored;
-    };
-    let parse = |value: &str| value.trim().parse::<usize>().ok();
-    let (start, end) = match (start.trim().is_empty(), end.trim().is_empty()) {
-        // A suffix: the last N bytes.
-        (true, false) => match parse(end) {
-            Some(0) => return Range::Unsatisfiable,
-            Some(suffix) => (length.saturating_sub(suffix), length.saturating_sub(1)),
-            None => return Range::Ignored,
-        },
-        (false, true) => match parse(start) {
-            Some(start) => (start, length.saturating_sub(1)),
-            None => return Range::Ignored,
-        },
-        (false, false) => match (parse(start), parse(end)) {
-            (Some(start), Some(end)) if start <= end => (start, end.min(length.saturating_sub(1))),
-            _ => return Range::Ignored,
-        },
-        (true, true) => return Range::Ignored,
-    };
-    if length == 0 || start >= length {
-        return Range::Unsatisfiable;
-    }
-    Range::Satisfiable(start, end)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Range, byte_range};
-
-    #[test]
-    fn answers_single_byte_ranges_and_ignores_the_rest() {
-        for (header, expected) in [
-            ("bytes=0-1", Range::Satisfiable(0, 1)),
-            ("bytes=2-", Range::Satisfiable(2, 9)),
-            ("bytes=-3", Range::Satisfiable(7, 9)),
-            ("bytes=-30", Range::Satisfiable(0, 9)),
-            ("bytes=5-500", Range::Satisfiable(5, 9)),
-            ("bytes=10-", Range::Unsatisfiable),
-            ("bytes=-0", Range::Unsatisfiable),
-            ("bytes=0-1,4-5", Range::Ignored),
-            ("bytes=3-2", Range::Ignored),
-            ("bytes=x-", Range::Ignored),
-            ("items=0-1", Range::Ignored),
-        ] {
-            assert_eq!(byte_range(header, 10), expected, "{header}");
-        }
-    }
+    Ok(response.into_response())
 }

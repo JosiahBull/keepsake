@@ -74,10 +74,10 @@ keepsake --profile ansam add --prompt 'Which bird is this?' --answer 'Kererū' \
   --media kereru.jpg --media kereru-call.m4a
 ```
 
-Keepsake keeps JPEG, PNG, GIF and WebP images and MP3, M4A, AAC, WAV, Ogg, WebM and
+Keepsake accepts JPEG, PNG, GIF and WebP images and MP3, M4A, AAC, WAV, Ogg, WebM and
 FLAC clips. Each file declares its type, through `Content-Type` for the API or its
-extension for the CLI, and must decode as that type before it is stored. Renamed,
-truncated and damaged files are refused, as are videos. Limits:
+extension for the CLI, and must decode as that type. Renamed, truncated and damaged
+files are refused, as are videos. Limits:
 
 | Limit | Value |
 | --- | --- |
@@ -87,13 +87,23 @@ truncated and damaged files are refused, as are videos. Limits:
 | Media per question | 4 |
 | Media per profile | 1 GiB |
 
-The website scales photos down to 2048 pixels before uploading them. Opus clips in Ogg
-or WebM, as browsers record them, are checked by reading their whole container; there
-is no Opus decoder to check the sound itself. Describe an image for screen readers
-without giving away the answer.
+Every upload is converted to one format for serving, and the upload itself is not kept:
 
-Media lives in SQLite with the facts that use it, so backups, restores and accepted
-shares include it. An upload that is never attached to a fact is removed after a day.
+| Upload | Served as |
+| --- | --- |
+| Still image | AVIF, at most 2048 pixels on the long edge, turned upright from its EXIF orientation, with metadata such as location removed |
+| Animated GIF, WebP or PNG | As uploaded, after every frame is checked |
+| Audio clip | AAC-LC in MP4 (`.m4a`), 56 kbit/s a channel, at most two channels and 48 kHz |
+
+The clip's index comes before its audio, and the server answers byte ranges, so playback
+and scrubbing start at once. AVIF needs Safari 16 or a current Chrome, Edge or Firefox.
+Describe an image for screen readers without giving away the answer.
+
+Media files live beside the database, in the same directory: `media/images/` and
+`media/audio/`, named by the hash of their contents. Uploads arrive in `tmp/`, which the
+server empties when it starts; it also removes media files that nothing references.
+SQLite holds only what describes each file. Accepted shares reuse the sender's file.
+An upload that is never attached to a fact is removed after a day.
 
 The CLI is the `keepsake-cli` workspace package and builds independently with
 `pnpm build:cli`. It shares fact types and SQLite storage with the server through
@@ -152,7 +162,8 @@ Create a backup before upgrading. Choose an existing destination directory:
 
 ```sh
 keepsake --database sqlite:/absolute/path/keepsake.db backup /backups/keepsake-2026-10-24.db
-keepsake restore /backups/keepsake-2026-10-24.db --to /data/keepsake-restored.db
+mkdir /restored
+keepsake restore /backups/keepsake-2026-10-24.db --to /restored/keepsake.db
 ```
 
 `backup` captures a consistent whole-household SQLite snapshot while the server is running,
@@ -162,7 +173,14 @@ and foreign keys before publishing the file. They preserve IDs, reviews and migr
 and refuse existing destinations or SQLite sidecars. Snapshot files are private to the
 current user on Unix. Keep copies on another volume with retention appropriate to your library.
 
-Restore to a new path, inspect its profiles with `keepsake --database sqlite:/data/keepsake-restored.db profiles list`,
+Images and audio go to a `-media` directory beside the backup, such as
+`/backups/keepsake-2026-10-24.db-media/`; keep the two together. Each file is checked
+against its hash when it is backed up and when it is restored, and a damaged or missing
+file stops either command. Restore into a directory of its own, without a `media/`
+folder: the restored database keeps its media there, and the server removes media files
+its own database does not reference.
+
+Restore to a new directory, inspect its profiles with `keepsake --database sqlite:/restored/keepsake.db profiles list`,
 and each library using `--profile ID_OR_HANDLE`. Stop the server before switching `DATABASE_URL` to that file and restarting.
 Keep the original until you have verified the restored library. Do not copy only the live
 database file: committed changes may still be in its WAL. Container users can run the CLI
@@ -377,7 +395,7 @@ Node is only needed to build the frontend.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | `sqlite:data/keepsake.db` for the server | SQLite file location |
+| `DATABASE_URL` | `sqlite:data/keepsake.db` for the server | SQLite file location; its directory also holds `media/` and `tmp/` |
 | `KEEPSAKE_PROFILE` | Sole profile when unambiguous | CLI library owner; overridden by `--profile` |
 | `BIND_ADDR` | `127.0.0.1:8080` | HTTP listening address |
 | `WEB_DIR` | `packages/web/dist` | Built frontend directory |
@@ -401,6 +419,8 @@ Missing database files and parent directories are created on startup. The databa
 directory must be writable, including for SQLite's WAL files. The container runs as
 UID/GID `10001:10001`; bind-mounted storage must grant that user write access.
 The default Compose named volume is initialized with the image's directory ownership.
+One database per directory: the server removes media files in its directory that its own
+database does not reference.
 
 An explicitly configured `WEB_DIR` must contain a readable `index.html`; startup fails
 before opening SQLite when it is missing. With `WEB_DIR` unset, the development API can

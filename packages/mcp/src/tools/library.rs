@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 use crate::config::MAX_ROWS;
 use crate::convert::{clip, table};
-use crate::error::{Outcome, finish, refused};
+use crate::error::{Failure, Outcome, finish, refused};
 use crate::server::KeepsakeMcp;
 
 /// Long enough to recognise a fact in a list; `get_fact` has the rest.
@@ -102,7 +102,8 @@ impl KeepsakeMcp {
     #[tool(
         name = "view_media",
         description = "Return an image or audio clip from a fact's question, by the media_id \
-                       get_fact lists, so you can see or hear what the learner is asked about.",
+                       get_fact lists, as the learner is served it: AVIF for still images, the \
+                       original GIF, WebP or PNG for animations, AAC in MP4 for clips.",
         annotations(read_only_hint = true, idempotent_hint = true)
     )]
     pub async fn view_media(
@@ -250,10 +251,13 @@ impl KeepsakeMcp {
     }
 
     async fn media(&self, media_id: i64) -> Outcome {
-        let file = media::read(&self.pool, self.profile.id, media_id)
+        let file = media::locate(&self.pool, self.profile.id, media_id)
             .await?
             .ok_or_else(|| refused(format!("Media {media_id} is not in this library.")))?;
-        let data = Base64::encode_string(&file.data);
+        let bytes = tokio::fs::read(&file.path)
+            .await
+            .map_err(|error| Failure::Internal(error.into()))?;
+        let data = Base64::encode_string(&bytes);
         Ok(CallToolResult::success(vec![
             if file.content_type.starts_with("image/") {
                 ContentBlock::image(data, file.content_type)

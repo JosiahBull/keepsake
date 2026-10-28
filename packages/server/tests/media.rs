@@ -98,9 +98,11 @@ async fn an_uploaded_clip_is_attached_and_served_with_ranges_to_its_owner_only()
     .await;
     assert_eq!(response.status(), StatusCode::CREATED);
     let saved: MediaUpload = serde_json::from_slice(&body(response).await).unwrap();
-    assert_eq!(saved.content_type, "audio/wav");
-    assert_eq!(saved.byte_size, wav.len() as i64);
+    // Stored as AAC in MP4, not as the WAV that was sent.
+    assert_eq!(saved.content_type, "audio/mp4");
     assert_eq!(saved.duration_ms, Some(250));
+    let size = saved.byte_size as usize;
+    assert!(size < wav.len());
 
     let fact = serde_json::json!({
         "prompt": "What does this word mean?",
@@ -125,7 +127,7 @@ async fn an_uploaded_clip_is_attached_and_served_with_ranges_to_its_owner_only()
     let whole = send(&app, get(&path, None)).await;
     assert_eq!(whole.status(), StatusCode::OK);
     let headers = whole.headers().clone();
-    assert_eq!(headers[header::CONTENT_TYPE], "audio/wav");
+    assert_eq!(headers[header::CONTENT_TYPE], "audio/mp4");
     assert_eq!(headers[header::ACCEPT_RANGES], "bytes");
     assert_eq!(
         headers[header::CACHE_CONTROL],
@@ -134,21 +136,24 @@ async fn an_uploaded_clip_is_attached_and_served_with_ranges_to_its_owner_only()
     assert_eq!(headers["cdn-cache-control"], "no-store");
     assert_eq!(headers["x-content-type-options"], "nosniff");
     assert!(!headers.contains_key(header::CONTENT_ENCODING));
-    assert_eq!(body(whole).await, wav);
+    let served = body(whole).await;
+    assert_eq!(served.len(), size);
+    assert_eq!(&served[4..12], b"ftypM4A ");
 
-    let partial = send(&app, get(&path, Some("bytes=0-3"))).await;
+    let partial = send(&app, get(&path, Some("bytes=4-11"))).await;
     assert_eq!(partial.status(), StatusCode::PARTIAL_CONTENT);
     assert_eq!(
         partial.headers()[header::CONTENT_RANGE],
-        format!("bytes 0-3/{}", wav.len())
+        format!("bytes 4-11/{size}")
     );
-    assert_eq!(body(partial).await, b"RIFF");
+    assert_eq!(partial.headers()[header::CONTENT_TYPE], "audio/mp4");
+    assert_eq!(body(partial).await, b"ftypM4A ");
 
-    let beyond = send(&app, get(&path, Some(&format!("bytes={}-", wav.len())))).await;
+    let beyond = send(&app, get(&path, Some(&format!("bytes={size}-")))).await;
     assert_eq!(beyond.status(), StatusCode::RANGE_NOT_SATISFIABLE);
     assert_eq!(
         beyond.headers()[header::CONTENT_RANGE],
-        format!("bytes */{}", wav.len())
+        format!("bytes */{size}")
     );
     assert_eq!(beyond.headers()[header::CACHE_CONTROL], "no-store");
 

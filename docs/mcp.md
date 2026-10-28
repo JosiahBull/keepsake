@@ -114,7 +114,8 @@ of those proposals; the research does not test an MCP integration.
   marked with `…`. `get_fact` gives the full text.
 - **Searches are paged**, 1 to 50 facts at a time, with the total and a `before_id` for the
   next page.
-- **Media is returned as MCP image or audio content**, exactly as stored.
+- **Media is returned as MCP image or audio content**, as the learner is served it: AVIF
+  for still images and AAC in MP4 for clips. Not every client can show AVIF.
 - **A refusal the agent can act on**, such as a missing fact or an invalid draft, returns
   as a tool error with its message. Anything else is logged and replaced with a fixed
   sentence, so no database path or SQL error reaches a transcript.

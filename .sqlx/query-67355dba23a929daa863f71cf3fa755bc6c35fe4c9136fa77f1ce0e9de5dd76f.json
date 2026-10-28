@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT file_sha256 FROM media WHERE profile_id=? AND upload_sha256=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "file_sha256",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "file_sha256"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "67355dba23a929daa863f71cf3fa755bc6c35fe4c9136fa77f1ce0e9de5dd76f"
+}

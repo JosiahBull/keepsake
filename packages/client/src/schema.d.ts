@@ -847,14 +847,18 @@ export interface components {
         McpMode: "off" | "read" | "write";
         /** @enum {string} */
         MediaKind: "image" | "audio";
-        /** @description A stored file, before or after it is attached to a question. */
+        /**
+         * @description A stored file, before or after it is attached to a question. Describes what is
+         *     served: AVIF for still images, the uploaded GIF, WebP or PNG for animations, and AAC
+         *     in MP4 for clips.
+         */
         MediaUpload: {
             /** Format: int64 */
             byte_size: number;
             content_type: string;
             /**
              * Format: int64
-             * @description Measured from the stream; clips only, absent when the stream does not say.
+             * @description Clips only.
              */
             duration_ms?: number | null;
             /** Format: int64 */
@@ -864,7 +868,7 @@ export interface components {
             media_id: number;
             /**
              * Format: int64
-             * @description Measured by decoding; images only.
+             * @description Images only.
              */
             width?: number | null;
         };
@@ -1557,7 +1561,7 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. The file must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. */
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4. */
         requestBody: {
             content: {
                 "application/octet-stream": string;
@@ -2308,7 +2312,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. The file must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. */
+        /** @description The file's bytes, sent with its own Content-Type, such as image/png or audio/mpeg. It must decode as that type: JPEG, PNG, GIF or WebP up to 4096 pixels a side, or MP3, M4A, AAC, WAV, Ogg, WebM or FLAC up to 5 minutes. At most 5 MiB. Still images are stored as AVIF, at most 2048 pixels on the long edge; animations as uploaded; clips as AAC in MP4. */
         requestBody: {
             content: {
                 "application/octet-stream": string;

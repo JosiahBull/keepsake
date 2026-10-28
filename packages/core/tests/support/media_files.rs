@@ -25,6 +25,28 @@ pub fn png(seed: u8) -> Vec<u8> {
     image(ImageFormat::Png, 4, 3, seed)
 }
 
+/// A half-transparent PNG.
+pub fn translucent_png() -> Vec<u8> {
+    let pixels = image::RgbaImage::from_fn(8, 8, |x, y| image::Rgba([200, x as u8, y as u8, 128]));
+    let mut out = Cursor::new(Vec::new());
+    pixels.write_to(&mut out, ImageFormat::Png).unwrap();
+    out.into_inner()
+}
+
+/// A JPEG stored sideways, with EXIF orientation 6 saying to turn it 90° clockwise.
+pub fn sideways_jpeg(width: u32, height: u32) -> Vec<u8> {
+    let jpeg = image(ImageFormat::Jpeg, width, height, 50);
+    // "Exif", then a big-endian TIFF header whose first IFD starts at offset 8.
+    let mut exif = b"Exif\0\0MM\0\x2A\0\0\0\x08".to_vec();
+    exif.extend_from_slice(&[0, 1]); // one entry
+    exif.extend_from_slice(&[0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, 6, 0, 0]); // Orientation = 6
+    exif.extend_from_slice(&[0, 0, 0, 0]); // no further IFD
+    let mut segment = vec![0xFF, 0xE1];
+    segment.extend_from_slice(&((exif.len() + 2) as u16).to_be_bytes());
+    segment.extend(exif);
+    [&jpeg[..2], &segment, &jpeg[2..]].concat()
+}
+
 /// A two-frame animation, to show later frames are decoded too.
 pub fn animated_gif() -> Vec<u8> {
     let mut out = Vec::new();
@@ -42,30 +64,45 @@ pub fn animated_gif() -> Vec<u8> {
 
 /// 16-bit mono PCM at 16 kHz.
 pub fn wav(milliseconds: u32, seed: u16) -> Vec<u8> {
-    pcm_wav(16_000, 16, milliseconds, |index| {
+    pcm_wav(16_000, 1, 16, milliseconds, |index| {
         let sample = ((index as u16).wrapping_mul(seed | 1) % 2000) as i16 - 1000;
         sample.to_le_bytes().to_vec()
     })
 }
 
+/// 16-bit PCM at any rate and channel count: a 440 Hz tone in every channel.
+pub fn tone(rate: u32, channels: u16, milliseconds: u32) -> Vec<u8> {
+    pcm_wav(rate, channels, 16, milliseconds, |index| {
+        let phase = f64::from(index) * 440.0 * std::f64::consts::TAU / f64::from(rate);
+        let sample = ((phase.sin() * 8000.0) as i16).to_le_bytes();
+        sample.repeat(usize::from(channels))
+    })
+}
+
 /// 8-bit mono PCM at 8 kHz: the cheapest way to make a long clip under the size limit.
 pub fn long_wav(milliseconds: u32) -> Vec<u8> {
-    pcm_wav(8_000, 8, milliseconds, |index| {
+    pcm_wav(8_000, 1, 8, milliseconds, |index| {
         vec![(index % 200) as u8 + 28]
     })
 }
 
-fn pcm_wav(rate: u32, bits: u16, milliseconds: u32, sample: impl Fn(u32) -> Vec<u8>) -> Vec<u8> {
-    let frames = rate / 1000 * milliseconds;
-    let data: Vec<u8> = (0..frames).flat_map(sample).collect();
-    let bytes_per_frame = u32::from(bits / 8);
+fn pcm_wav(
+    rate: u32,
+    channels: u16,
+    bits: u16,
+    milliseconds: u32,
+    frame: impl Fn(u32) -> Vec<u8>,
+) -> Vec<u8> {
+    let frames = (u64::from(rate) * u64::from(milliseconds) / 1000) as u32;
+    let data: Vec<u8> = (0..frames).flat_map(frame).collect();
+    let bytes_per_frame = u32::from(bits / 8) * u32::from(channels);
     let mut out = Vec::new();
     out.extend_from_slice(b"RIFF");
     out.extend_from_slice(&(36 + data.len() as u32).to_le_bytes());
     out.extend_from_slice(b"WAVEfmt ");
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    out.extend_from_slice(&1u16.to_le_bytes()); // mono
+    out.extend_from_slice(&channels.to_le_bytes());
     out.extend_from_slice(&rate.to_le_bytes());
     out.extend_from_slice(&(rate * bytes_per_frame).to_le_bytes());
     out.extend_from_slice(&(bytes_per_frame as u16).to_le_bytes());

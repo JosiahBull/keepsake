@@ -1,30 +1,32 @@
--- Images and audio clips asked with a fact's question. The bytes live in SQLite so
--- backups, restores and accepted shares carry them with the facts that use them.
+-- Images and audio clips asked with a fact's question. Each is checked, converted to the
+-- one format it is served in, and written beside the database as
+-- media/images/<file_sha256>.<ext> or media/audio/<file_sha256>.m4a. Rows describe those
+-- files; the bytes never enter SQLite, and the upload itself is not kept.
 -- AUTOINCREMENT keeps IDs unique forever: browsers cache media by ID as immutable.
--- The server decodes every file before storing it; these constraints repeat its
--- limits so nothing outside them can be stored by any other route.
 CREATE TABLE media (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
     kind TEXT NOT NULL CHECK (kind IN ('image', 'audio')),
+    -- What is served: AVIF for still images, the checked upload for animations, and AAC
+    -- in MP4 for clips. Nothing else can be stored by any route.
     content_type TEXT NOT NULL CHECK (
-        (kind = 'image' AND content_type IN ('image/jpeg', 'image/png', 'image/gif', 'image/webp'))
-        OR (kind = 'audio' AND content_type IN (
-            'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/flac'
-        ))
+        (kind = 'image' AND content_type IN ('image/avif', 'image/gif', 'image/webp', 'image/png'))
+        OR (kind = 'audio' AND content_type = 'audio/mp4')
     ),
-    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    -- The upload's hash, so the same file uploaded again is not processed again.
+    upload_sha256 TEXT NOT NULL CHECK (length(upload_sha256) = 64),
+    -- The served file's hash, which names it on disk.
+    file_sha256 TEXT NOT NULL CHECK (length(file_sha256) = 64),
     byte_size INTEGER NOT NULL CHECK (byte_size BETWEEN 1 AND 5242880),
     width INTEGER CHECK (width BETWEEN 1 AND 4096),
     height INTEGER CHECK (height BETWEEN 1 AND 4096),
     duration_ms INTEGER CHECK (duration_ms BETWEEN 0 AND 300000),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    -- Last, so metadata reads stop before the blob's overflow pages.
-    data BLOB NOT NULL CHECK (length(data) = byte_size),
     CHECK ((kind = 'image') = (width IS NOT NULL AND height IS NOT NULL)),
-    CHECK (kind = 'audio' OR duration_ms IS NULL),
-    UNIQUE (profile_id, sha256)
+    CHECK ((kind = 'audio') = (duration_ms IS NOT NULL)),
+    UNIQUE (profile_id, upload_sha256)
 ) STRICT;
+CREATE INDEX media_file ON media(file_sha256);
 
 CREATE TABLE fact_media (
     fact_id INTEGER NOT NULL REFERENCES facts(id) ON DELETE CASCADE,
