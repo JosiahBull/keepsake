@@ -96,7 +96,8 @@ jobs:
       - name: Install Rust build dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends build-essential pkg-config curl
+          # CMake builds libopus, the Opus decoder for uploaded clips.
+          apt-get install -y --no-install-recommends build-essential pkg-config curl cmake
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
