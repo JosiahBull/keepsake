@@ -80,7 +80,7 @@
   {
     "name": "view_media",
     "tier": "read",
-    "description": "Return an image or audio clip from a fact's question, by the media_id get_fact lists, as the learner is served it: AVIF for still images, the original GIF, WebP or PNG for animations, AAC in MP4 for clips.",
+    "description": "Return an image or audio clip from a fact's question, by the media_id get_fact lists, as the learner is served it: AVIF for images, AAC in MP4 for clips.",
     "read_only": true,
     "destructive": null,
     "idempotent": true,

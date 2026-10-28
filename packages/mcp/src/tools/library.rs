@@ -102,8 +102,8 @@ impl KeepsakeMcp {
     #[tool(
         name = "view_media",
         description = "Return an image or audio clip from a fact's question, by the media_id \
-                       get_fact lists, as the learner is served it: AVIF for still images, the \
-                       original GIF, WebP or PNG for animations, AAC in MP4 for clips.",
+                       get_fact lists, as the learner is served it: AVIF for images, AAC in MP4 \
+                       for clips.",
         annotations(read_only_hint = true, idempotent_hint = true)
     )]
     pub async fn view_media(

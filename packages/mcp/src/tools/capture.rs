@@ -62,9 +62,9 @@ pub struct DraftPractice {
 pub struct DraftMedia {
     /// The file's bytes, base64-encoded. At most 5 MiB before encoding.
     pub data_base64: String,
-    /// The file's type: image/jpeg, image/png, image/gif, image/webp, audio/mpeg,
-    /// audio/mp4, audio/aac, audio/wav, audio/ogg, audio/webm or audio/flac. The file
-    /// must decode as this type. Still images are stored as AVIF and clips as AAC.
+    /// The file's type: image/jpeg, image/png, image/webp, audio/mpeg, audio/mp4,
+    /// audio/aac, audio/wav, audio/ogg, audio/webm or audio/flac. The file must decode as
+    /// this type; images must be still. Images are stored as AVIF and clips as AAC.
     pub content_type: String,
     /// For an image: what it shows, for screen readers, without giving away the answer.
     #[serde(default)]
