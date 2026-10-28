@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
+use crate::media::{NewQuestionMedia, QuestionMedia};
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum PracticeKind {
@@ -58,6 +60,10 @@ pub struct NewFact {
     pub tags: Vec<String>,
     #[serde(default)]
     pub practices: Vec<NewPractice>,
+    /// Uploaded images and audio clips asked with the question, in display order.
+    /// Omitted when empty, so share snapshots of text-only facts are unchanged.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media: Vec<NewQuestionMedia>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -83,6 +89,8 @@ pub struct Fact {
     pub practices: Vec<Practice>,
     #[serde(default)]
     pub shared_by: Option<String>,
+    /// Images and audio clips asked with the question, in display order.
+    pub media: Vec<QuestionMedia>,
 }
 
 fn bounded(value: &str, label: &str, limit: usize, required: bool) -> anyhow::Result<()> {
@@ -153,6 +161,7 @@ pub fn validate_new_fact(fact: &NewFact) -> anyhow::Result<()> {
         bounded(tag, "tag", 100, true)?;
     }
     validate_practices(&fact.practices)?;
+    crate::media::validate(&fact.media)?;
     Ok(())
 }
 
@@ -223,8 +232,10 @@ async fn load(connection: &mut SqliteConnection, row: FactRow) -> anyhow::Result
     .bind(row.id)
     .fetch_optional(&mut *connection)
     .await?;
+    let media = crate::media::for_fact(connection, row.id).await?;
     Ok(Fact {
         shared_by,
+        media,
         id: row.id,
         prompt: row.prompt,
         answer: row.answer,
@@ -360,6 +371,7 @@ pub(crate) async fn insert_fact(
     .execute(&mut *connection)
     .await?;
     let id = result.last_insert_rowid();
+    crate::media::attach(connection, profile_id, id, &fact.media).await?;
     for practice in &fact.practices {
         insert_practice(connection, id, practice).await?;
     }

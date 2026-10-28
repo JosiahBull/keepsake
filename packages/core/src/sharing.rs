@@ -6,6 +6,7 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     facts::{NewFact, NewPractice},
+    media::NewQuestionMedia,
     scheduling::StudyError,
 };
 
@@ -138,6 +139,14 @@ async fn snapshot_fact(
                 answer: practice.answer,
                 choices: practice.choices,
                 explanation: practice.explanation,
+            })
+            .collect(),
+        media: fact
+            .media
+            .into_iter()
+            .map(|media| NewQuestionMedia {
+                media_id: media.media_id,
+                alt: media.alt,
             })
             .collect(),
     };
@@ -377,8 +386,13 @@ async fn accept_one(
     let json = sqlx::query_scalar!("SELECT snapshot_json FROM fact_shares WHERE id=?", id)
         .fetch_one(&mut *connection)
         .await?;
-    let snapshot: NewFact = serde_json::from_str(&json)?;
+    let mut snapshot: NewFact = serde_json::from_str(&json)?;
     validate_snapshot(&snapshot)?;
+    // The snapshot names the sender's files; the copy owns its own.
+    for media in &mut snapshot.media {
+        media.media_id =
+            crate::media::copy(connection, share.sender_id, media.media_id, profile_id).await?;
+    }
     let fact = crate::facts::insert_fact(connection, profile_id, snapshot).await?;
 
     // Approval is personal: only one canonical recall prompt starts eligible.

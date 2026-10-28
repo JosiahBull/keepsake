@@ -554,3 +554,52 @@ fn finds_te_reo_answers_using_either_macron_case() {
         assert_eq!(page["items"][0]["answer"], "Ka Āwhina ahau i a koe.");
     }
 }
+
+#[test]
+fn media_must_decode_as_its_extension_says_before_a_fact_is_saved() {
+    let temp = tempfile::tempdir().unwrap();
+    let db = temp.path().join("media.db");
+    support::prepare(&db);
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../core/tests/fixtures/media");
+    let clip = fixtures.join("tone.m4a");
+    let saved = json(&cli(
+        &db,
+        &[
+            "add",
+            "--prompt",
+            "Which note is this?",
+            "--answer",
+            "A4",
+            "--media",
+            clip.to_str().unwrap(),
+        ],
+    ));
+    assert_eq!(saved["media"][0]["content_type"], "audio/mp4");
+    assert!(saved["media"][0]["duration_ms"].as_i64().unwrap() > 400);
+
+    let renamed = temp.path().join("tone.mp3");
+    std::fs::copy(fixtures.join("tone.flac"), &renamed).unwrap();
+    let notes = temp.path().join("notes.txt");
+    std::fs::write(&notes, "not media").unwrap();
+    for (path, message) in [
+        (&renamed, "is not an MP3 clip"),
+        (&notes, "no supported extension"),
+    ] {
+        let output = cli(
+            &db,
+            &[
+                "add",
+                "--prompt",
+                "Which note?",
+                "--answer",
+                "A4",
+                "--media",
+                path.to_str().unwrap(),
+            ],
+        );
+        assert!(!output.status.success());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(message), "{stderr}");
+    }
+    assert_eq!(json(&cli(&db, &["list"]))["total"], 1);
+}

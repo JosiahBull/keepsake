@@ -84,6 +84,7 @@ pub async fn queue_at_for(
         items.push(StudyQuestion {
             fact: crate::paging::FactSummary {
                 shared_by: fact.shared_by,
+                media: fact.media,
                 id: fact.id,
                 prompt: fact.prompt,
                 answer: fact.answer,

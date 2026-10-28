@@ -15,6 +15,7 @@ fn fact(index: usize) -> NewFact {
         source: format!("https://example.org/{index}"),
         tags: vec![format!("tag-{index}"), "paging-fixture".into()],
         practices: vec![],
+        media: vec![],
     }
 }
 async fn pool() -> (tempfile::TempDir, sqlx::SqlitePool) {

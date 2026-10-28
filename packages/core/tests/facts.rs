@@ -13,6 +13,7 @@ fn fact() -> NewFact {
         source: "https://sqlite.org/wal.html".into(),
         tags: vec!["sqlite".into()],
         practices: vec![],
+        media: vec![],
     }
 }
 

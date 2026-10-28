@@ -24,6 +24,7 @@ async fn snapshots_committed_wal_and_restores_ids_history_and_schema() {
         source: "https://sqlite.org/wal.html".into(),
         tags: vec!["sqlite".into()],
         practices: vec![],
+        media: vec![],
     };
     let saved = facts::create(&pool, input.clone()).await.unwrap();
     facts::record_review(

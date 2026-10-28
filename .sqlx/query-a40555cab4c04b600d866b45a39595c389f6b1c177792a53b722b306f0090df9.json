@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT content_type, data FROM media WHERE id=? AND profile_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "content_type",
+        "ordinal": 0,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "content_type"
+          }
+        }
+      },
+      {
+        "name": "data",
+        "ordinal": 1,
+        "type_info": "Blob",
+        "origin": {
+          "Table": {
+            "table": "media",
+            "name": "data"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "a40555cab4c04b600d866b45a39595c389f6b1c177792a53b722b306f0090df9"
+}

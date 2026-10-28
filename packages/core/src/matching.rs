@@ -19,9 +19,14 @@ pub(crate) async fn sample(
     // Count distinct, unambiguous pairs inside each bank before choosing a seed.
     // The seed's smallest eligible bank wins over broad tags such as "beginner".
     // db::connect supplies Unicode-aware, whitespace-trimming NOCASE comparisons.
+    // A question's images and clips are part of it: "What is this?" asked of two
+    // different pictures is two questions. Text-only keys are unchanged.
     let rows = sqlx::query!(
         "WITH normalized AS (
-           SELECT id, prompt COLLATE NOCASE AS prompt_key, answer COLLATE NOCASE AS answer_key
+           SELECT id, (prompt || coalesce(char(31) || (
+             SELECT group_concat(m.sha256, ',' ORDER BY fm.position)
+             FROM fact_media fm JOIN media m ON m.id = fm.media_id WHERE fm.fact_id = facts.id
+           ), '')) COLLATE NOCASE AS prompt_key, answer COLLATE NOCASE AS answer_key
            FROM facts WHERE profile_id = ?
          ), tagged AS (
            SELECT DISTINCT n.id, n.prompt_key, n.answer_key,
@@ -175,6 +180,7 @@ mod tests {
             fact: FactSummary {
                 id,
                 shared_by: None,
+                media: vec![],
                 prompt: prompt.into(),
                 answer: format!("Answer {id}"),
                 context: String::new(),

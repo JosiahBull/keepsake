@@ -7,6 +7,7 @@ use keepsake_cli::{
 use keepsake_core::{
     backup, db,
     facts::{self, Fact, NewFact},
+    media::{self, NewQuestionMedia},
     paging,
 };
 use std::{io::Read, path::PathBuf};
@@ -19,6 +20,7 @@ const AFTER_HELP: &str = concat!(
     "Examples:\n",
     "  keepsake --profile default add --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' --tag sqlite\n",
     "  keepsake --profile default add --prompt 'What does WAL stand for?' --answer 'Write-ahead logging' --agent claude --dry-run\n",
+    "  keepsake --profile ansam add --prompt 'Which bird is this?' --answer 'Kererū' --media kereru.jpg\n",
     "  keepsake --profile ansam add --url https://example.com/article --prompt 'Remember the main ideas' --dry-run\n",
     "  keepsake --profile default generate FACT_ID --agent codex --dry-run\n",
     "  keepsake --profile default add --file reviewed-fact.json\n",
@@ -152,6 +154,9 @@ struct Add {
     source: String,
     #[arg(long = "tag", conflicts_with = "file")]
     tags: Vec<String>,
+    /// Image or audio clip asked with the question; repeat for up to 4, shown in order.
+    #[arg(long = "media", value_name = "PATH", conflicts_with_all = ["file", "url", "dry_run"])]
+    media: Vec<PathBuf>,
     /// Fetch a page and extract facts following --prompt. Defaults to Claude Haiku.
     #[arg(long, requires = "prompt", conflicts_with = "file")]
     url: Option<String>,
@@ -400,6 +405,7 @@ async fn add_facts(
                 source: add.source,
                 tags: add.tags,
                 practices: vec![],
+                media: vec![],
             }],
             false,
         )
@@ -434,7 +440,29 @@ async fn add_facts(
         };
     }
 
+    // Read every file before storing any, so a missing path saves nothing.
+    let files = add
+        .media
+        .iter()
+        .map(|path| read_media(path))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    if files.len() > media::MAX_QUESTION_MEDIA {
+        bail!(
+            "a question can have at most {} images or clips",
+            media::MAX_QUESTION_MEDIA
+        );
+    }
     let pool = db::connect(&database_url).await?;
+    for ((declared, bytes), path) in files.into_iter().zip(&add.media) {
+        // An upload left unattached by a failed save is removed after a day.
+        let upload = media::upload(&pool, actor, declared, bytes)
+            .await
+            .with_context(|| format!("store {}", path.display()))?;
+        proposed[0].media.push(NewQuestionMedia {
+            media_id: upload.media_id,
+            alt: String::new(),
+        });
+    }
     let mut saved = facts::create_many_for(&pool, actor, proposed).await?;
     pool.close().await;
 
@@ -465,6 +493,7 @@ async fn draft_practices(
         source: fact.source,
         tags: fact.tags,
         practices: Vec::new(),
+        media: vec![],
     };
 
     if let Some(path) = file {
@@ -509,6 +538,31 @@ fn read_fact(path: PathBuf) -> anyhow::Result<NewFact> {
         bail!("generate --file expects the single fact object from generate --dry-run");
     }
     facts.pop().context("fact JSON was empty")
+}
+
+/// A file's declared type, from its extension, and its bytes. The type is checked
+/// against the contents when the file is stored.
+fn read_media(path: &std::path::Path) -> anyhow::Result<(&'static str, Vec<u8>)> {
+    let declared = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .and_then(media::type_for_extension)
+        .with_context(|| {
+            format!(
+                "{} has no supported extension. {}.",
+                path.display(),
+                media::SUPPORTED_FORMATS
+            )
+        })?;
+    let file = std::fs::File::open(path).with_context(|| format!("open {}", path.display()))?;
+    let mut bytes = Vec::new();
+    file.take(media::MAX_MEDIA_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("read {}", path.display()))?;
+    if bytes.len() > media::MAX_MEDIA_BYTES {
+        bail!("{} is larger than 5 MiB", path.display());
+    }
+    Ok((declared, bytes))
 }
 
 fn read_input(path: PathBuf) -> anyhow::Result<(Vec<NewFact>, bool)> {
@@ -556,6 +610,19 @@ fn output_fact(fact: Fact, json: bool) -> anyhow::Result<()> {
         }
         if !fact.tags.is_empty() {
             println!("Tags: {}", fact.tags.join(", "));
+        }
+        for item in &fact.media {
+            println!(
+                "Media: {} {} ({} bytes){}",
+                item.media_id,
+                item.content_type,
+                item.byte_size,
+                if item.alt.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — {}", item.alt)
+                }
+            );
         }
         for practice in fact.practices {
             println!(

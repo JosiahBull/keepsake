@@ -21,6 +21,7 @@ async fn creates_missing_database_and_nested_directories_then_reopens_existing_d
             source: String::new(),
             tags: vec![],
             practices: vec![],
+            media: vec![],
         },
     )
     .await

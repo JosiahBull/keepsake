@@ -58,12 +58,14 @@ work also keeps capture in the intended library if another profile is later crea
 ## Share facts
 
 Select facts in your library and choose the recipient. The offer contains a frozen
-copy of their question, answer, context, source, tags, and practice content. The
+copy of their question and its images and audio, answer, context, source, tags, and
+practice content. The
 recipient’s inbox shows questions with answers hidden until accepted. They can
 accept one or several offers, or decline. Senders can withdraw pending offers.
 
 Acceptance creates an independent owned fact with a fresh schedule. It copies no
-reviews, successful recall history, cooldowns, or generated-prompt approvals. A retry
+reviews, successful recall history, cooldowns, or generated-prompt approvals. The
+recipient gets their own copy of each image and clip, counted against their storage. A retry
 of an accepted offer returns the same copy. Later edits and new offers cannot replace
 an existing accepted copy or its progress. Decline and withdrawal leave libraries
 unchanged. There is no live synchronization or automatic merging of duplicate facts.
@@ -84,8 +86,8 @@ so repeating acceptance does not create another fact.
 
 ## Back up or downgrade
 
-Backup and restore include the entire household: profiles, libraries, learning
-history, settings, pending offers, and acceptance provenance. They never filter by
+Backup and restore include the entire household: profiles, libraries and their
+images and audio, learning history, settings, pending offers, and acceptance provenance. They never filter by
 `--profile`. There is no per-profile backup/export-and-restore operation.
 
 To downgrade, restore the pre-upgrade backup to a new database path and stop the

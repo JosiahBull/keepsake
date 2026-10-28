@@ -264,6 +264,11 @@ test("a fact can be added and disclosed with the keyboard", async ({ page }) => 
   await expect(page.getByRole("textbox", { name: "Answer", exact: true })).toBeFocused();
   await page.keyboard.type("To drink");
   await page.keyboard.press("Tab");
+  // Safari skips file inputs, as it does buttons, unless full keyboard access is on.
+  const media = page.getByLabel("Images and audio");
+  if (await media.evaluate((element) => element === document.activeElement)) {
+    await page.keyboard.press("Tab");
+  }
   await expect(page.getByText("Context, source and tags (optional)", { exact: true })).toBeFocused();
   // Safari's button tab stops depend on the user's keyboard-navigation setting.
   const save = page.getByRole("button", { name: "Save fact", exact: true });

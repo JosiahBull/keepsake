@@ -1,0 +1,47 @@
+-- Images and audio clips asked with a fact's question. The bytes live in SQLite so
+-- backups, restores and accepted shares carry them with the facts that use them.
+-- AUTOINCREMENT keeps IDs unique forever: browsers cache media by ID as immutable.
+-- The server decodes every file before storing it; these constraints repeat its
+-- limits so nothing outside them can be stored by any other route.
+CREATE TABLE media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK (kind IN ('image', 'audio')),
+    content_type TEXT NOT NULL CHECK (
+        (kind = 'image' AND content_type IN ('image/jpeg', 'image/png', 'image/gif', 'image/webp'))
+        OR (kind = 'audio' AND content_type IN (
+            'audio/mpeg', 'audio/aac', 'audio/mp4', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/flac'
+        ))
+    ),
+    sha256 TEXT NOT NULL CHECK (length(sha256) = 64),
+    byte_size INTEGER NOT NULL CHECK (byte_size BETWEEN 1 AND 5242880),
+    width INTEGER CHECK (width BETWEEN 1 AND 4096),
+    height INTEGER CHECK (height BETWEEN 1 AND 4096),
+    duration_ms INTEGER CHECK (duration_ms BETWEEN 0 AND 300000),
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    -- Last, so metadata reads stop before the blob's overflow pages.
+    data BLOB NOT NULL CHECK (length(data) = byte_size),
+    CHECK ((kind = 'image') = (width IS NOT NULL AND height IS NOT NULL)),
+    CHECK (kind = 'audio' OR duration_ms IS NULL),
+    UNIQUE (profile_id, sha256)
+) STRICT;
+
+CREATE TABLE fact_media (
+    fact_id INTEGER NOT NULL REFERENCES facts(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL CHECK (position BETWEEN 0 AND 3),
+    media_id INTEGER NOT NULL REFERENCES media(id) ON DELETE RESTRICT,
+    alt TEXT NOT NULL DEFAULT '' CHECK (length(CAST(alt AS BLOB)) <= 1000),
+    PRIMARY KEY (fact_id, position)
+) STRICT;
+CREATE INDEX fact_media_media ON fact_media(media_id);
+
+CREATE TRIGGER fact_media_owner BEFORE INSERT ON fact_media
+WHEN NOT EXISTS (
+  SELECT 1 FROM facts f JOIN media m ON m.profile_id = f.profile_id
+  WHERE f.id = NEW.fact_id AND m.id = NEW.media_id
+)
+BEGIN SELECT RAISE(ABORT, 'media owner must match fact'); END;
+CREATE TRIGGER fact_media_immutable BEFORE UPDATE ON fact_media
+BEGIN SELECT RAISE(ABORT, 'question media is immutable'); END;
+CREATE TRIGGER media_immutable BEFORE UPDATE ON media
+BEGIN SELECT RAISE(ABORT, 'media is immutable'); END;

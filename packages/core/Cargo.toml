@@ -9,10 +9,14 @@ anyhow.workspace = true
 chrono.workspace = true
 chrono-tz.workspace = true
 fsrs.workspace = true
+# Decoders that prove an upload is the format it claims. Pure Rust, no system codecs.
+image = { version = "0.25", default-features = false, features = ["gif", "jpeg", "png", "webp"] }
 serde.workspace = true
 serde_json.workspace = true
+sha2 = "0.10"
 sqlx.workspace = true
+symphonia = { version = "0.6", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mkv", "mp3", "ogg", "pcm", "vorbis", "wav"] }
 utoipa.workspace = true
 tempfile = "3"
-tokio.workspace = true
+tokio = { workspace = true, features = ["sync"] }
 uuid.workspace = true

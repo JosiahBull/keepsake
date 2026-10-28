@@ -5,6 +5,7 @@ use sqlx::SqlitePool;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::facts::{FactRow, Practice, PracticeRow, Review};
+use crate::media::QuestionMedia;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct FactSummary {
@@ -17,6 +18,8 @@ pub struct FactSummary {
     pub created_at: String,
     #[serde(default)]
     pub shared_by: Option<String>,
+    /// Images and audio clips asked with the question, in display order.
+    pub media: Vec<QuestionMedia>,
 }
 
 impl TryFrom<FactRow> for FactSummary {
@@ -25,6 +28,7 @@ impl TryFrom<FactRow> for FactSummary {
     fn try_from(row: FactRow) -> anyhow::Result<Self> {
         Ok(Self {
             shared_by: None,
+            media: Vec::new(),
             id: row.id,
             prompt: row.prompt,
             answer: row.answer,
@@ -426,7 +430,8 @@ pub(crate) async fn enrich_summary(
          WHERE s.accepted_fact_id=? AND s.status='accepted' LIMIT 1",
     )
     .bind(fact.id)
-    .fetch_optional(connection)
+    .fetch_optional(&mut *connection)
     .await?;
+    fact.media = crate::media::for_fact(connection, fact.id).await?;
     Ok(())
 }

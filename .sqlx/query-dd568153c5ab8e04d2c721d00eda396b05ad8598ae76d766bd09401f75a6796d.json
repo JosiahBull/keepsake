@@ -1,0 +1,105 @@
+{
+  "db_name": "SQLite",
+  "query": "WITH normalized AS (\n           SELECT id, (prompt || coalesce(char(31) || (\n             SELECT group_concat(m.sha256, ',' ORDER BY fm.position)\n             FROM fact_media fm JOIN media m ON m.id = fm.media_id WHERE fm.fact_id = facts.id\n           ), '')) COLLATE NOCASE AS prompt_key, answer COLLATE NOCASE AS answer_key\n           FROM facts WHERE profile_id = ?\n         ), tagged AS (\n           SELECT DISTINCT n.id, n.prompt_key, n.answer_key,\n             tag.value COLLATE NOCASE AS bank\n           FROM normalized n JOIN facts f ON f.id = n.id, json_each(f.tags) tag\n           WHERE tag.type = 'text' AND tag.value COLLATE NOCASE <> ''\n         ), unambiguous AS (\n           SELECT t.* FROM tagged t WHERE NOT EXISTS (\n             SELECT 1 FROM tagged other\n             WHERE other.bank = t.bank AND other.prompt_key = t.prompt_key\n               AND other.answer_key <> t.answer_key\n           )\n         ), pairs AS (\n           SELECT bank, answer_key, min(id) AS id\n           FROM unambiguous GROUP BY bank, answer_key\n         ), banks AS (\n           SELECT bank, count(*) AS pair_count FROM pairs\n           GROUP BY bank HAVING count(*) >= 3\n         ), seed AS (\n           SELECT p.id FROM pairs p JOIN banks b ON b.bank = p.bank\n           GROUP BY p.id ORDER BY random() LIMIT 1\n         ), chosen_bank AS (\n           SELECT p.bank FROM pairs p JOIN banks b ON b.bank = p.bank\n           WHERE p.id = (SELECT id FROM seed)\n           ORDER BY b.pair_count, random() LIMIT 1\n         ), ranked AS (\n           SELECT p.id, count(*) AS shared_tags\n           FROM pairs p JOIN chosen_bank b ON b.bank = p.bank\n           JOIN tagged t ON t.id = p.id\n           WHERE t.bank IN (SELECT bank FROM tagged WHERE id = (SELECT id FROM seed))\n           GROUP BY p.id\n         )\n         SELECT f.id AS \"id!\", f.prompt, f.answer, f.context, f.source, f.tags, f.created_at,\n           r.shared_tags AS \"shared_tags!: i64\"\n         FROM ranked r JOIN facts f ON f.id = r.id\n         ORDER BY (f.id = (SELECT id FROM seed)) DESC, r.shared_tags DESC, random()\n         LIMIT 100",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "prompt",
+        "ordinal": 1,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "prompt"
+          }
+        }
+      },
+      {
+        "name": "answer",
+        "ordinal": 2,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "answer"
+          }
+        }
+      },
+      {
+        "name": "context",
+        "ordinal": 3,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "context"
+          }
+        }
+      },
+      {
+        "name": "source",
+        "ordinal": 4,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "name": "tags",
+        "ordinal": 5,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "tags"
+          }
+        }
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "facts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "name": "shared_tags!: i64",
+        "ordinal": 7,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "dd568153c5ab8e04d2c721d00eda396b05ad8598ae76d766bd09401f75a6796d"
+}

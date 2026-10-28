@@ -41,6 +41,7 @@ fn fact(index: usize) -> NewFact {
         source: "https://example.com/scheduling-fixture".into(),
         tags: vec!["scheduling-fixture".into()],
         practices: vec![],
+        media: vec![],
     }
 }
 

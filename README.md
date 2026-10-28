@@ -63,6 +63,38 @@ cargo install --path packages/cli --bin keepsake --locked
 keepsake --profile default add --prompt 'Your question' --answer 'Your answer'
 ```
 
+### Images and audio
+
+A question can include images or audio clips, such as a photo to name or a word to
+recognise by ear. They appear with every practice format and in matching.
+Choose them under Images and audio when adding a fact, or pass them to the CLI:
+
+```sh
+keepsake --profile ansam add --prompt 'Which bird is this?' --answer 'Kererū' \
+  --media kereru.jpg --media kereru-call.m4a
+```
+
+Keepsake keeps JPEG, PNG, GIF and WebP images and MP3, M4A, AAC, WAV, Ogg, WebM and
+FLAC clips. Each file declares its type, through `Content-Type` for the API or its
+extension for the CLI, and must decode as that type before it is stored. Renamed,
+truncated and damaged files are refused, as are videos. Limits:
+
+| Limit | Value |
+| --- | --- |
+| File size | 5 MiB |
+| Image size | 4096 pixels on each side; 200 frames for an animation |
+| Clip length | 5 minutes |
+| Media per question | 4 |
+| Media per profile | 1 GiB |
+
+The website scales photos down to 2048 pixels before uploading them. Opus clips in Ogg
+or WebM, as browsers record them, are checked by reading their whole container; there
+is no Opus decoder to check the sound itself. Describe an image for screen readers
+without giving away the answer.
+
+Media lives in SQLite with the facts that use it, so backups, restores and accepted
+shares include it. An upload that is never attached to a fact is removed after a day.
+
 The CLI is the `keepsake-cli` workspace package and builds independently with
 `pnpm build:cli`. It shares fact types and SQLite storage with the server through
 `keepsake-core`; neither executable depends on the other.
@@ -347,7 +379,7 @@ Node is only needed to build the frontend.
 | `REQUEST_TIMEOUT_SECS` | `30` | Request deadline after headers, including body receipt and handler work |
 | `MAX_CONNECTIONS` | `128` | Concurrent TCP connections |
 | `MAX_IN_FLIGHT` | `32` | Concurrent requests; excess requests receive 503 with `Retry-After` |
-| `MAX_BODY_BYTES` | `524288` | Request-body size limit in bytes |
+| `MAX_BODY_BYTES` | `524288` | Request-body size limit in bytes; media uploads have a fixed 5 MiB limit |
 | `PUSH_CONTACT` | `https://github.com/JosiahBull/keepsake` | `mailto:` or `https:` contact sent to push services with each reminder |
 
 Run the server from the repository root with its defaults. `.env` files are not loaded
@@ -379,9 +411,10 @@ bind addresses to loopback. The endpoint itself checks the running server's data
 
 API failures use JSON, with `X-Request-ID` for log correlation. Request summaries record
 method, route template, status and duration without query strings, headers or fact content.
-API responses are `no-store`; fingerprinted frontend assets are immutable and the shell
-revalidates. Browser security headers apply to ordinary responses and rejections. These
-controls do not add authentication or cross-origin access.
+API responses are `no-store`, except question media, which only the browser may cache;
+fingerprinted frontend assets are immutable and the shell revalidates. Browser security
+headers apply to ordinary responses and rejections. These controls do not add
+authentication or cross-origin access.
 
 The Dockerfile packages both Rust binaries and the website into one image. `compose.yaml`
 mounts `/data` for persistence. CI builds and smoke-tests the container before release.

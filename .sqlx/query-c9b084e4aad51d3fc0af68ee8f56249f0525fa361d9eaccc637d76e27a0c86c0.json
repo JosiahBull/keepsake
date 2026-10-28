@@ -1,0 +1,21 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT coalesce(sum(byte_size), 0) AS \"used!: i64\" FROM media WHERE profile_id=?",
+  "describe": {
+    "columns": [
+      {
+        "name": "used!: i64",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c9b084e4aad51d3fc0af68ee8f56249f0525fa361d9eaccc637d76e27a0c86c0"
+}

@@ -34,6 +34,7 @@ fn fact(index: usize) -> NewFact {
         source: String::new(),
         tags: vec![],
         practices: vec![],
+        media: vec![],
     }
 }
 

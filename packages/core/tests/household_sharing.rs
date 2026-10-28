@@ -30,6 +30,12 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
             "0005_profiles.sql",
             include_str!("../migrations/0005_profiles.sql"),
         ),
+        // Repository code used to build the fixture reads question media. Adding
+        // that schema early still leaves household seeding to run afterwards.
+        (
+            "0009_question_media.sql",
+            include_str!("../migrations/0009_question_media.sql"),
+        ),
     ] {
         std::fs::write(migrations.join(name), contents).unwrap();
     }
@@ -80,6 +86,7 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
             source: "https://maoridictionary.co.nz/search?idiom=0&keywords=kai&loan=0&phrase=0&proverb=0".into(),
             tags: vec!["te-reo-māori".into(), "household".into()],
             practices: vec![],
+            media: vec![],
         },
     )
     .await
