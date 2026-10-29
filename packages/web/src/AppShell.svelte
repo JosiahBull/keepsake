@@ -9,6 +9,7 @@
     profileId,
     title,
     detail = null,
+    back = null,
     current,
     disabled,
     adding = false,
@@ -22,6 +23,8 @@
     /** A line under the title, such as the fact count. An empty string keeps the
      * line while it loads, so the title stays put; null has no line. */
     detail?: string | null;
+    /** A screen pushed on top of another, such as settings, can go back to it. */
+    back?: { label: string; onBack: () => void } | null;
     current: View | null;
     disabled: boolean;
     adding?: boolean;
@@ -68,6 +71,19 @@
     >
       <img src="/keepsake-logo.png" alt="Keepsake" width="2172" height="724" />
     </a>
+    {#if back}
+      <button
+        class="back"
+        aria-label={`Back to ${back.label}`}
+        {disabled}
+        onclick={back.onBack}
+      >
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+          <path d="M15 5.5 8.5 12l6.5 6.5" />
+        </svg>
+        <span>{back.label}</span>
+      </button>
+    {/if}
     <div class="title">
       <h1>{title}</h1>
       {#if detail !== null}<span class="detail">{detail}</span>{/if}
@@ -206,6 +222,26 @@
     display: none;
   }
 
+  /* Wider screens keep the navigation in view, so only phones show Back. */
+  .back {
+    display: none;
+  }
+
+  /* The Home Screen app's edge swipe: horizontal drags reach the page, and the
+     page slides over a darker backdrop while it follows the finger. */
+  :global(html.edge-swipe) .app-shell {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  :global(html.swiping-back body) {
+    background: #dde5e1;
+  }
+
+  :global(html.swiping-back) main {
+    background: #f5f8f7;
+    box-shadow: -8px 0 24px #18362f29;
+  }
+
   main {
     padding: 1.25rem 0 4rem;
   }
@@ -263,6 +299,30 @@
       background: #f5f8f7e6;
       -webkit-backdrop-filter: saturate(1.8) blur(20px);
       backdrop-filter: saturate(1.8) blur(20px);
+    }
+
+    .back {
+      grid-column: 1;
+      justify-self: start;
+      display: flex;
+      align-items: center;
+      max-width: 100%;
+      min-width: 0;
+      padding: 0.4rem 0.25rem 0.4rem 0;
+      margin-left: -0.35rem;
+      background: none;
+      color: #244c44;
+      font-size: 1rem;
+    }
+
+    .back svg {
+      flex-shrink: 0;
+    }
+
+    .back span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .title {

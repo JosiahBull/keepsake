@@ -339,7 +339,8 @@ over HTTPS; browsers allow service workers and notifications only on secure orig
 - **Android:** open Keepsake in Chrome, open the menu, then choose Add to Home screen.
 
 The installed app opens without browser controls. Starting it offline shows Keepsake's
-connection error rather than a browser error page; nothing is saved offline.
+connection error rather than a browser error page; nothing is saved offline. On iPhone
+and iPad, swipe in from the left edge to go back to the previous Keepsake screen.
 
 Turn on reminders in Profile settings. On iPhone and iPad this needs iOS 16.4 or later,
 and Keepsake must be opened from its Home Screen icon. Each profile gets at most one
