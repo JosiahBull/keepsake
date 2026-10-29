@@ -98,8 +98,7 @@ test("an edge swipe away from unsaved settings asks before discarding them", asy
   await expect(page.getByRole("textbox", { name: "Name", exact: true })).toHaveValue("Josiah B");
 });
 
-test("on phones, Profile settings has a back button to the screen it was opened from", async ({ page, isMobile }) => {
-  test.skip(!isMobile, "Wider screens keep the navigation in view instead.");
+test("Profile settings has a back button to the screen it was opened from", async ({ page }) => {
   await openPractice(page);
   await page.getByLabel("Profile: Josiah", { exact: true }).click();
   await page.getByRole("button", { name: "Profile settings", exact: true }).click();
