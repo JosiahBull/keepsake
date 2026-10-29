@@ -103,11 +103,13 @@ test("a fresh household has Josiah's 40 facts, Ansam's 60 facts and one-way pend
   ).toBeVisible();
   await page.getByRole("button", { name: "Ansam", exact: true }).click();
   await expect(page.getByText("60 facts", { exact: true })).toBeVisible();
-  await expect(
-    page
-      .getByRole("region", { name: "Saved facts", exact: true })
-      .locator("article"),
-  ).toHaveCount(25);
+  const listed = page
+    .getByRole("region", { name: "Saved facts", exact: true })
+    .locator("article");
+  await expect(async () => {
+    await listed.last().scrollIntoViewIfNeeded();
+    await expect(listed).toHaveCount(60, { timeout: 1_000 });
+  }).toPass();
   await page.getByLabel("Profile: Ansam", { exact: true }).click();
   await page.getByRole("button", { name: "Josiah", exact: true }).click();
   await expect(page.getByText("40 facts", { exact: true })).toBeVisible();

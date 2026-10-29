@@ -216,7 +216,7 @@ test("Practise automatically mixes every supported format without a mode selecto
   expect((await reviewHistory(app, fact.id)).total).toBe(5);
 });
 
-test("practice samples the whole library independently of library page and search", async ({ app, page }) => {
+test("practice samples the whole library however far the library is scrolled or searched", async ({ app, page }) => {
   const facts: Fact[] = [];
   for (let index = 0; index < 26; index += 1) {
     facts.push(await app.createFact({
@@ -225,10 +225,9 @@ test("practice samples the whole library independently of library page and searc
     }));
   }
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Library pages" })
-    .getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("region", { name: "Saved facts" }).getByRole("article").last().scrollIntoViewIfNeeded();
   await expect(page.getByRole("heading", { name: facts[0].prompt, exact: true })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Saved facts" }).getByRole("article")).toHaveCount(1);
+  await expect(page.getByRole("region", { name: "Saved facts" }).getByRole("article")).toHaveCount(26);
   await page.getByRole("searchbox", { name: "Search facts" }).fill("nonexistent synthetic search");
   await expect(page.getByText("No facts match “nonexistent synthetic search”. Clear or change your search.", {
     exact: true,
@@ -345,10 +344,7 @@ test("matching keeps one topic bank across rounds despite library pagination and
   }
 
   await page.goto("/");
-  await page.getByRole("navigation", { name: "Library pages" })
-    .getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByRole("navigation", { name: "Library pages" })
-    .getByText("Page 2", { exact: true })).toBeVisible();
+  await page.getByRole("region", { name: "Saved facts" }).getByRole("article").last().scrollIntoViewIfNeeded();
   await expect(page.getByRole("heading", { name: banks[0].facts[0].prompt, exact: true })).toBeVisible();
   await page.getByRole("searchbox", { name: "Search facts" }).fill("unrelated item 23");
   await expect(page.getByRole("region", { name: "Saved facts" }).getByRole("article")).toHaveCount(1);
