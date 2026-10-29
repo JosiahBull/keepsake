@@ -93,7 +93,7 @@ test.describe("profile screenshots", () => {
   });
 });
 
-test("install page", async ({ page, isMobile }) => {
+test("install page", async ({ page, isMobile }, testInfo) => {
   // The written steps are the baseline, not a prompt the test browser might offer.
   await page.addInitScript(() => {
     addEventListener("beforeinstallprompt", (event) => event.stopImmediatePropagation(), { capture: true });
@@ -105,10 +105,14 @@ test("install page", async ({ page, isMobile }) => {
   });
   // The QR code encodes the test server's port, which changes on every run.
   const qr = page.getByRole("img", { name: /^QR code/ });
+  // Review copies match the comparison, so CI's can become new Linux baselines.
+  const capture = { fullPage: true, mask: [qr], animations: "disabled", caret: "hide", scale: "css" } as const;
+  await page.screenshot({ ...capture, path: testInfo.outputPath("install-review.png") });
   await expect.soft(page).toHaveScreenshot("install.png", { fullPage: true, mask: [qr] });
   if (isMobile) {
     await page.getByRole("button", { name: "Install Keepsake", exact: true }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
+    await page.screenshot({ ...capture, fullPage: false, path: testInfo.outputPath("install-steps-review.png") });
     await expect.soft(page).toHaveScreenshot("install-steps.png");
   }
 });
