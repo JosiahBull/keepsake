@@ -15,6 +15,7 @@
     type Screen,
   } from "./profiles";
   import { openDialog } from "./dialog";
+  import { edgeSwipeBack, iosHomeScreenApp } from "./swipeBack";
   import { preload } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
   import { play, unlockSoundsOnTap } from "./sounds";
@@ -48,6 +49,19 @@
   let pendingScreen = $state<Screen | null>(null);
   let draft = $state<FactDraft | null>(null);
   const activeId = $derived(active?.setup_complete ? active.id : null);
+  // Entries Keepsake pushes record how many Keepsake screens lie behind them and
+  // which one came last, so back can stay inside Keepsake and say where it goes.
+  type Entry = { depth: number; from: Screen };
+  let depth = $state(0);
+  let cameFrom = $state<Screen | null>(null);
+  const titles: Record<Screen, string> = {
+    library: "Library",
+    sharing: "Library",
+    sent: "Library",
+    practice: "Practise",
+    matching: "Match pairs",
+    settings: "Profile settings",
+  };
 
   $effect(() => {
     if (activeId === null) return;
@@ -92,13 +106,38 @@
     pendingScreen = null;
   }
 
+  function readEntry() {
+    const state: unknown = history.state;
+    const entry: Record<string, unknown> =
+      typeof state === "object" && state !== null ? { ...state } : {};
+    depth =
+      typeof entry.depth === "number" && entry.depth > 0 ? entry.depth : 0;
+    cameFrom =
+      typeof entry.from === "string" && Object.hasOwn(titles, entry.from)
+        ? (entry.from as Screen)
+        : null;
+  }
+
+  function push(path: string) {
+    history.pushState({ depth: depth + 1, from: screen } satisfies Entry, "", path);
+    readEntry();
+  }
+
   function navigate(next: Screen, replace = false) {
     if (!active) return;
-    screen = next;
     const path = `/p/${active.id}/${next}`;
-    if (location.pathname !== path)
-      history[replace ? "replaceState" : "pushState"](null, "", path);
+    if (location.pathname !== path) {
+      if (replace) history.replaceState(history.state, "", path);
+      else push(path);
+    }
+    screen = next;
     window.scrollTo(0, 0);
+  }
+
+  // Back goes to the screen before this one, or to the library from a first screen.
+  function goBack() {
+    if (depth > 0) history.back();
+    else requestNavigation(() => navigate("library", true));
   }
 
   // Guess the first screen from the address so its data loads alongside the profiles.
@@ -129,6 +168,7 @@
 
   function readLocation() {
     mountId += 1;
+    readEntry();
     const match =
       /^\/p\/(\d+)\/(library|practice|matching|sharing|sent|settings)\/?$/.exec(
         location.pathname,
@@ -208,9 +248,10 @@
         pendingProfileCreate
       ) {
         const requestedPath = location.pathname;
-        if (active) history.pushState(null, "", `/p/${active.id}/${screen}`);
+        readEntry();
+        if (active) push(`/p/${active.id}/${screen}`);
         requestNavigation(() => {
-          history.pushState(null, "", requestedPath);
+          push(requestedPath);
           dirty = false;
           readLocation();
         });
@@ -248,7 +289,7 @@
       const path = data.path;
       if (location.pathname + location.search === path) return;
       requestNavigation(() => {
-        history.pushState(null, "", path);
+        push(path);
         dirty = false;
         shareIds = [];
         readLocation();
@@ -257,6 +298,13 @@
     const visibility = () => {
       if (activeId !== null) void refreshBadge(activeId);
     };
+    // The Home Screen app has no back button, so an edge swipe goes back as in iOS apps.
+    const stopSwipingBack = iosHomeScreenApp()
+      ? edgeSwipeBack(
+          () => depth > 0 && !blocked,
+          () => history.back(),
+        )
+      : () => undefined;
     window.addEventListener("popstate", pop);
     window.addEventListener("beforeunload", leave);
     document.addEventListener("visibilitychange", visibility);
@@ -265,6 +313,7 @@
     return () => {
       disposed = true;
       stopUnlockingSounds();
+      stopSwipingBack();
       window.removeEventListener("popstate", pop);
       window.removeEventListener("beforeunload", leave);
       document.removeEventListener("visibilitychange", visibility);
@@ -544,6 +593,12 @@
     profileId={active.id}
     title={screen === "settings" ? "Profile settings" : "Library"}
     detail={screen === "settings" ? null : ""}
+    back={screen === "settings"
+      ? {
+          label: depth > 0 && cameFrom ? titles[cameFrom] : "Library",
+          onBack: goBack,
+        }
+      : null}
     current={screen === "settings" ? null : "library"}
     disabled={blocked}
     onNavigate={(next) => requestNavigation(() => navigate(next))}
