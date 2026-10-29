@@ -1,3 +1,4 @@
+import type { PageScreenshotOptions } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { startExtraPractice } from "./actions";
 
@@ -106,7 +107,7 @@ test("install page", async ({ page, isMobile }, testInfo) => {
   // The QR code encodes the test server's port, which changes on every run.
   const qr = page.getByRole("img", { name: /^QR code/ });
   // Review copies match the comparison, so CI's can become new Linux baselines.
-  const capture = { fullPage: true, mask: [qr], animations: "disabled", caret: "hide", scale: "css" } as const;
+  const capture: PageScreenshotOptions = { fullPage: true, mask: [qr], animations: "disabled", caret: "hide", scale: "css" };
   await page.screenshot({ ...capture, path: testInfo.outputPath("install-review.png") });
   await expect.soft(page).toHaveScreenshot("install.png", { fullPage: true, mask: [qr] });
   if (isMobile) {
