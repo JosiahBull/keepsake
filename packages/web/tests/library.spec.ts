@@ -177,43 +177,101 @@ test("saved content stays text and only HTTP sources become safe external links"
   await expectViewportFit(page);
 });
 
-test("pagination has no missing or repeated facts and moves keyboard focus to page content", async ({ page, app }) => {
-  for (let number = 1; number <= 30; number += 1) {
-    await app.createFact(plainFact(`Household fact ${String(number).padStart(2, "0")}`));
+/** Scrolls to the last listed fact until the list holds `count` facts. */
+async function scrollUntilListed(page: Page, count: number) {
+  const rows = page.getByRole("article");
+  await expect(async () => {
+    await rows.last().scrollIntoViewIfNeeded();
+    await expect(rows).toHaveCount(count, { timeout: 1_000 });
+  }).toPass();
+}
+
+function gate() {
+  let release!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  return { promise, release };
+}
+
+test("scrolling to the end of the library lists every fact once, newest first", async ({ page, app }) => {
+  const created: Fact[] = [];
+  for (let number = 1; number <= 60; number += 1) {
+    created.push(await app.createFact(plainFact(`Household fact ${String(number).padStart(2, "0")}`)));
   }
+  const cursors: (string | null)[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname === "/api/profiles/1/facts") {
+      cursors.push(url.searchParams.get("before_id"));
+    }
+  });
 
   await page.goto("/");
+  await expect(page.getByText("60 facts", { exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Library pages" })).toHaveCount(0);
+  await scrollUntilListed(page, 60);
+
   const rows = page.getByRole("article");
-  const pagination = page.getByRole("navigation", { name: "Library pages" });
-  await expect(rows).toHaveCount(25);
-  await expect(page.getByText("30 facts", { exact: true })).toBeVisible();
-  await expect(pagination.getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
-  await expect(rows.first().getByRole("heading")).toHaveText("Household fact 30");
-  await expect(rows.last().getByRole("heading")).toHaveText("Household fact 06");
-  const firstPage = await rows.getByRole("heading").allTextContents();
-
-  const next = pagination.getByRole("button", { name: "Next", exact: true });
-  await next.focus();
-  await page.keyboard.press("Enter");
-  await expect(rows).toHaveCount(5);
-  await expect(pagination.getByText("Page 2", { exact: true })).toBeVisible();
-  await expect(next).toBeDisabled();
-  await expect(rows.first().locator("summary")).toBeFocused();
-  await expect(rows.first().getByRole("heading")).toHaveText("Household fact 05");
-  await expect(rows.last().getByRole("heading")).toHaveText("Household fact 01");
-  const secondPage = await rows.getByRole("heading").allTextContents();
-  expect(new Set([...firstPage, ...secondPage]).size).toBe(30);
-  await page.keyboard.press("Space");
-  await expect(rows.first().getByText("Answer for Household fact 05", { exact: true })).toBeVisible();
-
-  await pagination.getByRole("button", { name: "Previous", exact: true }).click();
-  await expect(rows).toHaveCount(25);
-  await expect(rows.first().locator("summary")).toBeFocused();
-  expect(await rows.getByRole("heading").allTextContents()).toEqual(firstPage);
+  expect(await rows.getByRole("heading").allTextContents()).toEqual(
+    created.map((fact) => fact.prompt).reverse(),
+  );
+  // Each page starts below the last fact listed, and nothing is asked for past the end.
+  expect(cursors).toEqual([null, String(created[35].id), String(created[10].id)]);
+  await rows.last().locator("summary").click();
+  await expect(rows.last().getByText("Answer for Household fact 01", { exact: true })).toBeVisible();
   await expectViewportFit(page);
 });
 
-test("search filters every supported field literally, handles Māori macrons, and resets pagination", async ({ page, app }) => {
+test("a page that fails to load can be retried, and a late page never joins a newer search", async ({ page, app }) => {
+  for (let number = 1; number <= 30; number += 1) {
+    await app.createFact(plainFact(`Household fact ${String(number).padStart(2, "0")}`));
+  }
+  const rows = page.getByRole("article");
+  let failed = false;
+  await page.route(/\/api\/profiles\/1\/facts\?.*before_id=/, async (route) => {
+    if (failed) {
+      await route.continue();
+      return;
+    }
+    failed = true;
+    await route.fulfill({ status: 503, json: { error: "The library is busy." } });
+  });
+
+  await page.goto("/");
+  await rows.last().scrollIntoViewIfNeeded();
+  const alert = page.getByRole("alert");
+  await expect(alert).toHaveText(/^Could not load more facts\. The library is busy\.\s*Try again$/);
+  await expect(rows).toHaveCount(25);
+  await alert.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(rows).toHaveCount(30);
+  await expect(alert).toHaveCount(0);
+
+  await page.unroute(/\/api\/profiles\/1\/facts\?.*before_id=/);
+  const held = gate();
+  await page.route(/\/api\/profiles\/1\/facts\?.*before_id=/, async (route) => {
+    await held.promise;
+    await route.continue();
+  });
+  try {
+    await page.reload();
+    await rows.last().scrollIntoViewIfNeeded();
+    await expect(page.getByRole("status").filter({ hasText: "Loading more facts…" })).toBeVisible();
+    await page.getByRole("searchbox", { name: "Search facts" }).fill("Household fact 03");
+    await expect(rows).toHaveCount(1);
+
+    const late = page.waitForResponse((response) => response.url().includes("before_id="));
+    held.release();
+    await late;
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await expect(rows).toHaveCount(1);
+    await expect(rows.getByRole("heading")).toHaveText("Household fact 03");
+  } finally {
+    held.release();
+  }
+});
+
+test("search filters every supported field literally, handles Māori macrons, and starts again from the newest fact", async ({ page, app }) => {
   for (let number = 1; number <= 26; number += 1) {
     await app.createFact(plainFact(`Ordinary household fact ${number}`));
   }
@@ -224,9 +282,7 @@ test("search filters every supported field literally, handles Māori macrons, an
   await app.createFact(plainFact("ĀĒĪŌŪ around the house", { answer: "Māori vowel practice" }));
   await page.goto("/");
   const rows = page.getByRole("article");
-  await expect(rows).toHaveCount(25);
-  await page.getByRole("navigation", { name: "Library pages" }).getByRole("button", { name: "Next", exact: true }).click();
-  await expect(page.getByText("Page 2", { exact: true })).toBeVisible();
+  await scrollUntilListed(page, 31);
 
   const search = page.getByRole("searchbox", { name: "Search facts" });
   for (const [query, title] of [
@@ -239,17 +295,15 @@ test("search filters every supported field literally, handles Māori macrons, an
     await search.fill(query);
     await expect(rows).toHaveCount(1);
     await expect(rows.getByRole("heading")).toHaveText(title);
-    await expect(page.getByRole("navigation", { name: "Library pages" })).toHaveCount(0);
   }
 
   await search.fill("no matching household word");
   await expect(rows).toHaveCount(0);
   await expect(page.getByText("No facts match “no matching household word”. Clear or change your search.", { exact: true })).toBeVisible();
   await search.fill("");
-  await expect(rows).toHaveCount(25);
   await expect(rows.first().getByRole("heading")).toHaveText("ĀĒĪŌŪ around the house");
-  await expect(page.getByText("Page 1", { exact: true })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Library pages" }).getByRole("button", { name: "Previous", exact: true })).toBeDisabled();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await scrollUntilListed(page, 31);
 });
 
 test("a fact can be added and disclosed with the keyboard", async ({ page }) => {

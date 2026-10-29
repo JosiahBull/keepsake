@@ -18,7 +18,7 @@ pnpm --filter @keepsake/web test:e2e:ui
 The suite runs desktop Chromium, mobile Chromium and mobile WebKit. It covers
 the web app manifest, Home Screen shortcuts, shared pages, reminder settings,
 fact forms, question images and audio, agent access settings, CLI/browser persistence across restarts, literal and Māori macron
-search, pagination and keyboard focus, every practice format and rating, mixed
+search, loading the library while scrolling, every practice format and rating, mixed
 sessions, matching, loading states, retries, background saves and their order, preloaded
 rounds, stale search responses and interface sounds.
 Success paths use the real API. Recovery tests intercept only the deliberate

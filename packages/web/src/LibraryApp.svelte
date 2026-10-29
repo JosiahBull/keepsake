@@ -154,10 +154,12 @@
   );
   let selectedFacts = $state<number[]>([]);
   let search = $state("");
+  // The search the listed facts match; later pages must use it, not a newer draft.
+  let listedSearch = "";
   let totalFacts = $state(0);
   let nextCursor = $state<number | null>(null);
-  let beforeCursor = $state<number | null>(null);
-  let pageHistory = $state<(number | null)[]>([]);
+  let loadingMore = $state(false);
+  let moreError = $state("");
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let libraryRequest = 0;
   let practiceRequest = 0;
@@ -282,28 +284,21 @@
   });
 
   // Library and fact form actions
-  async function loadFacts(
-    cursor: number | null = beforeCursor,
-    history = pageHistory,
-  ) {
+  /** Lists the newest facts again, replacing everything listed so far. */
+  async function loadFacts() {
     const request = ++libraryRequest;
     loading = true;
+    loadingMore = false;
     error = "";
-    beforeCursor = cursor;
-    pageHistory = [...history];
+    moreError = "";
+    listedSearch = search;
     facts = [];
     nextCursor = null;
 
     try {
       const page = unwrap(
         await api.GET("/api/facts", {
-          params: {
-            query: {
-              limit: 25,
-              ...(cursor === null ? {} : { before_id: cursor }),
-              search,
-            },
-          },
+          params: { query: { limit: 25, search: listedSearch } },
         }),
       );
 
@@ -325,6 +320,66 @@
     }
   }
 
+  /** Appends the next older page. A new search or reload discards a late response. */
+  async function loadMore() {
+    if (loading || loadingMore || moreError || nextCursor === null) {
+      return;
+    }
+
+    const request = libraryRequest;
+    loadingMore = true;
+
+    try {
+      const page = unwrap(
+        await api.GET("/api/facts", {
+          params: {
+            query: { limit: 25, before_id: nextCursor, search: listedSearch },
+          },
+        }),
+      );
+
+      if (request !== libraryRequest) {
+        return;
+      }
+
+      const listed = new Set(facts.map((fact) => fact.id));
+      facts = [...facts, ...page.items.filter((fact) => !listed.has(fact.id))];
+      totalFacts = page.total;
+      nextCursor = page.next_cursor ?? null;
+    } catch (caught) {
+      if (request === libraryRequest) {
+        moreError = `Could not load more facts. ${message(caught)}`;
+      }
+    } finally {
+      if (request === libraryRequest) {
+        loadingMore = false;
+      }
+    }
+  }
+
+  /** Loads the next page once the end of the list is within a screen of view. */
+  function nearListEnd(element: HTMLElement, _listed: number) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { rootMargin: "0px 0px 100% 0px" },
+    );
+    observer.observe(element);
+
+    return {
+      // Observing again reports the end's current position, so a page that
+      // leaves it in view still loads the next.
+      update() {
+        observer.unobserve(element);
+        observer.observe(element);
+      },
+      destroy() {
+        observer.disconnect();
+      },
+    };
+  }
+
   function searchLibrary(event: Event) {
     search = (event.currentTarget as HTMLInputElement).value;
     clearTimeout(searchTimer);
@@ -332,32 +387,8 @@
     // Invalidate an earlier search immediately, before the debounce expires.
     libraryRequest += 1;
     searchTimer = setTimeout(() => {
-      void loadFacts(null, []);
+      void loadFacts();
     }, 200);
-  }
-
-  function focusPageContent() {
-    if (!error) {
-      document.querySelector<HTMLElement>(".fact-details > summary")?.focus();
-    }
-  }
-
-  async function previousPage() {
-    if (pageHistory.length === 0 || loading) {
-      return;
-    }
-
-    await loadFacts(pageHistory.at(-1) ?? null, pageHistory.slice(0, -1));
-    focusPageContent();
-  }
-
-  async function nextPage() {
-    if (nextCursor === null || loading) {
-      return;
-    }
-
-    await loadFacts(nextCursor, [...pageHistory, beforeCursor]);
-    focusPageContent();
   }
 
   function showLibrary() {
@@ -544,7 +575,7 @@
       play("keep");
       search = "";
       clearTimeout(searchTimer);
-      void loadFacts(null, []);
+      void loadFacts();
     } catch (caught) {
       error = `Could not save the fact. ${message(caught)}`;
       play("alert");
@@ -1297,7 +1328,7 @@
       </section>
     {/if}
 
-    {#if totalFacts > 0 || search || pageHistory.length > 0}
+    {#if totalFacts > 0 || search}
       <div class="library-tools">
         <label class="search">
           <span class="sr-only">Search facts</span>
@@ -1389,20 +1420,25 @@
           {/if}
         {/each}
       </section>
-      {#if pageHistory.length > 0 || nextCursor !== null}
-        <nav class="pagination" aria-label="Library pages">
-          <button
-            class="quiet"
-            disabled={loading || pageHistory.length === 0}
-            onclick={previousPage}>Previous</button
-          >
-          <span class="muted">Page {pageHistory.length + 1}</span>
-          <button
-            class="quiet"
-            disabled={loading || nextCursor === null}
-            onclick={nextPage}>Next</button
-          >
-        </nav>
+      {#if nextCursor !== null || moreError}
+        <div class="list-end" use:nearListEnd={facts.length}>
+          {#if moreError}
+            <div class="message error" role="alert">
+              {moreError}
+              <button
+                class="text-button"
+                onclick={() => {
+                  moreError = "";
+                  void loadMore();
+                }}>Try again</button
+              >
+            </div>
+          {:else}
+            <p class="muted" role="status">
+              {loadingMore ? "Loading more facts…" : ""}
+            </p>
+          {/if}
+        </div>
       {/if}
     {/if}
   {:else if view === "practice"}
@@ -2182,17 +2218,13 @@
     padding: 0.2rem 0.5rem;
   }
 
-  .pagination {
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 1rem;
-    margin: 1.5rem 0 0;
+  .list-end {
+    min-height: 4rem;
+    padding: 1rem 0;
   }
 
-  .pagination button {
-    color: #51675e;
-    padding: 0.7rem 0.9rem;
+  .list-end p {
+    margin: 0;
   }
 
   /* Practice session */
@@ -2436,18 +2468,7 @@
     border: 0;
   }
 
-  @media (max-width: 850px) {
-    .pagination button {
-      padding: 0.65rem;
-      font-size: 0.9rem;
-    }
-  }
-
   @media (max-width: 580px) {
-    .pagination button {
-      flex: 1;
-    }
-
     .fact-details h2 {
       font-size: 1rem;
     }

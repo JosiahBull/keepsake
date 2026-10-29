@@ -322,9 +322,9 @@ are case-sensitive. JSON output is `{items, next_cursor, total}`;
 continue with `--before NEXT_CURSOR` and the same search until the cursor is null.
 `list` accepts 1–100 facts per page; `show ID` includes that fact's practice variants.
 
-The website has Previous/Next library navigation. Due queues contain up to 20 eligible
-targets; Extra practice samples up to 20 prompts across formats. Library pages and
-searches do not restrict either queue. Review-history
+The website's library loads the next 25 facts as you scroll towards the end. Due queues
+contain up to 20 eligible targets; Extra practice samples up to 20 prompts across formats.
+Neither queue depends on the library's search or how far it is scrolled. Review-history
 requests return up to 50 reviews by default (maximum 100), with `after_id` for the next page.
 
 ## Install on a phone
