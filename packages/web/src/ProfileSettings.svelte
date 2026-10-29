@@ -112,7 +112,6 @@
 </script>
 
 <section class="settings">
-  <h1>Profile settings</h1>
   {#if error}<p class="message error" role="alert">{error}</p>
     {#if settings}<button
         class="quiet recover"
@@ -209,13 +208,6 @@
   }
   .settings {
     max-width: 580px;
-  }
-  h1 {
-    font:
-      500 2rem/1.2 "Iowan Old Style",
-      Palatino,
-      serif;
-    letter-spacing: -0.035em;
   }
   form {
     display: grid;

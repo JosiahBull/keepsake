@@ -25,7 +25,8 @@ async function expectNavigationDisabled(page: Page) {
     await expect(page.getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name, exact: true })).toBeDisabled();
   }
-  await expect(page.locator(".add-top")).toBeDisabled();
+  await expect(page.getByRole("banner")
+    .getByRole("button", { name: "Add a fact", exact: true })).toBeDisabled();
 }
 
 test("library retries a failed load and shows loading until the real response arrives", async ({ app, page }) => {

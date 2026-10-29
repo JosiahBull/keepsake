@@ -1158,6 +1158,16 @@
 
 <AppShell
   {profileId}
+  title={view === "library"
+    ? "Library"
+    : view === "practice"
+      ? "Practise"
+      : "Match pairs"}
+  detail={view !== "library"
+    ? null
+    : error || loading
+      ? ""
+      : `${totalFacts} ${totalFacts === 1 ? "fact" : "facts"}`}
   current={view}
   disabled={navigationBlocked}
   adding={showAdd}
@@ -1201,19 +1211,23 @@
   {/if}
 
   {#if view === "library"}
-    <LibraryHeading
-      current="library"
-      disabled={blocked}
-      addDisabled={navigationBlocked}
-      adding={showAdd}
-      onAdd={openAdd}
-      {onNavigate}
-    >
-      {#if !error && !loading}
-        <span class="muted">
-          {totalFacts}
-          {totalFacts === 1 ? "fact" : "facts"}
-        </span>
+    <LibraryHeading current="library" disabled={blocked} {onNavigate}>
+      {#if totalFacts > 0 || search}
+        <label class="search">
+          <span class="sr-only">Search facts</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+            ><circle cx="10.5" cy="10.5" r="6.5" /><path
+              d="m15.5 15.5 5 5"
+            /></svg
+          >
+          <input
+            type="search"
+            value={search}
+            oninput={searchLibrary}
+            placeholder="Search facts or tags"
+            maxlength="1000"
+          />
+        </label>
       {/if}
     </LibraryHeading>
 
@@ -1328,20 +1342,6 @@
       </section>
     {/if}
 
-    {#if totalFacts > 0 || search}
-      <div class="library-tools">
-        <label class="search">
-          <span class="sr-only">Search facts</span>
-          <input
-            type="search"
-            value={search}
-            oninput={searchLibrary}
-            placeholder="Search facts or tags"
-            maxlength="1000"
-          />
-        </label>
-      </div>
-    {/if}
     {#if loading}
       <p role="status">Loading library…</p>
     {:else if totalFacts === 0 && !search}
@@ -1442,7 +1442,6 @@
       {/if}
     {/if}
   {:else if view === "practice"}
-    <h1 class="sr-only">Practise</h1>
     <div class="practice-layout">
       <div class="practice-toolbar">
         <span class="muted"
@@ -1701,8 +1700,6 @@
       {/if}
     </div>
   {:else}
-    <h1 class="sr-only">Match pairs</h1>
-
     {#if matchingLoading}
       <p role="status">Loading matching pairs…</p>
     {:else if matchingError}
@@ -1993,17 +1990,30 @@
     font-size: 0.85rem;
   }
 
-  .library-tools {
-    margin-bottom: 0.75rem;
+  /* An iOS-style search field: filled, rounded, with a magnifier. */
+  .search {
+    position: relative;
+    display: block;
+    flex: 0 1 340px;
   }
 
-  .search {
-    display: block;
-    max-width: 460px;
+  .search svg {
+    position: absolute;
+    left: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    fill: none;
+    stroke: #64786c;
+    stroke-width: 2;
+    stroke-linecap: round;
+    pointer-events: none;
   }
 
   .search input {
-    background: transparent;
+    padding: 0.45rem 0.75rem 0.45rem 2.1rem;
+    background: #e3ebe7;
+    border: 0;
+    border-radius: 10px;
   }
 
   .fact-row {
@@ -2466,6 +2476,12 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+
+  @media (max-width: 700px) {
+    .search {
+      flex: 1 1 100%;
+    }
   }
 
   @media (max-width: 580px) {

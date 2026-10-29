@@ -282,7 +282,9 @@ test("library tabs keep the header, heading and tab bar in place", async ({
 
 test("the profile menu's chevron is centred on the profile name", async ({
   page,
+  isMobile,
 }) => {
+  test.skip(isMobile, "Phones show the profile as an avatar, without a chevron.");
   await page.goto("/p/1/library");
   const summary = page.getByLabel("Profile: Josiah", { exact: true });
   const name = await summary.getByText("Josiah", { exact: true }).boundingBox();

@@ -426,6 +426,7 @@
 {#snippet profileMenu()}
   <details class="profile-menu">
     <summary aria-label={`Profile: ${active?.name ?? "Choose profile"}`}
+      ><span class="avatar" aria-hidden="true">{[...(active?.name ?? "?")][0]}</span
       ><span class="profile-name">{active?.name ?? "Choose profile"}</span
       ><!-- Glyphs such as ⌄ sit on the text baseline, so the chevron is drawn to centre on the name. --><svg
         class="chevron"
@@ -551,6 +552,8 @@
 {:else}
   <AppShell
     profileId={active.id}
+    title={screen === "settings" ? "Profile settings" : "Library"}
+    detail={screen === "settings" ? null : ""}
     current={screen === "settings" ? null : "library"}
     disabled={blocked}
     onNavigate={(next) => requestNavigation(() => navigate(next))}
@@ -562,8 +565,6 @@
       <LibraryHeading
         current={screen}
         disabled={blocked}
-        addDisabled={blocked}
-        onAdd={addFact}
         onNavigate={(next) => requestNavigation(() => navigate(next))}
       />
     {/if}
@@ -765,6 +766,9 @@
   .profile-menu[open] .chevron {
     transform: rotate(180deg);
   }
+  .avatar {
+    display: none;
+  }
   .profile-menu summary::-webkit-details-marker {
     display: none;
   }
@@ -869,10 +873,31 @@
       Palatino,
       serif;
   }
-  @media (max-width: 580px) {
-    .profile-menu {
-      margin-left: auto;
+  /* Phones show the profile as an avatar in the navigation bar. */
+  @media (max-width: 700px) {
+    .profile-menu summary {
+      padding: 0.2rem;
+      border: 0;
     }
+    .profile-name,
+    .chevron {
+      display: none;
+    }
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #244c44;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .menu {
+      top: calc(100% + 0.35rem);
+    }
+  }
+  @media (max-width: 580px) {
     .dialog {
       padding: 1.3rem;
     }
