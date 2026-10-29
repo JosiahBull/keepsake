@@ -76,6 +76,7 @@ test.describe("profile screenshots", () => {
     await page.screenshot({ path: testInfo.outputPath("profile-chooser-review.png"), fullPage: true });
     await expect.soft(page).toHaveScreenshot("profile-chooser.png", { fullPage: true });
     await page.getByRole("button", { name: "Josiah", exact: true }).click();
+    await page.getByRole("button", { name: "Select", exact: true }).click();
     await page.getByRole("checkbox", { name: `Select ${fact.prompt}`, exact: true }).check();
     await page.getByRole("button", { name: "Share selected", exact: true }).click();
     await page.getByLabel("Share with", { exact: true }).selectOption(String(partner.id));

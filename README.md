@@ -124,6 +124,9 @@ Deleting a fact removes it with its practice variants, reviews, schedule and stu
 history. Only a backup brings it back. The CLI prints what it deleted, so the content can
 be saved again, as a new fact with a fresh schedule. A deleted fact's ID is never reused.
 
+In the website, swipe a fact left on a touch screen, or hover over it with a pointer,
+and choose Delete. The website asks before it deletes.
+
 ```sh
 keepsake --profile default delete FACT_ID
 curl -X DELETE http://localhost:8080/api/profiles/1/facts/FACT_ID
