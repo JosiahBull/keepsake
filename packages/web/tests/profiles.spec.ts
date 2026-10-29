@@ -15,6 +15,7 @@ async function switchTo(page: Page, name: string) {
 }
 
 async function shareWith(page: Page, prompt: string, recipientId: number) {
+  await page.getByRole("button", { name: "Select", exact: true }).click();
   await page
     .getByRole("checkbox", { name: `Select ${prompt}`, exact: true })
     .check();
@@ -101,6 +102,7 @@ test("separate browser contexts accept copies while both libraries and schedules
     tags: ["household"],
   });
   await page.goto("/p/1/library");
+  await page.getByRole("button", { name: "Select", exact: true }).click();
   await page
     .getByRole("checkbox", { name: `Select ${first.prompt}`, exact: true })
     .check();

@@ -4,6 +4,7 @@
   import createClient from "openapi-fetch";
   import type { Snippet } from "svelte";
   import AppShell from "./AppShell.svelte";
+  import { openDialog } from "./dialog";
   import LibraryHeading from "./LibraryHeading.svelte";
   import QuestionMedia from "./QuestionMedia.svelte";
   import { preloaded } from "./preload";
@@ -153,6 +154,7 @@
     untrack(() => initialView),
   );
   let selectedFacts = $state<number[]>([]);
+  let selecting = $state(false);
   let search = $state("");
   // The search the listed facts match; later pages must use it, not a newer draft.
   let listedSearch = "";
@@ -164,6 +166,18 @@
   let libraryRequest = 0;
   let practiceRequest = 0;
   let matchingRequest = 0;
+
+  // Row actions. On touch screens a row slides left to show Share and Delete.
+  const ACTIONS_WIDTH = 152;
+  let swiped = $state<number | null>(null);
+  let drag = $state<{ id: number; offset: number } | null>(null);
+  // Set when a swipe ends, so the click its release may produce is not a tap.
+  let swipeJustEnded = false;
+  // A pinch-zoomed page needs sideways drags to pan, so rows stop taking them.
+  let zoomed = $state(false);
+  let deleting = $state<Fact | null>(null);
+  let deleteBusy = $state(false);
+  let deleteError = $state("");
 
   // Fact form, optionally opened with shared context from the system share sheet
   const initialDraft = untrack(() => draft);
@@ -250,7 +264,7 @@
 
   $effect(() => {
     // Leaving would discard saves that have not reached the server.
-    blocked = saves.size > 0 || saving;
+    blocked = saves.size > 0 || saving || deleteBusy;
     dirty = Boolean(
       response.trim() ||
       prompt.trim() ||
@@ -268,11 +282,15 @@
   });
 
   onMount(() => {
+    const zoom = () => (zoomed = (visualViewport?.scale ?? 1) > 1.01);
+    zoom();
+    visualViewport?.addEventListener("resize", zoom);
     if (initialDraft) onDraftOpened?.();
     if (initialView === "practice") void startPractice();
     else if (initialView === "matching") void startMatching();
     else void loadFacts();
     return () => {
+      visualViewport?.removeEventListener("resize", zoom);
       for (const attachment of attachments)
         URL.revokeObjectURL(attachment.preview);
       clearTimeout(searchTimer);
@@ -378,6 +396,152 @@
         observer.disconnect();
       },
     };
+  }
+
+  /**
+   * Follows a horizontal touch drag on a row, then leaves its actions open or
+   * closed. Vertical drags stay with the browser, which scrolls the page.
+   */
+  function swipeRow(element: HTMLElement, id: number) {
+    let start: { x: number; y: number; pointer: number; from: number } | null =
+      null;
+    let horizontal = false;
+
+    const down = (event: PointerEvent) => {
+      swipeJustEnded = false;
+      if (event.pointerType === "mouse" || !event.isPrimary || zoomed) return;
+      start = {
+        x: event.clientX,
+        y: event.clientY,
+        pointer: event.pointerId,
+        from: swiped === id ? -ACTIONS_WIDTH : 0,
+      };
+      horizontal = false;
+    };
+    const move = (event: PointerEvent) => {
+      if (!start || event.pointerId !== start.pointer) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      if (!horizontal) {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+          start = null;
+          return;
+        }
+        if (Math.abs(dx) < 10) return;
+        horizontal = true;
+        if (swiped !== id) swiped = null;
+        try {
+          element.setPointerCapture(event.pointerId);
+        } catch {
+          /* A pointer that has already gone cannot be captured. */
+        }
+      }
+      // Past the actions the row resists, as an iOS list row does.
+      const offset = Math.min(0, start.from + dx);
+      drag = {
+        id,
+        offset:
+          offset < -ACTIONS_WIDTH
+            ? -ACTIONS_WIDTH + (offset + ACTIONS_WIDTH) / 3
+            : offset,
+      };
+    };
+    const up = (event: PointerEvent) => {
+      if (!start || event.pointerId !== start.pointer) return;
+      if (horizontal && drag?.id === id) {
+        swiped =
+          event.type === "pointerup" && drag.offset < -ACTIONS_WIDTH / 2
+            ? id
+            : null;
+        swipeJustEnded = true;
+      }
+      start = null;
+      drag = null;
+    };
+    // The release that ends a swipe is not a tap, and a tap on an open row closes it.
+    const click = (event: MouseEvent) => {
+      const inActions =
+        event.target instanceof Element &&
+        event.target.closest(".row-actions") !== null;
+      if (swipeJustEnded || (swiped === id && !inActions)) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!swipeJustEnded) swiped = null;
+        swipeJustEnded = false;
+      }
+    };
+
+    element.addEventListener("pointerdown", down);
+    element.addEventListener("pointermove", move);
+    element.addEventListener("pointerup", up);
+    element.addEventListener("pointercancel", up);
+    element.addEventListener("click", click, true);
+    return {
+      destroy() {
+        element.removeEventListener("pointerdown", down);
+        element.removeEventListener("pointermove", move);
+        element.removeEventListener("pointerup", up);
+        element.removeEventListener("pointercancel", up);
+        element.removeEventListener("click", click, true);
+      },
+    };
+  }
+
+  function closeSwipedOutside(event: PointerEvent) {
+    if (
+      swiped !== null &&
+      !(event.target instanceof Element && event.target.closest(".fact-row.open"))
+    )
+      swiped = null;
+  }
+
+  function toggleSelecting() {
+    selecting = !selecting;
+    selectedFacts = [];
+    swiped = null;
+  }
+
+  function shareFact(fact: Fact) {
+    swiped = null;
+    onShare([fact.id]);
+  }
+
+  function askDelete(fact: Fact) {
+    deleting = fact;
+    deleteError = "";
+  }
+
+  async function deleteFact() {
+    const fact = deleting;
+    if (!fact || deleteBusy) {
+      return;
+    }
+
+    deleteBusy = true;
+    deleteError = "";
+    try {
+      const { error: failure, response } = await api.DELETE(
+        "/api/facts/{id}",
+        { params: { path: { id: fact.id } } },
+      );
+      // A fact already deleted elsewhere, such as from the CLI, is gone either way.
+      if (failure && response.status !== 404) {
+        throw new Error(failure.error);
+      }
+
+      facts = facts.filter((item) => item.id !== fact.id);
+      totalFacts = Math.max(0, totalFacts - 1);
+      selectedFacts = selectedFacts.filter((id) => id !== fact.id);
+      clearDisclosure(fact.id);
+      swiped = null;
+      deleting = null;
+      notice = "Fact deleted.";
+    } catch (caught) {
+      deleteError = `Could not delete the fact. ${message(caught)}`;
+      play("alert");
+    } finally {
+      deleteBusy = false;
+    }
   }
 
   function searchLibrary(event: Event) {
@@ -1147,6 +1311,41 @@
 </script>
 
 <svelte:head><title>Keepsake</title></svelte:head>
+<svelte:window onpointerdown={closeSwipedOutside} />
+
+{#if deleting}
+  <dialog
+    class="dialog"
+    use:openDialog
+    oncancel={(event) => {
+      event.preventDefault();
+      if (!deleteBusy) deleting = null;
+    }}
+    role="alertdialog"
+    aria-modal="true"
+    aria-labelledby="delete-title"
+    aria-describedby="delete-detail"
+  >
+    <h2 id="delete-title">Delete this fact?</h2>
+    <p class="delete-prompt">{deleting.prompt}</p>
+    <p id="delete-detail">
+      Its reviews and schedule go with it, and pending shares of it are
+      withdrawn. This cannot be undone.
+    </p>
+    {#if deleteError}<p class="message error" role="alert">
+        {deleteError}
+      </p>{/if}
+    <div class="form-actions">
+      <button
+        class="quiet"
+        disabled={deleteBusy}
+        onclick={() => (deleting = null)}>Cancel</button
+      ><button class="danger" disabled={deleteBusy} onclick={deleteFact}
+        >{deleteBusy ? "Deleting…" : "Delete fact"}</button
+      >
+    </div>
+  </dialog>
+{/if}
 
 {#snippet savedReviews()}
   {#if saves.size}
@@ -1212,34 +1411,47 @@
 
   {#if view === "library"}
     <LibraryHeading current="library" disabled={blocked} {onNavigate}>
-      {#if totalFacts > 0 || search}
-        <label class="search">
-          <span class="sr-only">Search facts</span>
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
-            ><circle cx="10.5" cy="10.5" r="6.5" /><path
-              d="m15.5 15.5 5 5"
-            /></svg
-          >
-          <input
-            type="search"
-            value={search}
-            oninput={searchLibrary}
-            placeholder="Search facts or tags"
-            maxlength="1000"
-          />
-        </label>
+      {#if totalFacts > 0 || search || selecting}
+        <div class="library-tools">
+          {#if totalFacts > 0 || search}
+            <label class="search">
+              <span class="sr-only">Search facts</span>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+                ><circle cx="10.5" cy="10.5" r="6.5" /><path
+                  d="m15.5 15.5 5 5"
+                /></svg
+              >
+              <input
+                type="search"
+                value={search}
+                oninput={searchLibrary}
+                placeholder="Search facts or tags"
+                maxlength="1000"
+              />
+            </label>
+          {/if}
+          {#if facts.length || selecting}
+            <button class="select-toggle" onclick={toggleSelecting}
+              >{selecting ? "Done" : "Select"}</button
+            >
+          {/if}
+        </div>
       {/if}
     </LibraryHeading>
 
-    {#if selectedFacts.length}<div class="share-selection">
-        <span>{selectedFacts.length} selected</span><button
-          class="quiet"
-          disabled={blocked}
+    {#if selecting}
+      <div class="selection-bar" role="toolbar" aria-label="Selected facts">
+        <span
+          >{selectedFacts.length
+            ? `${selectedFacts.length} selected`
+            : "Choose facts to share"}</span
+        ><button
+          class="primary"
+          disabled={blocked || selectedFacts.length === 0}
           onclick={() => onShare(selectedFacts)}>Share selected</button
-        ><button class="text-button" onclick={() => (selectedFacts = [])}
-          >Clear selection</button
         >
-      </div>{/if}
+      </div>
+    {/if}
 
     {#if showAdd}
       <section class="add-panel" aria-labelledby="add-heading">
@@ -1349,68 +1561,122 @@
         <p class="empty-state">No facts yet. Add a fact to start.</p>
       {/if}
     {:else}
-      <section class="fact-list" aria-label="Saved facts">
+      <section
+        class="fact-list"
+        class:selecting
+        class:zoomed
+        aria-label="Saved facts"
+      >
         {#each facts as fact (fact.id)}
-          <article class="fact-row">
-            <input
-              class="fact-select"
-              type="checkbox"
-              aria-label={`Select ${fact.prompt}`}
-              checked={selectedFacts.includes(fact.id)}
-              disabled={!selectedFacts.includes(fact.id) &&
-                selectedFacts.length >= 20}
-              onchange={() =>
-                (selectedFacts = selectedFacts.includes(fact.id)
-                  ? selectedFacts.filter((id) => id !== fact.id)
-                  : [...selectedFacts, fact.id])}
-            />
-            <details
-              class="fact-details"
-              ontoggle={(event) => discloseFact(event, fact.id)}
-            >
-              <summary onclick={() => clearDisclosure(fact.id)}>
-                <h2>{fact.prompt}</h2>
-                {#if fact.media.length}<span class="media-note"
-                    >{describeMedia(fact.media)}</span
-                  >{/if}
-              </summary>
-              {#if disclosedFacts.includes(fact.id)}
-                <div class="fact-body">
-                  <QuestionMedia profileId={profileId} media={fact.media} />
-                  <p class="answer-copy">{fact.answer}</p>
+          <article
+            class="fact-row"
+            class:open={swiped === fact.id}
+            class:dragging={drag?.id === fact.id}
+            style:--offset={drag?.id === fact.id
+              ? `${drag.offset}px`
+              : swiped === fact.id
+                ? `-${ACTIONS_WIDTH}px`
+                : undefined}
+            use:swipeRow={fact.id}
+          >
+            {#if selecting}
+              <label class="select-row">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${fact.prompt}`}
+                  checked={selectedFacts.includes(fact.id)}
+                  disabled={!selectedFacts.includes(fact.id) &&
+                    selectedFacts.length >= 20}
+                  onchange={() =>
+                    (selectedFacts = selectedFacts.includes(fact.id)
+                      ? selectedFacts.filter((id) => id !== fact.id)
+                      : [...selectedFacts, fact.id])}
+                />
+                <span class="prompt">{fact.prompt}</span>
+              </label>
+            {:else}
+              <div class="row-content">
+                <details
+                  class="fact-details"
+                  ontoggle={(event) => discloseFact(event, fact.id)}
+                >
+                  <summary onclick={() => clearDisclosure(fact.id)}>
+                    <h2>{fact.prompt}</h2>
+                    {#if fact.media.length}<span class="media-note"
+                        >{describeMedia(fact.media)}</span
+                      >{/if}
+                    <svg
+                      class="disclosure"
+                      viewBox="0 0 12 12"
+                      width="12"
+                      height="12"
+                      aria-hidden="true"><path d="M4.5 2.5 8 6l-3.5 3.5" /></svg
+                    >
+                  </summary>
+                  {#if disclosedFacts.includes(fact.id)}
+                    <div class="fact-body">
+                      <QuestionMedia profileId={profileId} media={fact.media} />
+                      <p class="answer-copy">{fact.answer}</p>
 
-                  {#if fact.context}
-                    <p class="context-copy">{fact.context}</p>
-                  {/if}
-
-                  {#if fact.source}
-                    <p class="source">
-                      Source:
-                      {#if sourceUrl(fact.source)}
-                        <a
-                          href={fact.source}
-                          title={fact.source}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {fact.source}
-                        </a>
-                      {:else}
-                        {fact.source}
+                      {#if fact.context}
+                        <p class="context-copy">{fact.context}</p>
                       {/if}
-                    </p>
-                  {/if}
 
-                  {#if fact.shared_by}<p class="source">
-                      Shared by {fact.shared_by}
-                    </p>{/if}
+                      {#if fact.source}
+                        <p class="source">
+                          Source:
+                          {#if sourceUrl(fact.source)}
+                            <a
+                              href={fact.source}
+                              title={fact.source}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {fact.source}
+                            </a>
+                          {:else}
+                            {fact.source}
+                          {/if}
+                        </p>
+                      {/if}
 
-                  {#if fact.tags.length}
-                    <p class="tags">Tags: {fact.tags.join(", ")}</p>
+                      {#if fact.shared_by}<p class="source">
+                          Shared by {fact.shared_by}
+                        </p>{/if}
+
+                      {#if fact.tags.length}
+                        <p class="tags">Tags: {fact.tags.join(", ")}</p>
+                      {/if}
+                    </div>
                   {/if}
-                </div>
-              {/if}
-            </details>
+                </details>
+              </div>
+              <!-- Touch screens reveal these by swiping the row; pointers, by hovering or focusing it. -->
+              <div
+                class="row-actions"
+                onfocusin={() => (swiped = fact.id)}
+                onfocusout={(event) => {
+                  if (
+                    !(event.currentTarget as HTMLElement).contains(
+                      event.relatedTarget as Node | null,
+                    )
+                  )
+                    swiped = null;
+                }}
+              >
+                <button
+                  class="row-action share"
+                  aria-label={`Share ${fact.prompt}`}
+                  disabled={blocked}
+                  onclick={() => shareFact(fact)}>Share</button
+                ><button
+                  class="row-action delete"
+                  aria-label={`Delete ${fact.prompt}`}
+                  disabled={blocked}
+                  onclick={() => askDelete(fact)}>Delete</button
+                >
+              </div>
+            {/if}
           </article>
         {:else}
           {#if !error}
@@ -1850,25 +2116,6 @@
 </AppShell>
 
 <style>
-  .share-selection {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-  }
-  .fact-row {
-    position: relative;
-    padding-left: 2rem !important;
-  }
-  .fact-select {
-    position: absolute;
-    left: 0;
-    top: 1.4rem;
-    width: auto;
-    accent-color: #244c44;
-  }
-
   /* Global defaults and accessible focus */
   :global(*) {
     box-sizing: border-box;
@@ -1990,11 +2237,18 @@
     font-size: 0.85rem;
   }
 
+  .library-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 1 26rem;
+  }
+
   /* An iOS-style search field: filled, rounded, with a magnifier. */
   .search {
     position: relative;
     display: block;
-    flex: 0 1 340px;
+    flex: 1;
   }
 
   .search svg {
@@ -2016,9 +2270,156 @@
     border-radius: 10px;
   }
 
+  .select-toggle {
+    flex-shrink: 0;
+    background: none;
+    color: #244c44;
+    font-weight: 600;
+    padding: 0.45rem 0.35rem;
+  }
+
+  /* Library rows, after iOS lists: compact, separated by hairlines. */
   .fact-row {
-    padding: 1.15rem 0;
-    border-bottom: 1px solid #d4e0d8;
+    position: relative;
+    border-bottom: 1px solid #dbe5df;
+  }
+
+  .fact-list.selecting {
+    padding-bottom: 5rem;
+  }
+
+  .row-content {
+    position: relative;
+    z-index: 1;
+    background: #f5f8f7;
+  }
+
+  /* With a pointer, the actions appear over the row while it is hovered or focused. */
+  .row-actions {
+    position: absolute;
+    z-index: 2;
+    top: 0.5rem;
+    right: 1.75rem;
+    display: flex;
+    gap: 0.35rem;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .fact-row:hover .row-actions,
+  .row-actions:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .row-action {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #244c44;
+    background: #fff;
+    border: 1px solid #c0d0c7;
+  }
+
+  .row-action:hover {
+    background: #e8f0eb;
+  }
+
+  .row-action.delete {
+    color: #a3402a;
+  }
+
+  .row-action.delete:hover {
+    background: #f9e9e3;
+  }
+
+  .select-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 0;
+    cursor: pointer;
+  }
+
+  .select-row .prompt {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  .select-row input {
+    appearance: none;
+    -webkit-appearance: none;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    border: 1.5px solid #9fb3aa;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .select-row input:checked {
+    background: #244c44;
+    border-color: #244c44;
+  }
+
+  .select-row input:checked::after {
+    content: "";
+    width: 5px;
+    height: 10px;
+    margin-top: -2px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+
+  .select-row input:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .selection-bar {
+    position: fixed;
+    z-index: 6;
+    left: 50%;
+    bottom: 1.5rem;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+    white-space: nowrap;
+    background: #fff;
+    border: 1px solid #c6d7cd;
+    border-radius: 12px;
+    box-shadow: 0 6px 24px #18362f24;
+  }
+
+  .selection-bar .primary {
+    padding: 0.6rem 1rem;
+  }
+
+  .danger {
+    background: #a3402a;
+    color: #fff;
+    padding: 0.85rem 1.2rem;
+    font-weight: 600;
+  }
+
+  .danger:hover {
+    background: #8a3522;
+  }
+
+  .delete-prompt {
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   details {
@@ -2041,18 +2442,48 @@
   }
 
   .fact-details > summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.8rem 0;
     color: #18362f;
+    list-style: none;
+  }
+
+  .fact-details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .fact-details[open] > summary {
+    margin-bottom: 0;
   }
 
   .fact-details h2 {
-    display: inline;
-    font-size: 1.05rem;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.45;
     overflow-wrap: anywhere;
+  }
+
+  .disclosure {
+    flex-shrink: 0;
+    fill: none;
+    stroke: #8fa39a;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s;
+  }
+
+  .fact-details[open] .disclosure {
+    transform: rotate(90deg);
   }
 
   .fact-body {
     max-width: 53rem;
-    padding-left: 1rem;
+    padding: 0 1.5rem 1rem 0;
   }
 
   .answer-copy,
@@ -2189,7 +2620,6 @@
   .media-note {
     color: #64786c;
     font-size: 0.82rem;
-    margin-left: 0.5rem;
   }
 
   .form-pair {
@@ -2478,9 +2908,85 @@
     border: 0;
   }
 
+  /* Pointer rows keep room for the actions that appear over them. */
+  @media (hover: hover) {
+    .fact-details h2 {
+      padding-right: 8.5rem;
+    }
+  }
+
+  /* Touch rows slide left to uncover full-height Share and Delete actions. */
+  @media (hover: none) {
+    .fact-row {
+      overflow-x: clip;
+    }
+
+    .row-content {
+      touch-action: pan-y;
+      transform: translateX(var(--offset, 0));
+      transition: transform 0.25s ease;
+    }
+
+    .dragging .row-content {
+      transition: none;
+    }
+
+    .zoomed .row-content {
+      touch-action: manipulation;
+    }
+
+    .row-content summary {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .row-actions {
+      inset: 0 0 0 auto;
+      z-index: 0;
+      gap: 0;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .row-action,
+    .row-action:hover {
+      width: 76px;
+      border: 0;
+      border-radius: 0;
+      color: #fff;
+      font-size: 0.9rem;
+    }
+
+    .row-action.share,
+    .row-action.share:hover {
+      background: #4d7383;
+    }
+
+    .row-action.delete,
+    .row-action.delete:hover {
+      color: #fff;
+      background: #b6452c;
+    }
+  }
+
   @media (max-width: 700px) {
-    .search {
+    .library-tools {
       flex: 1 1 100%;
+    }
+
+    .selection-bar {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      transform: none;
+      justify-content: space-between;
+      height: calc(52px + env(safe-area-inset-bottom));
+      padding: 0 1rem env(safe-area-inset-bottom);
+      background: #f5f8f7;
+      border: 0;
+      border-top: 0.5px solid #18362f33;
+      border-radius: 0;
+      box-shadow: none;
     }
   }
 

@@ -14,6 +14,7 @@
     type Profile,
     type Screen,
   } from "./profiles";
+  import { openDialog } from "./dialog";
   import { preload } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
   import { play, unlockSoundsOnTap } from "./sounds";
@@ -53,17 +54,6 @@
     void remindersOn(activeId).catch(() => undefined);
     void refreshBadge(activeId);
   });
-
-  function openDialog(element: HTMLDialogElement) {
-    const previous = document.activeElement;
-    element.showModal();
-    return {
-      destroy() {
-        if (previous instanceof HTMLElement && previous.isConnected)
-          previous.focus();
-      },
-    };
-  }
 
   function remember(id: number) {
     try {
@@ -854,10 +844,11 @@
     color: #833d2b;
     background: #f9e9e3;
   }
-  .dialog::backdrop {
+  /* Shared by every dialog, including the library's delete confirmation. */
+  :global(.dialog::backdrop) {
     background: #18362f40;
   }
-  .dialog {
+  :global(.dialog) {
     color: #18362f;
     width: min(100%, 490px);
     max-height: 90vh;
@@ -867,7 +858,7 @@
     border: 1px solid #b4c8c0;
     border-radius: 12px;
   }
-  .dialog h2 {
+  :global(.dialog h2) {
     font:
       500 1.5rem/1.3 "Iowan Old Style",
       Palatino,
@@ -898,7 +889,7 @@
     }
   }
   @media (max-width: 580px) {
-    .dialog {
+    :global(.dialog) {
       padding: 1.3rem;
     }
   }

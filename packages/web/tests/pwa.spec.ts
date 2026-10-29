@@ -211,11 +211,14 @@ test("typing does not zoom the page and short screens do not scroll", async ({ a
   await expect(page.getByLabel("Tags")).toBeVisible();
   expect(await smallFields(page)).toEqual([]);
 
+  await page.getByRole("button", { name: "Select", exact: true }).click();
   await page.getByRole("checkbox", { name: `Select ${fact.prompt}`, exact: true }).check();
   await page.getByRole("button", { name: "Share selected", exact: true }).click();
   await expect(page.getByLabel("Share with", { exact: true })).toBeVisible();
   expect(await smallFields(page)).toEqual([]);
   await page.getByRole("button", { name: "Cancel", exact: true }).last().click();
+  // On phones the selection toolbar covers the tab bar, as iOS edit mode does.
+  await page.getByRole("button", { name: "Done", exact: true }).click();
 
   await page.getByRole("button", { name: "Close form", exact: true }).first().click();
   await page.getByRole("navigation", { name: "Main navigation" })

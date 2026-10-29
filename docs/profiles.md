@@ -57,7 +57,8 @@ work also keeps capture in the intended library if another profile is later crea
 
 ## Share facts
 
-Select facts in your library and choose the recipient. The offer contains a frozen
+Choose Select in your library, tick up to 20 facts and choose Share selected, then
+the recipient. To share one fact, use the Share action on its row. The offer contains a frozen
 copy of their question and its images and audio, answer, context, source, tags, and
 practice content. The
 recipient’s inbox shows questions with answers hidden until accepted. They can

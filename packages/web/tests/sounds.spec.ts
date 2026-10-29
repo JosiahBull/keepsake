@@ -181,6 +181,7 @@ test("saving and accepting facts sound like keeping them, and sharing sends them
   await page.getByRole("button", { name: "Save fact", exact: true }).click();
   await expect(page.getByRole("status").filter({ hasText: "Fact saved." })).toBeVisible();
 
+  await page.getByRole("button", { name: "Select", exact: true }).click();
   await page.getByRole("checkbox", { name: `Select ${prompt}`, exact: true }).check();
   await page.getByRole("button", { name: "Share selected", exact: true }).click();
   await page.getByLabel("Share with", { exact: true }).selectOption(String(partner.id));
