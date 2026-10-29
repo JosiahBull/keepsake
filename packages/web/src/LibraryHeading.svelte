@@ -3,21 +3,16 @@
 
   type Tab = "library" | "sharing" | "sent";
 
-  // My library, Shared with me and Sent facts share one heading and tab bar.
+  // My library, Shared with me and Sent facts share one segmented control.
+  // Search, when there is any, sits beside it, or below it on phones.
   let {
     current,
     disabled,
-    addDisabled,
-    adding = false,
-    onAdd,
     onNavigate,
     children,
   }: {
     current: Tab;
     disabled: boolean;
-    addDisabled: boolean;
-    adding?: boolean;
-    onAdd: () => void;
     onNavigate: (tab: Tab) => void;
     children?: Snippet;
   } = $props();
@@ -29,86 +24,65 @@
   ];
 </script>
 
-<div class="page-heading">
-  <h1>Library</h1>
+<div class="library-heading">
+  <div class="library-tabs">
+    {#each tabs as tab}<button
+        class:active={current === tab.id}
+        aria-current={current === tab.id ? "page" : undefined}
+        disabled={disabled || current === tab.id}
+        onclick={() => onNavigate(tab.id)}>{tab.label}</button
+      >{/each}
+  </div>
   {@render children?.()}
-  <button class="primary mobile-add" disabled={addDisabled} onclick={onAdd}
-    >{adding ? "Close form" : "Add a fact"}</button
-  >
-</div>
-
-<div class="library-tabs">
-  {#each tabs as tab}<button
-      class:active={current === tab.id}
-      aria-current={current === tab.id ? "page" : undefined}
-      disabled={disabled || current === tab.id}
-      onclick={() => onNavigate(tab.id)}>{tab.label}</button
-    >{/each}
 </div>
 
 <style>
-  .page-heading {
+  .library-heading {
     display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  h1 {
-    font-family:
-      "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
-    font-size: 2rem;
-    font-weight: 500;
-    letter-spacing: -0.035em;
-    line-height: 1.2;
-    margin-bottom: 0;
-  }
-
-  .primary {
-    background: #244c44;
-    color: #fff;
-    padding: 0.85rem 1.2rem;
-    font-weight: 600;
-  }
-
-  .primary:hover {
-    background: #183c34;
-  }
-
-  .mobile-add {
-    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
   }
 
   .library-tabs {
     display: flex;
-    gap: 0.4rem;
-    border-bottom: 1px solid #cedbd5;
-    margin-bottom: 1.4rem;
+    gap: 2px;
+    padding: 2px;
+    background: #e3ebe7;
+    border-radius: 9px;
   }
 
   .library-tabs button {
-    padding: 0.7rem 1rem;
+    padding: 0.4rem 1rem;
     color: #244c44;
     background: transparent;
+    border-radius: 7px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.4;
   }
 
   .library-tabs .active {
-    background: #e3ede7;
+    background: #fff;
+    box-shadow:
+      0 1px 3px #18362f1f,
+      0 0 0 0.5px #18362f0f;
     opacity: 1;
     font-weight: 600;
   }
 
-  @media (max-width: 580px) {
-    .mobile-add {
-      display: block;
-      margin-left: auto;
-      font-size: 0.85rem;
-      padding: 0.75rem 0.8rem;
+  @media (max-width: 700px) {
+    .library-tabs {
+      flex: 1 1 100%;
     }
 
     .library-tabs button {
-      padding: 0.7rem 0.55rem;
-      font-size: 0.9rem;
+      flex: 1;
+      padding: 0.35rem 0.25rem;
+      font-size: 0.82rem;
+      white-space: nowrap;
     }
   }
 </style>
