@@ -135,7 +135,7 @@ test("extra practice loads its next session while the learner finishes the curre
     await app.createFact({ prompt: `Synthetic extra round question ${number}?` });
   }
   const samples = countRequests(page, "/api/profiles/1/practice");
-  await page.goto("/");
+  await page.goto("/app");
   await startExtraPractice(page);
 
   for (const number of [1, 2]) {
@@ -161,7 +161,7 @@ test("matching loads the next round while the learner rates the last pair", asyn
     }));
   }
   const samples = countRequests(page, "/api/profiles/1/facts/sample");
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Match pairs", exact: true }).click();
   const game = page.getByRole("region", { name: "Matching pairs game" });
 

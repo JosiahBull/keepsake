@@ -88,7 +88,7 @@ test("scheduled recall selects canonical prompts, previews intervals and persist
     ],
   });
   const initial = await schedule(app, fact.id);
-  await page.goto("/");
+  await page.goto("/app");
   const queue = await startScheduled(page);
   expect(queue.items).toHaveLength(1);
   expect(queue.items[0].practice).toMatchObject({ kind: "flashcard", prompt: fact.prompt });
@@ -127,7 +127,7 @@ test("scheduled recall selects canonical prompts, previews intervals and persist
 
 test("a spoken recall attempt can be confirmed without typing", async ({ app, page }) => {
   await app.createFact();
-  await page.goto("/");
+  await page.goto("/app");
   await startScheduled(page);
   await page.getByRole("checkbox", { name: "I tried to recall", exact: true }).check();
   await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
@@ -143,7 +143,7 @@ test("a spoken recall attempt can be confirmed without typing", async ({ app, pa
 test("revealing without an attempt records exposure and offers no recall rating", async ({ app, page }) => {
   const fact = await app.createFact();
   const before = await schedule(app, fact.id);
-  await page.goto("/");
+  await page.goto("/app");
   await startScheduled(page);
   const saved = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
@@ -172,7 +172,7 @@ test("revealing without an attempt records exposure and offers no recall rating"
 
 test("feedback is recorded before rating so reloading cannot turn a viewed answer into unaided recall", async ({ app, page }) => {
   const fact = await app.createFact();
-  await page.goto("/");
+  await page.goto("/app");
   await startScheduled(page);
   await attempt(page);
   await expect(page.getByRole("button", { name: /^Good\b/ })).toBeEnabled();
@@ -205,7 +205,7 @@ test("a lost feedback response blocks ratings until the same exposure is confirm
     }
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/app");
   await startScheduled(page);
   await attempt(page, "My unaided synthetic answer", false);
   await expect(page.getByRole("alert")).toContainText("Could not save this activity.");
@@ -230,7 +230,7 @@ test("unattempted answer exposures consume the bounded daily new-card intake", a
   for (let index = 0; index < 7; index += 1) {
     await app.createFact({ prompt: `Synthetic new intake question ${index}?` });
   }
-  await page.goto("/");
+  await page.goto("/app");
   const queue = await startScheduled(page);
   expect(queue.items).toHaveLength(5);
   for (const question of queue.items) {
@@ -267,7 +267,7 @@ test("retrying after a committed but lost review response keeps one UUID and one
     }
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/app");
   await startScheduled(page);
   await attempt(page);
   await page.getByRole("button", { name: /^Good\b/ }).click();
@@ -293,7 +293,7 @@ test("retrying after a committed but lost review response keeps one UUID and one
 test("a stale browser tab cannot overwrite a newer schedule and can refresh the due queue", async ({ app, page, context }) => {
   const fact = await app.createFact();
   const other = await context.newPage();
-  await Promise.all([page.goto("/"), other.goto(app.url)]);
+  await Promise.all([page.goto("/app"), other.goto(`${app.url}/app`)]);
   const [first, second] = await Promise.all([startScheduled(page), startScheduled(other)]);
   expect(first.items[0].schedule_version).toBe(second.items[0].schedule_version);
   await attempt(page);
@@ -325,7 +325,7 @@ test("library exposure retries a lost committed response and survives restart wi
     }
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("heading", { name: fact.prompt, exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Could not save this activity.");
   await expect(page.getByText(fact.answer, { exact: true })).toHaveCount(0);
@@ -348,7 +348,7 @@ test("library exposure retries a lost committed response and survives restart wi
 
 test("reopening a library fact hides its cached answer until the new exposure is saved", async ({ app, page }) => {
   const fact = await app.createFact();
-  await page.goto("/");
+  await page.goto("/app");
   const summary = page.getByRole("heading", { name: fact.prompt, exact: true });
   await summary.click();
   await expect(page.getByText(fact.answer, { exact: true })).toBeVisible();
@@ -384,7 +384,7 @@ test("multiple-choice options record recognition exposure before any answer is c
       choices: ["Synthetic correct option", "Synthetic wrong option"],
     }],
   });
-  await page.goto("/");
+  await page.goto("/app");
   const loaded = page.waitForResponse((response) => new URL(response.url()).pathname === "/api/profiles/1/practice");
   await startExtraPractice(page);
   const extra: components["schemas"]["PracticeSession"] = await (await loaded).json();
@@ -423,7 +423,7 @@ test("matching exposure failure blocks play until its batch is saved and never a
     }
     await route.continue();
   });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Match pairs", exact: true }).click();
   const game = page.getByRole("region", { name: "Matching pairs game" });
   await expect(page.getByRole("alert")).toContainText("Could not save this activity.");
@@ -461,7 +461,7 @@ test("the daily study budget is a notice and does not hide available practice", 
   const question = queue.items.find((item) => item.fact.id === first.id)!;
   const saved = await app.request.post("/api/profiles/1/study/events", { data: submission(question, 60_000) });
   expect(saved.ok(), await saved.text()).toBeTruthy();
-  await page.goto("/");
+  await page.goto("/app");
   const remaining = await startScheduled(page);
   expect(remaining.budget_reached).toBe(true);
   expect(remaining.items.map((item) => item.fact.id)).toContain(second.id);

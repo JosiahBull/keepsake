@@ -46,7 +46,7 @@ test("library retries a failed load and shows loading until the real response ar
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await expect(page.getByRole("alert")).toContainText("Could not load your library.");
     await expect(page.getByText("No facts yet. Add a fact to start.")).toBeHidden();
     await page.getByRole("button", { name: "Try again", exact: true }).click();
@@ -84,7 +84,7 @@ test("practice recovers from a dropped request without showing an empty session"
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await startExtraPractice(page);
     await expect(page.getByRole("alert")).toContainText("Could not load practice.");
     await expect(page.getByRole("heading", { name: "No facts yet.", exact: true })).toBeHidden();
@@ -122,7 +122,7 @@ test("matching retries an unavailable sample against the real library", async ({
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("button", { name: "Match pairs", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Could not load matching pairs.");
     await expect(page.getByRole("heading", { name: "Add three related facts with a shared topic tag to play." })).toBeHidden();
@@ -161,7 +161,7 @@ test("a failed fact save preserves every draft field and retry inserts exactly o
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("button", { name: "Add a fact", exact: true }).click();
     const form = page.getByRole("region", { name: "Add a fact", exact: true });
     await form.getByLabel("Question", { exact: true }).fill("What survives a failed save?");
@@ -222,7 +222,7 @@ test("a failed review save lets practice finish and blocks leaving until one ret
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await startExtraPractice(page);
     await page.getByLabel("Your answer").fill("My original attempt");
     await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
@@ -284,7 +284,7 @@ test("a failed matching review keeps the round moving and later reviews wait the
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await page.getByRole("button", { name: "Match pairs", exact: true }).click();
     const game = page.getByRole("region", { name: "Matching pairs game" });
     await game.getByRole("button", { name: facts[0].prompt, exact: true }).click();
@@ -352,7 +352,7 @@ for (const staleResult of ["success", "failure"] as const) {
     });
 
     try {
-      await page.goto("/");
+      await page.goto("/app");
       await expect(page.getByRole("heading", { name: oldFact.prompt, exact: true })).toBeVisible();
       const search = page.getByRole("searchbox", { name: "Search facts", exact: true });
       await search.fill("apricot");

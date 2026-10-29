@@ -56,7 +56,7 @@ test("swiping a row left uncovers Share and Delete, and a tap closes it without 
 }) => {
   test.skip(!isMobile, "Rows slide on touch screens; pointers hover instead.");
   await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   const kai = row(page, "What does kai mean?");
   await expect(kai).toBeVisible();
 
@@ -87,7 +87,7 @@ test("swiping a row left uncovers Share and Delete, and a tap closes it without 
 test("rows leave sideways drags to the page while it is pinch-zoomed", async ({ app, page, isMobile }) => {
   test.skip(!isMobile, "Rows slide on touch screens; pointers hover instead.");
   await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   const kai = row(page, "What does kai mean?");
   await expect(kai).toBeVisible();
   // Test browsers cannot pinch, so the visual viewport reports a zoomed scale instead.
@@ -114,7 +114,7 @@ test("a row's Share offers just that fact", async ({ app, page, isMobile }) => {
   expect(created.status()).toBe(201);
   const partner = (await created.json()) as { id: number };
   const facts = await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   const kai = row(page, "What does kai mean?");
   await revealActions(kai, isMobile);
   await kai.getByRole("button", { name: "Share What does kai mean?", exact: true }).click();
@@ -133,7 +133,7 @@ test("Delete asks first; Cancel keeps the fact and Delete fact removes it everyw
   isMobile,
 }) => {
   const facts = await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByText("3 facts", { exact: true })).toBeVisible();
   const kai = row(page, "What does kai mean?");
 
@@ -174,7 +174,7 @@ test("a failed delete keeps the fact and its dialog, and a fact deleted elsewher
     }
     await route.fulfill({ status: 503, json: { error: "The library is busy." } });
   });
-  await page.goto("/");
+  await page.goto("/app");
   const wai = row(page, "What does wai mean?");
   await revealActions(wai, isMobile);
   await wai.getByRole("button", { name: "Delete What does wai mean?", exact: true }).click();
@@ -195,7 +195,7 @@ test("a failed delete keeps the fact and its dialog, and a fact deleted elsewher
 test("keyboard focus reaches a row's actions and shows them", async ({ app, page, browserName, isMobile }) => {
   test.skip(browserName === "webkit", "Safari's button tab stops depend on the user's keyboard setting.");
   await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   const kai = row(page, "What does kai mean?");
   await kai.locator("summary").focus();
   await page.keyboard.press("Tab");
@@ -212,7 +212,7 @@ test("keyboard focus reaches a row's actions and shows them", async ({ app, page
 
 test("Select turns rows into a checklist for sharing, and Done turns them back", async ({ app, page }) => {
   await threeFacts(app);
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await page.getByRole("button", { name: "Select", exact: true }).click();
 

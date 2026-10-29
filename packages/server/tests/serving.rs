@@ -31,6 +31,17 @@ async fn serves_spa_and_keeps_unknown_api_routes_out_of_it() {
         ("/api", StatusCode::NOT_FOUND, None),
         ("/", StatusCode::OK, Some("<h1>Keepsake</h1>")),
         ("/app.js", StatusCode::OK, Some("console.log")),
+        // The app's own pages are found; other paths get the shell, which explains, as a 404.
+        ("/app", StatusCode::OK, Some("<h1>Keepsake</h1>")),
+        ("/share", StatusCode::OK, Some("<h1>Keepsake</h1>")),
+        ("/p/1/library", StatusCode::OK, Some("<h1>Keepsake</h1>")),
+        ("/p/7/settings", StatusCode::OK, Some("<h1>Keepsake</h1>")),
+        (
+            "/p/1/elsewhere",
+            StatusCode::NOT_FOUND,
+            Some("<h1>Keepsake</h1>"),
+        ),
+        ("/missing", StatusCode::NOT_FOUND, Some("<h1>Keepsake</h1>")),
     ] {
         let response = app
             .clone()

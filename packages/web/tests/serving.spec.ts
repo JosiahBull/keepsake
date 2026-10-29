@@ -19,7 +19,7 @@ function expectResponsePolicy(headers: Record<string, string>, cache: string) {
 }
 
 test("empty practice offers a working path to the fact form", async ({ app, page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByText("No facts yet. Add a fact to start.", { exact: true })).toBeVisible();
   await startExtraPractice(page);
 
@@ -40,7 +40,7 @@ test("empty practice offers a working path to the fact form", async ({ app, page
 });
 
 test("matching requires three distinct pairs within a topic bank even when duplicate records make three facts", async ({ app, page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const start = page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true });
   const empty = page.getByRole("heading", {
@@ -85,7 +85,7 @@ test("untagged facts from different topics do not form a matching bank", async (
   ]) {
     await app.createFact({ prompt, answer, tags: [] });
   }
-  await page.goto("/");
+  await page.goto("/app");
   const sample = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/facts/sample");
   await page.getByRole("navigation", { name: "Main navigation" })
@@ -105,7 +105,7 @@ test("the production document, browser-loaded assets and API enforce their respo
     /^\/assets\/[^/]+\.js$/.test(new URL(response.url()).pathname));
   const libraryLoaded = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/facts");
-  const document = await page.goto("/");
+  const document = await page.goto("/app");
   expect(document).not.toBeNull();
   expect(document!.status()).toBe(200);
   expect(document!.headers()["content-type"]).toContain("text/html");

@@ -7,7 +7,7 @@ test.use({ serviceWorkers: "allow", channel: "chromium" });
 
 test("shows pushed reminders and opens the cached shell offline", async ({ app, context, page }) => {
   await context.grantPermissions(["notifications"], { origin: app.url });
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByRole("heading", { name: "Library", exact: true })).toBeVisible();
   await page.evaluate(() => navigator.serviceWorker.ready);
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
@@ -48,7 +48,7 @@ test("shows pushed reminders and opens the cached shell offline", async ({ app, 
     body: "2 reviews are ready.",
     tag: "reminder-1",
     // Links to another origin are replaced by the app's own start page.
-    data: { navigate: `${app.url}/` },
+    data: { navigate: `${app.url}/app` },
   }]);
 
   await context.setOffline(true);

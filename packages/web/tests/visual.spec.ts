@@ -2,7 +2,7 @@ import { test, expect } from "./fixtures";
 import { startExtraPractice } from "./actions";
 
 test("empty library and fact form", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByText("No facts yet. Add a fact to start.")).toBeVisible();
   await expect.soft(page).toHaveScreenshot("empty-library.png", { fullPage: true });
 
@@ -25,7 +25,7 @@ test("expanded library fact and practice feedback", async ({ app, page }) => {
     source: "Synthetic household notebook",
     tags: ["te reo", "household"],
   });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("heading", { name: fact.prompt, exact: true }).click();
   await expect(page.getByText(fact.answer, { exact: true })).toBeVisible();
   await expect(page.getByText("Saving…", { exact: true })).toHaveCount(0);
@@ -46,7 +46,7 @@ test("scheduled recall feedback shows its interval previews", async ({ app, page
     source: "Synthetic household notebook",
     tags: ["te reo", "household"],
   });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Practise", exact: true }).click();
   await page.getByRole("heading", { name: fact.prompt, exact: true }).click();
   await page.getByLabel("Your answer").fill("Water");
@@ -66,7 +66,7 @@ test.describe("profile screenshots", () => {
     expect(created.status()).toBe(201);
     const partner = await created.json();
     const fact = await app.createFact({ prompt: "What does wai mean?", answer: "Water", tags: ["te reo", "household"] });
-    await page.goto("/");
+    await page.goto("/app");
     await expect(page.getByRole("heading", { name: "Who’s practising?", exact: true })).toBeVisible();
     // First-entry screenshots must include the decoded raster logo, especially in WebKit.
     await page.getByRole("img", { name: "Keepsake", exact: true }).evaluate(async (logo: HTMLImageElement) => {
@@ -91,4 +91,24 @@ test.describe("profile screenshots", () => {
     await page.screenshot({ path: testInfo.outputPath("shared-inbox-review.png"), fullPage: true });
     await expect.soft(page).toHaveScreenshot("shared-inbox.png", { fullPage: true });
   });
+});
+
+test("install page", async ({ page, isMobile }) => {
+  // The written steps are the baseline, not a prompt the test browser might offer.
+  await page.addInitScript(() => {
+    addEventListener("beforeinstallprompt", (event) => event.stopImmediatePropagation(), { capture: true });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Keep what you learn", level: 1 })).toBeVisible();
+  await page.getByRole("img", { name: "Keepsake", exact: true }).evaluate(async (logo: HTMLImageElement) => {
+    await logo.decode();
+  });
+  // The QR code encodes the test server's port, which changes on every run.
+  const qr = page.getByRole("img", { name: /^QR code/ });
+  await expect.soft(page).toHaveScreenshot("install.png", { fullPage: true, mask: [qr] });
+  if (isMobile) {
+    await page.getByRole("button", { name: "Install Keepsake", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect.soft(page).toHaveScreenshot("install-steps.png");
+  }
 });

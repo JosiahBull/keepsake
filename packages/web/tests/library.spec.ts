@@ -21,7 +21,7 @@ async function expectViewportFit(page: Page) {
 }
 
 test("required fields and cancellation leave an empty library unchanged", async ({ page, app }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByText("No facts yet. Add a fact to start.")).toBeVisible();
   await expect(page.getByRole("searchbox", { name: "Search facts" })).toHaveCount(0);
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
@@ -56,7 +56,7 @@ test("UTF-8 byte validation preserves the draft and allows a corrected save", as
     }
   });
 
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   const question = page.getByRole("textbox", { name: "Question", exact: true });
   const answer = page.getByRole("textbox", { name: "Answer", exact: true });
@@ -98,7 +98,7 @@ test("facts saved in the browser survive reload and restart and round-trip throu
   const context = "Horoi ngā rīhi.\nWash the dishes.";
   const source = "https://example.com/learning/horoi?language=mi&household=true";
 
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByRole("textbox", { name: "Question", exact: true }).fill(`  ${prompt}  `);
   await page.getByRole("textbox", { name: "Answer", exact: true }).fill(`  ${answer}  `);
@@ -132,7 +132,7 @@ test("facts saved in the browser survive reload and restart and round-trip throu
   expect(imported.prompt).toBe("What does kai mean?");
 
   await app.restart();
-  await page.goto(app.url);
+  await page.goto(`${app.url}/app`);
   await expect(page.getByRole("article")).toHaveCount(2);
   await expect(page.getByRole("heading", { name: prompt, exact: true })).toBeVisible();
   await page.getByRole("heading", { name: imported.prompt, exact: true }).click();
@@ -153,7 +153,7 @@ test("saved content stays text and only HTTP sources become safe external links"
   await app.createFact(plainFact("Safe source", { source: safeSource }));
   await app.createFact(plainFact("Book source", { source: "A household phrasebook, page 12" }));
 
-  await page.goto("/");
+  await page.goto("/app");
   const unsafe = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Unsafe source and literal markup", exact: true }) });
   await unsafe.locator("summary").click();
   await expect(unsafe.getByText(markup, { exact: true })).toBeVisible();
@@ -207,7 +207,7 @@ test("scrolling to the end of the library lists every fact once, newest first", 
     }
   });
 
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByText("60 facts", { exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Library pages" })).toHaveCount(0);
   await scrollUntilListed(page, 60);
@@ -238,7 +238,7 @@ test("a page that fails to load can be retried, and a late page never joins a ne
     await route.fulfill({ status: 503, json: { error: "The library is busy." } });
   });
 
-  await page.goto("/");
+  await page.goto("/app");
   await rows.last().scrollIntoViewIfNeeded();
   const alert = page.getByRole("alert");
   await expect(alert).toHaveText(/^Could not load more facts\. The library is busy\.\s*Try again$/);
@@ -280,7 +280,7 @@ test("search filters every supported field literally, handles Māori macrons, an
   await app.createFact(plainFact("Plain context question", { context: "Distinctive context needle" }));
   await app.createFact(plainFact("Plain tag question", { tags: ["tag-needle"] }));
   await app.createFact(plainFact("ĀĒĪŌŪ around the house", { answer: "Māori vowel practice" }));
-  await page.goto("/");
+  await page.goto("/app");
   const rows = page.getByRole("article");
   await scrollUntilListed(page, 31);
 
@@ -307,7 +307,7 @@ test("search filters every supported field literally, handles Māori macrons, an
 });
 
 test("a fact can be added and disclosed with the keyboard", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const add = page.getByRole("button", { name: "Add a fact", exact: true });
   await add.focus();
   await page.keyboard.press("Enter");

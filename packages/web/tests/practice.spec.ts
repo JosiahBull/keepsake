@@ -146,7 +146,7 @@ for (const scenario of cases) {
       practices: [prompt],
     });
     await freezeClock(page);
-    await page.goto("/");
+    await page.goto("/app");
     const session = await beginPractice(page);
     expect(session.items).toHaveLength(scenario.kind === "flashcard" ? 1 : 2);
     expect(session.items.some((item) => item.practice.kind === scenario.kind)).toBeTruthy();
@@ -196,7 +196,7 @@ test("Practise automatically mixes every supported format without a mode selecto
     practices: prompts,
   });
   await freezeClock(page);
-  await page.goto("/");
+  await page.goto("/app");
   const session = await beginPractice(page);
   expect(session.items.map((item) => item.practice.kind).sort()).toEqual([...kinds].sort());
   await expect(page.getByRole("combobox")).toHaveCount(0);
@@ -224,7 +224,7 @@ test("practice samples the whole library however far the library is scrolled or 
       answer: `Synthetic household answer ${index}.`,
     }));
   }
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("region", { name: "Saved facts" }).getByRole("article").last().scrollIntoViewIfNeeded();
   await expect(page.getByRole("heading", { name: facts[0].prompt, exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Saved facts" }).getByRole("article")).toHaveCount(26);
@@ -257,7 +257,7 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
     }));
   }
   await freezeClock(page);
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true }).click();
   const game = page.getByRole("region", { name: "Matching pairs game" });
@@ -343,7 +343,7 @@ test("matching keeps one topic bank across rounds despite library pagination and
     });
   }
 
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("region", { name: "Saved facts" }).getByRole("article").last().scrollIntoViewIfNeeded();
   await expect(page.getByRole("heading", { name: banks[0].facts[0].prompt, exact: true })).toBeVisible();
   await page.getByRole("searchbox", { name: "Search facts" }).fill("unrelated item 23");
