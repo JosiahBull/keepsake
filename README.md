@@ -27,7 +27,7 @@ Download the CLI for your platform from [Releases](https://github.com/JosiahBull
 Verify its archive against the release's `SHA256SUMS`, extract it, and put `keepsake`
 on your `PATH`. Linux, macOS, and Windows binaries are available.
 
-The container image is `ghcr.io/josiahbull/keepsake:0.7.0` for Linux amd64 and arm64.
+The container image is `ghcr.io/josiahbull/keepsake:0.8.0` for Linux amd64 and arm64.
 From a checkout, start it with persistent SQLite storage using:
 
 ```sh
@@ -39,7 +39,7 @@ Open http://localhost:8080/app, or http://localhost:8080 for the install page. T
 also be built independently from source:
 
 ```sh
-cargo install --git https://github.com/JosiahBull/keepsake --tag v0.7.0 keepsake-cli --locked
+cargo install --git https://github.com/JosiahBull/keepsake --tag v0.8.0 keepsake-cli --locked
 ```
 
 ## Capture a fact
