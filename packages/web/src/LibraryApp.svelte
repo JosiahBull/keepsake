@@ -173,6 +173,8 @@
   let drag = $state<{ id: number; offset: number } | null>(null);
   // Set when a swipe ends, so the click its release may produce is not a tap.
   let swipeJustEnded = false;
+  // A pinch-zoomed page needs sideways drags to pan, so rows stop taking them.
+  let zoomed = $state(false);
   let deleting = $state<Fact | null>(null);
   let deleteBusy = $state(false);
   let deleteError = $state("");
@@ -280,11 +282,15 @@
   });
 
   onMount(() => {
+    const zoom = () => (zoomed = (visualViewport?.scale ?? 1) > 1.01);
+    zoom();
+    visualViewport?.addEventListener("resize", zoom);
     if (initialDraft) onDraftOpened?.();
     if (initialView === "practice") void startPractice();
     else if (initialView === "matching") void startMatching();
     else void loadFacts();
     return () => {
+      visualViewport?.removeEventListener("resize", zoom);
       for (const attachment of attachments)
         URL.revokeObjectURL(attachment.preview);
       clearTimeout(searchTimer);
@@ -403,7 +409,7 @@
 
     const down = (event: PointerEvent) => {
       swipeJustEnded = false;
-      if (event.pointerType === "mouse" || !event.isPrimary) return;
+      if (event.pointerType === "mouse" || !event.isPrimary || zoomed) return;
       start = {
         x: event.clientX,
         y: event.clientY,
@@ -1555,7 +1561,12 @@
         <p class="empty-state">No facts yet. Add a fact to start.</p>
       {/if}
     {:else}
-      <section class="fact-list" class:selecting aria-label="Saved facts">
+      <section
+        class="fact-list"
+        class:selecting
+        class:zoomed
+        aria-label="Saved facts"
+      >
         {#each facts as fact (fact.id)}
           <article
             class="fact-row"
@@ -2918,6 +2929,10 @@
 
     .dragging .row-content {
       transition: none;
+    }
+
+    .zoomed .row-content {
+      touch-action: manipulation;
     }
 
     .row-content summary {

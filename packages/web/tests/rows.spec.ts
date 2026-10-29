@@ -84,6 +84,31 @@ test("swiping a row left uncovers Share and Delete, and a tap closes it without 
   await expect(wai.getByText("Answer for What does wai mean?", { exact: true })).toBeVisible();
 });
 
+test("rows leave sideways drags to the page while it is pinch-zoomed", async ({ app, page, isMobile }) => {
+  test.skip(!isMobile, "Rows slide on touch screens; pointers hover instead.");
+  await threeFacts(app);
+  await page.goto("/");
+  const kai = row(page, "What does kai mean?");
+  await expect(kai).toBeVisible();
+  // Test browsers cannot pinch, so the visual viewport reports a zoomed scale instead.
+  await page.evaluate(() => {
+    Object.defineProperty(visualViewport!, "scale", { configurable: true, get: () => 2 });
+    visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect(kai.locator(".row-content")).toHaveCSS("touch-action", "manipulation");
+  await drag(kai.locator("summary"), -120);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  expect(await slid(kai)).toBe(0);
+
+  await page.evaluate(() => {
+    Object.defineProperty(visualViewport!, "scale", { configurable: true, get: () => 1 });
+    visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect(kai.locator(".row-content")).toHaveCSS("touch-action", "pan-y");
+  await drag(kai.locator("summary"), -120);
+  await expect.poll(() => slid(kai)).toBe(-152);
+});
+
 test("a row's Share offers just that fact", async ({ app, page, isMobile }) => {
   const created = await app.request.post("/api/profiles", { data: { name: "Partner", handle: "partner" } });
   expect(created.status()).toBe(201);
