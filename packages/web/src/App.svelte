@@ -590,7 +590,6 @@
   {/key}
 {:else}
   <AppShell
-    profileId={active.id}
     title={screen === "settings" ? "Profile settings" : "Library"}
     detail={screen === "settings" ? null : ""}
     back={screen === "settings"

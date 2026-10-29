@@ -1356,7 +1356,6 @@
 {/snippet}
 
 <AppShell
-  {profileId}
   title={view === "library"
     ? "Library"
     : view === "practice"
@@ -1563,7 +1562,6 @@
     {:else}
       <section
         class="fact-list"
-        class:selecting
         class:zoomed
         aria-label="Saved facts"
       >
@@ -2284,10 +2282,6 @@
     border-bottom: 1px solid #dbe5df;
   }
 
-  .fact-list.selecting {
-    padding-bottom: 5rem;
-  }
-
   .row-content {
     position: relative;
     z-index: 1;
@@ -2385,21 +2379,24 @@
     cursor: default;
   }
 
+  /* The selection toolbar takes the tab bar's place until Done, as iOS edit mode does. */
   .selection-bar {
     position: fixed;
     z-index: 6;
-    left: 50%;
-    bottom: 1.5rem;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 1.5rem;
-    padding: 0.5rem 0.5rem 0.5rem 1.25rem;
+    height: calc(56px + env(safe-area-inset-bottom));
+    /* Lines its contents up with the list on wide screens. */
+    padding: 0 max(1.5rem, calc((100% - 1240px) / 2 + 3rem))
+      env(safe-area-inset-bottom);
     white-space: nowrap;
-    background: #fff;
-    border: 1px solid #c6d7cd;
-    border-radius: 12px;
-    box-shadow: 0 6px 24px #18362f24;
+    background: #f5f8f7;
+    border-top: 0.5px solid #18362f33;
   }
 
   .selection-bar .primary {
@@ -2975,18 +2972,8 @@
     }
 
     .selection-bar {
-      left: 0;
-      right: 0;
-      bottom: 0;
-      transform: none;
-      justify-content: space-between;
       height: calc(52px + env(safe-area-inset-bottom));
       padding: 0 1rem env(safe-area-inset-bottom);
-      background: #f5f8f7;
-      border: 0;
-      border-top: 0.5px solid #18362f33;
-      border-radius: 0;
-      box-shadow: none;
     }
   }
 

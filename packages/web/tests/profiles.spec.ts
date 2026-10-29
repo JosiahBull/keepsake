@@ -282,6 +282,23 @@ test("library tabs keep the header, heading and tab bar in place", async ({
   ).toBeVisible();
 });
 
+test("at every width the tab bar runs along the bottom and Back sits at the top left", async ({ page }) => {
+  await page.goto("/p/1/library");
+  const viewport = page.viewportSize()!;
+  const tabs = (await page.getByRole("navigation", { name: "Main navigation" }).boundingBox())!;
+  expect(Math.round(tabs.x)).toBe(0);
+  expect(Math.round(tabs.width)).toBe(viewport.width);
+  expect(Math.round(tabs.y + tabs.height)).toBe(viewport.height);
+  const bar = (await page.getByRole("banner").boundingBox())!;
+  expect(Math.round(bar.y)).toBe(0);
+
+  await page.getByLabel("Profile: Josiah", { exact: true }).click();
+  await page.getByRole("button", { name: "Profile settings", exact: true }).click();
+  const back = (await page.getByRole("button", { name: "Back to Library", exact: true }).boundingBox())!;
+  expect(back.x).toBeLessThan(viewport.width / 4);
+  expect(back.y + back.height).toBeLessThanOrEqual(bar.y + bar.height);
+});
+
 test("the profile menu's chevron is centred on the profile name", async ({
   page,
   isMobile,
