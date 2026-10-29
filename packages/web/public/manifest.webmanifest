@@ -5,7 +5,7 @@
   "description": "A personal flashcard library for storing and recalling detailed information.",
   "lang": "en",
   "dir": "ltr",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
@@ -25,21 +25,21 @@
       "name": "Practise",
       "short_name": "Practise",
       "description": "Start scheduled recall",
-      "url": "/?open=practice",
+      "url": "/app?open=practice",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Add a fact",
       "short_name": "Add",
       "description": "Open the fact form",
-      "url": "/?open=add",
+      "url": "/app?open=add",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Match pairs",
       "short_name": "Match",
       "description": "Play a matching round",
-      "url": "/?open=matching",
+      "url": "/app?open=matching",
       "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ],

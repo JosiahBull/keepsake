@@ -12,7 +12,7 @@ type Manifest = {
 };
 
 test("the document links an installable manifest whose icons and shortcuts resolve", async ({ app, page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const head = page.locator("head");
   await expect(head.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
   await expect(head.locator('link[rel="apple-touch-icon"]')).toHaveAttribute("href", "/icons/apple-touch-icon.png");
@@ -22,7 +22,8 @@ test("the document links an installable manifest whose icons and shortcuts resol
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("application/manifest+json");
   const manifest = (await response.json()) as Manifest;
-  expect(manifest).toMatchObject({ id: "/", start_url: "/", scope: "/", display: "standalone" });
+  // The id stays "/" so installs from before the app moved to /app remain the same app.
+  expect(manifest).toMatchObject({ id: "/", start_url: "/app", scope: "/", display: "standalone" });
   for (const [size, purpose] of [["192x192", "any"], ["512x512", "any"], ["192x192", "maskable"], ["512x512", "maskable"]]) {
     expect(manifest.icons, `${size} ${purpose}`).toContainEqual(expect.objectContaining({ sizes: size, purpose }));
   }
@@ -43,25 +44,29 @@ test("the document links an installable manifest whose icons and shortcuts resol
     expect(image.headers()["content-type"], src).toBe("image/png");
   }
   expect(manifest.shortcuts.map((shortcut) => shortcut.url)).toEqual([
-    "/?open=practice",
-    "/?open=add",
-    "/?open=matching",
+    "/app?open=practice",
+    "/app?open=add",
+    "/app?open=matching",
   ]);
 });
 
 test("Home Screen shortcuts open the remembered profile's screen", async ({ app, page }) => {
   await app.createFact({ prompt: "What is the shortcut fixture?", answer: "A scheduled fact" });
-  await page.goto("/?open=practice");
+  await page.goto("/app?open=practice");
   await expect(page).toHaveURL(/\/p\/1\/practice$/);
   await expect(page.getByRole("heading", { name: "What is the shortcut fixture?", exact: true })).toBeVisible();
 
-  await page.goto("/?open=add");
+  await page.goto("/app?open=add");
   await expect(page).toHaveURL(/\/p\/1\/library$/);
   await expect(page.getByRole("region", { name: "Add a fact", exact: true })
     .getByRole("textbox", { name: "Question", exact: true })).toBeVisible();
 
-  await page.goto("/?open=matching");
+  await page.goto("/app?open=matching");
   await expect(page).toHaveURL(/\/p\/1\/matching$/);
+
+  // Shortcuts saved before the app moved to /app still open it, not the install page.
+  await page.goto("/?open=practice");
+  await expect(page).toHaveURL(/\/p\/1\/practice$/);
 });
 
 test("a shared page opens the fact form with its title, text and address", async ({ page }) => {

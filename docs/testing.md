@@ -18,7 +18,7 @@ pnpm --filter @keepsake/web test:e2e:ui
 The suite runs desktop Chromium, mobile Chromium and mobile WebKit. It covers
 the web app manifest, Home Screen shortcuts, shared pages, reminder settings,
 fact forms, question images and audio, agent access settings, CLI/browser persistence across restarts, literal and Māori macron
-search, loading the library while scrolling, row actions and deleting facts, back navigation and the Home Screen edge swipe, every practice format and rating, mixed
+search, loading the library while scrolling, row actions and deleting facts, back navigation and the Home Screen edge swipe, the install page's steps for each browser, every practice format and rating, mixed
 sessions, matching, loading states, retries, background saves and their order, preloaded
 rounds, stale search responses and interface sounds.
 Success paths use the real API. Recovery tests intercept only the deliberate
@@ -36,8 +36,10 @@ call an AI agent.
 
 ## Visual comparisons
 
-Four views have screenshot baselines for each browser project: the empty library,
-fact form, expanded fact and practice feedback. Baselines include the platform in
+Each browser project has screenshot baselines for the empty library, fact form,
+expanded fact, practice and scheduled feedback, profile chooser, share dialog, shared
+inbox, and the install page with its steps. The install page's QR code is masked, because
+it encodes the test server's port. Baselines include the platform in
 their names because macOS and Linux fonts differ. CI uses the pinned Playwright
 image in `.github/workflows/checks.yml`; its version must match the exact
 `@playwright/test` dependency.

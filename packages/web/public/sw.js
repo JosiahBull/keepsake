@@ -116,7 +116,7 @@ function sameOrigin(value) {
   } catch {
     // Fall through to the app's start page.
   }
-  return new URL("/", self.location.origin);
+  return new URL("/app", self.location.origin);
 }
 
 // The server sends declarative push messages. Safari 18.4+ shows them itself;
@@ -138,7 +138,7 @@ self.addEventListener("push", (event) => {
         dir: notification.dir,
         icon: "/icons/icon-192.png",
         badge: "/icons/badge-96.png",
-        data: { navigate: sameOrigin(notification.navigate ?? "/").href },
+        data: { navigate: sameOrigin(notification.navigate ?? "/app").href },
       }),
       setBadge(notification.app_badge),
     ]),
@@ -147,7 +147,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = sameOrigin(event.notification.data?.navigate ?? "/");
+  const target = sameOrigin(event.notification.data?.navigate ?? "/app");
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

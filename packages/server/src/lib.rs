@@ -30,6 +30,7 @@ use profile_schema::ProfilePaths;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::{path::Path, sync::Arc};
+use strum::{EnumIter, IntoEnumIterator};
 use tower_http::{
     compression::{
         CompressionLayer,
@@ -237,10 +238,20 @@ pub fn router_with_mcp(
             app = app.route("/mcp/{profile}", any(agent_access_api::endpoint));
         }
     }
+    // The website's own pages render the app shell. Any other path missing from the web
+    // directory gets the shell too, so the app can say so, but as a 404.
+    let shell = ServeFile::new(web_dir.join("index.html"));
+    let mut app = app
+        .route_service("/app", shell.clone())
+        .route_service("/share", shell.clone());
+    for screen in Screen::iter() {
+        app = app.route_service(
+            &format!("/p/{{profile_id}}/{}", screen.as_str()),
+            shell.clone(),
+        );
+    }
     let app = app
-        .fallback_service(
-            ServeDir::new(web_dir).not_found_service(ServeFile::new(web_dir.join("index.html"))),
-        )
+        .fallback_service(ServeDir::new(web_dir).not_found_service(shell))
         .with_state(pool)
         .layer(Extension(notifier))
         .layer(Extension(Arc::new(mcp)))
@@ -255,6 +266,30 @@ pub fn router_with_mcp(
             limits::admit,
         ));
     context::wrap(app).layer(from_fn(headers::response_headers))
+}
+
+/// A profile's screens in the website, each at `/p/PROFILE/SCREEN`.
+#[derive(Clone, Copy, EnumIter)]
+enum Screen {
+    Library,
+    Practice,
+    Matching,
+    Sharing,
+    Sent,
+    Settings,
+}
+
+impl Screen {
+    fn as_str(self) -> &'static str {
+        match self {
+            Screen::Library => "library",
+            Screen::Practice => "practice",
+            Screen::Matching => "matching",
+            Screen::Sharing => "sharing",
+            Screen::Sent => "sent",
+            Screen::Settings => "settings",
+        }
+    }
 }
 
 fn content_routes() -> Router<SqlitePool> {

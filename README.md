@@ -35,7 +35,8 @@ docker compose pull
 docker compose up -d
 ```
 
-Open http://localhost:8080. The CLI can also be built independently from source:
+Open http://localhost:8080/app, or http://localhost:8080 for the install page. The CLI can
+also be built independently from source:
 
 ```sh
 cargo install --git https://github.com/JosiahBull/keepsake --tag v0.7.0 keepsake-cli --locked
@@ -335,8 +336,15 @@ requests return up to 50 reviews by default (maximum 100), with `after_id` for t
 Keepsake installs from the browser as a Home Screen app. The server must be reachable
 over HTTPS; browsers allow service workers and notifications only on secure origins.
 
-- **iPhone and iPad:** open Keepsake in Safari, tap Share, then Add to Home Screen.
-- **Android:** open Keepsake in Chrome, open the menu, then choose Add to Home screen.
+Open Keepsake's address in the phone's browser. The front page shows the install steps
+for that browser: Safari or Chrome on iPhone and iPad, Chrome, Samsung Internet or
+Firefox on Android. Where the browser offers its own install prompt, one tap installs.
+An app's built-in browser, such as Instagram's, cannot install anything, so the page
+offers to open itself in Safari or Chrome. On a computer, the front page shows a QR code
+for the phone.
+
+The app itself lives at `/app`, which is where the installed app opens. **Use it in this
+browser instead** on the front page, or `/app` directly, opens it in any browser.
 
 The installed app opens without browser controls. Starting it offline shows Keepsake's
 connection error rather than a browser error page; nothing is saved offline. On iPhone
@@ -390,7 +398,7 @@ pnpm gen:client
 pnpm dev
 ```
 
-Open http://localhost:5173. Vite proxies `/api` to the backend on port 8080.
+Open http://localhost:5173/app. Vite proxies `/api` to the backend on port 8080.
 The backend rebuilds on Rust and migration changes; the frontend reloads through Vite.
 
 Builds check static SQL against committed `.sqlx` metadata, without opening a database.
@@ -412,7 +420,7 @@ pnpm build
 WEB_DIR=packages/web/dist ./target/release/keepsake-server
 ```
 
-Open http://localhost:8080. The Rust process serves both the static website and the API.
+Open http://localhost:8080/app. The Rust process serves both the static website and the API.
 Node is only needed to build the frontend.
 
 | Variable | Default | Purpose |

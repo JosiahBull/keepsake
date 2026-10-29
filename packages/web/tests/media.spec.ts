@@ -57,7 +57,7 @@ function wav(milliseconds: number): Buffer {
 
 test("a question keeps its image and clip from the form through to practice", async ({ page, app }) => {
   const description = "A large green and white pigeon";
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByRole("textbox", { name: "Question", exact: true }).fill("Which bird is this?");
   await page.getByRole("textbox", { name: "Answer", exact: true }).fill("Kererū");
@@ -104,7 +104,7 @@ test("a question keeps its image and clip from the form through to practice", as
 });
 
 test("a file that is not what it claims to be is refused and nothing is saved", async ({ page, app }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByRole("textbox", { name: "Question", exact: true }).fill("Which bird is this?");
   await page.getByRole("textbox", { name: "Answer", exact: true }).fill("Tūī");
@@ -130,7 +130,7 @@ test("a GIF is turned away before it is uploaded", async ({ page }) => {
       uploads.push(request.url());
     }
   });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByLabel("Images and audio").setInputFiles({
     name: "dance.gif",

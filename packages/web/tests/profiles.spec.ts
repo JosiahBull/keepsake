@@ -41,7 +41,7 @@ test.describe("first setup", () => {
       prompt: "Existing household fact?",
       answer: "Existing answer",
     });
-    await page.goto("/");
+    await page.goto("/app");
     await expect(
       page.getByRole("heading", {
         name: "Keep your existing progress",

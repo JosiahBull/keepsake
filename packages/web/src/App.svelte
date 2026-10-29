@@ -140,6 +140,11 @@
     else requestNavigation(() => navigate("library", true));
   }
 
+  // /app opens the remembered profile, or the household chooser.
+  function appEntry(): boolean {
+    return location.pathname === "/app" || location.pathname === "/app/";
+  }
+
   // Guess the first screen from the address so its data loads alongside the profiles.
   function preloadLaunch() {
     const route = /^\/p\/(\d+)\/(library|practice|matching)\/?$/.exec(
@@ -149,7 +154,7 @@
       preload(Number(route[1]), route[2] as "library" | "practice" | "matching");
       return;
     }
-    if (location.pathname !== "/" && location.pathname !== "/share") return;
+    if (!appEntry() && location.pathname !== "/share") return;
     let remembered: string | null = null;
     try {
       remembered = localStorage.getItem("keepsake.profile");
@@ -160,7 +165,7 @@
     const open = new URLSearchParams(location.search).get("open");
     preload(
       Number(remembered),
-      location.pathname === "/" && (open === "practice" || open === "matching")
+      appEntry() && (open === "practice" || open === "matching")
         ? open
         : "library",
     );
@@ -190,7 +195,7 @@
       chooser = false;
       return;
     }
-    if (location.pathname !== "/" && location.pathname !== "/share") {
+    if (!appEntry() && location.pathname !== "/share") {
       active = null;
       error = "This page does not exist. Choose a household profile.";
       return;

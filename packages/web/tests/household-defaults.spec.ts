@@ -91,7 +91,7 @@ test("a fresh household has Josiah's 40 facts, Ansam's 60 facts and one-way pend
     expect(await response.json()).toMatchObject({ total: 0, items: [] });
   }
 
-  await page.goto("/");
+  await page.goto("/app");
   await expect(
     page.getByRole("heading", { name: "Who’s practising?", exact: true }),
   ).toBeVisible();

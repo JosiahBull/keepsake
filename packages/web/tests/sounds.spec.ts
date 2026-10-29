@@ -30,7 +30,7 @@ test("recall flips each answer, files every rating alike and completes after the
   });
 
   try {
-    await page.goto("/");
+    await page.goto("/app");
     await practise(page);
     // A rewarding sound for Good or Easy would reward the rating rather than the recall.
     for (const rating of ["Again", "Hard", "Good", "Easy"]) {
@@ -64,7 +64,7 @@ test("only multiple choice sounds right or wrong when its answer is shown", asyn
       }],
     });
   }
-  await page.goto("/");
+  await page.goto("/app");
   const loaded = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/practice");
   await startExtraPractice(page);
@@ -99,7 +99,7 @@ test("matching ticks a question, knocks a wrong answer and completes on the last
       tags: ["synthetic-sound-bank"],
     }));
   }
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true }).click();
   const game = page.getByRole("region", { name: "Matching pairs game" });
@@ -135,7 +135,7 @@ test("a failed background save sounds an alert and completion waits for the retr
     await route.continue();
   });
 
-  await page.goto("/");
+  await page.goto("/app");
   await startExtraPractice(page);
   await recall(page);
   await page.getByRole("button", { name: /^Good\b/ }).click();
@@ -174,7 +174,7 @@ test("saving and accepting facts sound like keeping them, and sharing sends them
   const partner = (await created.json()) as { id: number };
   const prompt = "Which synthetic fact is shared?";
 
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByRole("textbox", { name: "Question", exact: true }).fill(prompt);
   await page.getByRole("textbox", { name: "Answer", exact: true }).fill("The shared synthetic fact.");
