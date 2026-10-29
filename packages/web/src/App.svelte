@@ -426,8 +426,15 @@
 {#snippet profileMenu()}
   <details class="profile-menu">
     <summary aria-label={`Profile: ${active?.name ?? "Choose profile"}`}
-      >{active?.name ?? "Choose profile"}
-      <span aria-hidden="true">⌄</span></summary
+      ><span class="profile-name">{active?.name ?? "Choose profile"}</span
+      ><!-- Glyphs such as ⌄ sit on the text baseline, so the chevron is drawn to centre on the name. --><svg
+        class="chevron"
+        viewBox="0 0 12 12"
+        width="12"
+        height="12"
+        aria-hidden="true"
+        ><path d="M2.5 4.5 6 8l3.5-3.5" /></svg
+      ></summary
     >
     <div class="menu">
       <p class="muted">Switch profile</p>
@@ -734,6 +741,9 @@
     flex-shrink: 0;
   }
   .profile-menu summary {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     color: #18362f;
     cursor: pointer;
     border: 1px solid #b4c8c0;
@@ -742,6 +752,18 @@
     font-weight: 600;
     list-style: none;
     white-space: nowrap;
+  }
+  .chevron {
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.15s;
+  }
+  .profile-menu[open] .chevron {
+    transform: rotate(180deg);
   }
   .profile-menu summary::-webkit-details-marker {
     display: none;

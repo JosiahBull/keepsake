@@ -280,6 +280,19 @@ test("library tabs keep the header, heading and tab bar in place", async ({
   ).toBeVisible();
 });
 
+test("the profile menu's chevron is centred on the profile name", async ({
+  page,
+}) => {
+  await page.goto("/p/1/library");
+  const summary = page.getByLabel("Profile: Josiah", { exact: true });
+  const name = await summary.getByText("Josiah", { exact: true }).boundingBox();
+  const chevron = await summary.locator("svg").boundingBox();
+  expect(name).not.toBeNull();
+  expect(chevron).not.toBeNull();
+  const middle = (box: { y: number; height: number }) => box.y + box.height / 2;
+  expect(Math.abs(middle(chevron!) - middle(name!))).toBeLessThanOrEqual(1);
+});
+
 test("switching confirms a typed answer, then clears queues, feedback and exposed answers", async ({
   app,
   page,
