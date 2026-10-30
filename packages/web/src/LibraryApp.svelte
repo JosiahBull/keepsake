@@ -7,7 +7,7 @@
   import { openDialog } from "./dialog";
   import LibraryHeading from "./LibraryHeading.svelte";
   import QuestionMedia from "./QuestionMedia.svelte";
-  import { preloaded } from "./preload";
+  import { fetchPreloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
   import { Rejected, SaveQueue } from "./saves.svelte";
@@ -37,7 +37,7 @@
   const profileId = untrack(() => profile.id);
   const api = createClient<paths>({
     baseUrl: "/",
-    fetch: (request) => preloaded(request) ?? fetch(request),
+    fetch: fetchPreloaded,
   });
   const controller = new AbortController();
   api.use({
@@ -559,13 +559,14 @@
     if (!navigationBlocked) {
       view = "library";
       onNavigate("library");
+      // Opened on Practise or Match pairs, the library has not been listed yet.
+      if (libraryRequest === 0) void loadFacts();
     }
   }
 
   function openAdd() {
     if (!navigationBlocked) {
-      view = "library";
-      onNavigate("library");
+      showLibrary();
       showAdd = !showAdd;
     }
   }

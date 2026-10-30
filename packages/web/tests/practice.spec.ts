@@ -343,6 +343,12 @@ test("matching keeps one topic bank across rounds despite library pagination and
     });
   }
 
+  // The first round's sample may be requested before the round opens, so collect every request.
+  const samples: URL[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname === "/api/profiles/1/facts/sample") samples.push(url);
+  });
   await page.goto("/app");
   await page.getByRole("region", { name: "Saved facts" }).getByRole("article").last().scrollIntoViewIfNeeded();
   await expect(page.getByRole("heading", { name: banks[0].facts[0].prompt, exact: true })).toBeVisible();
@@ -353,25 +359,17 @@ test("matching keeps one topic bank across rounds despite library pagination and
   const start = page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true });
   for (let round = 0; round < 3; round += 1) {
-    const loaded = page.waitForResponse((response) =>
-      new URL(response.url()).pathname === "/api/profiles/1/facts/sample" &&
-      response.request().method() === "GET");
+    const requested = samples.length;
     await start.click();
-    const response = await loaded;
-    expect(response.ok()).toBeTruthy();
-    expect(new URL(response.url()).searchParams.get("search")).toBeNull();
-    expect(new URL(response.url()).searchParams.get("before_id")).toBeNull();
-    const sample: components["schemas"]["FactSample"] = await response.json();
-    expect(sample.items).toHaveLength(4);
-    const bank = banks.find((candidate) => sample.items[0].tags.includes(candidate.tag));
-    expect(bank, "every round must select one eligible topic bank").toBeDefined();
-    expect(sample.items.map((fact) => fact.id).sort((left, right) => left - right))
-      .toEqual(bank!.facts.map((fact) => fact.id).sort((left, right) => left - right));
-    expect(sample.items.every((fact) => fact.tags.includes(bank!.tag))).toBeTruthy();
-
     const game = page.getByRole("region", { name: "Matching pairs game" });
     await expect(game.getByText("0 of 4 matched", { exact: true })).toBeVisible();
     await expect(game.getByRole("button")).toHaveCount(8);
+    // Later rounds ask again; the first may use a sample requested earlier.
+    if (round > 0) expect(samples.length).toBeGreaterThan(requested);
+    const shown = await Promise.all(banks.map((candidate) =>
+      game.getByRole("button", { name: candidate.facts[0].prompt, exact: true }).count()));
+    const bank = banks.find((_, index) => shown[index] > 0);
+    expect(bank, "every round must select one eligible topic bank").toBeDefined();
     for (const fact of bank!.facts) {
       await expect(game.getByRole("button", { name: fact.prompt, exact: true })).toBeEnabled();
       await expect(game.getByRole("button", { name: fact.answer, exact: true })).toBeDisabled();
@@ -383,5 +381,9 @@ test("matching keeps one topic bank across rounds despite library pagination and
       }
     }
     await expect(game.getByText("Synthetic unrelated", { exact: false })).toHaveCount(0);
+  }
+  for (const sample of samples) {
+    expect(sample.searchParams.get("search")).toBeNull();
+    expect(sample.searchParams.get("before_id")).toBeNull();
   }
 });

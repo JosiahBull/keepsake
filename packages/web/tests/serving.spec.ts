@@ -85,9 +85,10 @@ test("untagged facts from different topics do not form a matching bank", async (
   ]) {
     await app.createFact({ prompt, answer, tags: [] });
   }
-  await page.goto("/app");
+  // Match pairs may open from a sample requested before it is pressed.
   const sample = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/facts/sample");
+  await page.goto("/app");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true }).click();
   const response = await sample;

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Page } from "@playwright/test";
+import type { Page, Response } from "@playwright/test";
 import type { components } from "@keepsake/client";
 import { test, expect, type TestApp } from "./fixtures";
 import { startExtraPractice } from "./actions";
@@ -30,14 +30,27 @@ async function dueQueue(app: TestApp): Promise<StudyQueue> {
   return response.json();
 }
 
+// Practice may open from a queue requested before Practise is pressed, so each page keeps its latest.
+const queues = new WeakMap<Page, Response>();
+
+function trackQueues(page: Page) {
+  page.on("response", (response) => {
+    if (new URL(response.url()).pathname === "/api/profiles/1/study/queue") queues.set(page, response);
+  });
+}
+
+test.beforeEach(({ page, context }) => {
+  trackQueues(page);
+  context.on("page", trackQueues);
+});
+
 async function startScheduled(page: Page): Promise<StudyQueue> {
-  const loaded = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === "/api/profiles/1/study/queue");
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Practise", exact: true }).click();
-  const response = await loaded;
-  expect(response.ok()).toBeTruthy();
-  return response.json();
+  await expect(page.getByText("Loading practice…", { exact: true })).toHaveCount(0);
+  const response = queues.get(page);
+  expect(response?.ok()).toBeTruthy();
+  return response!.json();
 }
 
 async function attempt(page: Page, answer = "My unaided synthetic answer", waitForFeedback = true) {
