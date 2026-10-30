@@ -90,7 +90,7 @@ test("only multiple choice sounds right or wrong when its answer is shown", asyn
   await expect.poll(() => sounds(page)).toEqual([...expected, "done"]);
 });
 
-test("matching ticks a question, knocks a wrong answer and completes on the last rating", async ({ app, page }) => {
+test("matching ticks a question, knocks a wrong answer and completes on the round's rating", async ({ app, page }) => {
   const facts: Fact[] = [];
   for (let index = 0; index < 3; index += 1) {
     facts.push(await app.createFact({
@@ -109,13 +109,14 @@ test("matching ticks a question, knocks a wrong answer and completes on the last
     await game.getByRole("button", { name: fact.prompt, exact: true }).click();
     if (index === 0) await game.getByRole("button", { name: facts[1].answer, exact: true }).click();
     await game.getByRole("button", { name: fact.answer, exact: true }).click();
-    await page.getByRole("button", { name: /^Good\b/ }).click();
   }
+  await page.getByRole("button", { name: /^Good\b/ }).click();
   await expect(game.getByRole("status")).toHaveText("Round complete.");
   expect(await sounds(page)).toEqual([
-    "tick", "miss", "right", "file",
-    "tick", "right", "file",
-    "tick", "right", "done",
+    "tick", "miss", "right",
+    "tick", "right",
+    "tick", "right",
+    "done",
   ]);
 });
 

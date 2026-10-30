@@ -286,7 +286,7 @@ test("a failed review save lets practice finish and blocks leaving until one ret
   }
 });
 
-test("a failed matching review keeps the round moving and later reviews wait their turn", async ({ app, page }) => {
+test("a failed matching review blocks leaving and the round's later reviews wait their turn", async ({ app, page }) => {
   const facts = await Promise.all([1, 2, 3].map((number) => app.createFact({
     prompt: `Durable matching question ${number}`,
     answer: `Durable matching answer ${number}`,
@@ -311,34 +311,34 @@ test("a failed matching review keeps the round moving and later reviews wait the
     await page.goto("/app");
     await page.getByRole("button", { name: "Match pairs", exact: true }).click();
     const game = page.getByRole("region", { name: "Matching pairs game" });
-    await game.getByRole("button", { name: facts[0].prompt, exact: true }).click();
-    await game.getByRole("button", { name: facts[0].answer, exact: true }).click();
+    await expect(game.getByText("0 of 3 matched", { exact: true })).toBeVisible();
+    // Reviews are sent in the order the questions are shown.
+    const order = await game.getByRole("heading", { level: 2, name: "Questions" }).locator("..")
+      .getByRole("button").allTextContents();
+    const shown = order.map((text) => facts.find((fact) => text.includes(fact.prompt))!);
+    for (const fact of shown) {
+      await game.getByRole("button", { name: fact.prompt, exact: true }).click();
+      await game.getByRole("button", { name: fact.answer, exact: true }).click();
+    }
     await game.getByRole("button", { name: "Hard Correct, with difficulty", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Could not save a review. Temporarily unavailable.");
-    await expect(game.getByText("1 of 3 matched", { exact: true })).toBeVisible();
-    await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeHidden();
+    await expect(game.getByRole("status")).toHaveText("Round complete.");
     await expectNavigationDisabled(page);
-
-    // The learner keeps playing; this rating queues behind the failed one.
-    await game.getByRole("button", { name: facts[1].prompt, exact: true }).click();
-    await game.getByRole("button", { name: facts[1].answer, exact: true }).click();
-    await game.getByRole("button", { name: "Good Correct", exact: true }).click();
-    await expect(game.getByText("2 of 3 matched", { exact: true })).toBeVisible();
-    expect(sent).toEqual([facts[0].id]);
+    // The round's other reviews queue behind the failed one.
+    expect(sent).toEqual([shown[0].id]);
 
     await page.getByRole("button", { name: "Retry save", exact: true }).click();
     await expect(page.getByRole("alert")).toHaveCount(0);
-    await expect.poll(() => sent).toEqual([facts[0].id, facts[0].id]);
+    await expect.poll(() => sent).toEqual([shown[0].id, shown[0].id]);
     retry.release();
 
-    await expect.poll(() => sent).toEqual([facts[0].id, facts[0].id, facts[1].id]);
+    await expect.poll(() => sent).toEqual([shown[0].id, ...shown.map((fact) => fact.id)]);
     await expect(page.getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name: "Library", exact: true })).toBeEnabled();
-    for (const [index, outcome] of [[0, "hard"], [1, "good"]] as const) {
-      const fact = facts[index];
+    for (const fact of facts) {
       await expect.poll(async () =>
         (await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).items)
-        .toMatchObject([{ fact_id: fact.id, practice_id: null, method: "matching", outcome }]);
+        .toMatchObject([{ fact_id: fact.id, practice_id: null, method: "matching", outcome: "hard" }]);
     }
   } finally {
     retry.release();

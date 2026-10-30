@@ -239,10 +239,12 @@
   let selectedPrompt = $state<number | null>(null);
   let selectedAnswer = $state<number | null>(null);
   let matchFeedback = $state("");
-  let pendingMatch = $state<number | null>(null);
   let matchStarted = $state<Record<number, number>>({});
-  let matchMs = $state(0);
-  let matchMisses = $state<Record<number, number>>({});
+  // How long each pair took, from first choosing its question to matching it.
+  let matchTimes: Record<number, number> = {};
+  let matchMisses = $state(0);
+  // One rating covers the whole round, once every pair is matched.
+  let roundRated = $state(false);
 
   // Derived library and practice data
   const current = $derived(queue[cursor]);
@@ -251,9 +253,6 @@
     current ? shuffled(current.practice.choices) : [],
   );
   const selectedMode = $derived(modes.find((item) => item.id === mode));
-  const pendingFact = $derived(
-    matchFacts.find((fact) => fact.id === pendingMatch),
-  );
   const scheduledQuestion = $derived(
     practiceMode === "scheduled" && current && "target_id" in current
       ? current
@@ -1151,10 +1150,11 @@
     matched = [];
     selectedPrompt = null;
     selectedAnswer = null;
-    pendingMatch = null;
     matchFeedback = "";
     matchStarted = {};
-    matchMisses = {};
+    matchTimes = {};
+    matchMisses = 0;
+    roundRated = false;
 
     try {
       const prefetched = nextSample;
@@ -1191,10 +1191,6 @@
   }
 
   function choosePrompt(id: number) {
-    if (pendingMatch !== null) {
-      return;
-    }
-
     selectedPrompt = id;
     selectedAnswer = null;
     matchFeedback = "";
@@ -1205,50 +1201,55 @@
   }
 
   function chooseAnswer(id: number) {
-    if (selectedPrompt === null || pendingMatch !== null) {
+    if (selectedPrompt === null) {
       return;
     }
 
     selectedAnswer = id;
     if (id === selectedPrompt) {
-      pendingMatch = id;
-      matchMs = Math.max(0, Date.now() - matchStarted[id]);
-      matchFeedback = "Matched. Rate your attempt.";
+      matchTimes[id] = Math.max(0, Date.now() - matchStarted[id]);
+      matched = [...matched, id];
+      selectedPrompt = null;
+      selectedAnswer = null;
+      const complete = matched.length === matchFacts.length;
+      matchFeedback = complete ? "All pairs matched." : "Matched.";
       play("right");
-      // Matching ignores schedules, so the next round can load during the last rating.
-      if (matched.length === matchFacts.length - 1) {
+      // Matching ignores schedules, so the next round can load during the rating.
+      if (complete) {
         nextSample ??= prefetch(matchingSample());
       }
     } else {
-      matchMisses = {
-        ...matchMisses,
-        [selectedPrompt]: (matchMisses[selectedPrompt] || 0) + 1,
-      };
+      matchMisses += 1;
       matchFeedback = "Not a match. Try another answer.";
       play("miss");
     }
   }
 
-  function gradeMatch(outcome: Outcome) {
-    if (pendingMatch === null) {
+  /** The round's rating follows the tiles, which fill a phone screen, so bring it into view. */
+  function bringIntoView(element: HTMLElement) {
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" });
+  }
+
+  /** Records the round's one rating against every pair, each with its own time. */
+  function gradeRound(outcome: Outcome) {
+    if (roundRated || matched.length < matchFacts.length) {
       return;
     }
 
-    const review: NewReview = {
-      fact_id: pendingMatch,
-      practice_id: null,
-      method: "matching",
-      outcome,
-      response_ms: matchMs,
-    };
-    void saveReview(() => postReview(review));
-    matched = [...matched, pendingMatch];
-    pendingMatch = null;
-    selectedPrompt = null;
-    selectedAnswer = null;
-    const complete = matched.length === matchFacts.length;
-    matchFeedback = complete ? "Round complete." : "Choose another question.";
-    play(complete ? "done" : "file");
+    for (const fact of matchFacts) {
+      const review: NewReview = {
+        fact_id: fact.id,
+        practice_id: null,
+        method: "matching",
+        outcome,
+        response_ms: matchTimes[fact.id] ?? 0,
+      };
+      void saveReview(() => postReview(review));
+    }
+    roundRated = true;
+    matchFeedback = "Round complete.";
+    play("done");
   }
 
   // Shared helpers
@@ -1995,7 +1996,7 @@
                   class="match-tile"
                   class:selected={selectedPrompt === fact.id}
                   class:matched={matched.includes(fact.id)}
-                  disabled={matched.includes(fact.id) || pendingMatch !== null}
+                  disabled={matched.includes(fact.id)}
                   onclick={() => choosePrompt(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -2032,8 +2033,7 @@
                     selectedAnswer === selectedPrompt}
                   class:matched={matched.includes(fact.id)}
                   disabled={matched.includes(fact.id) ||
-                    selectedPrompt === null ||
-                    pendingMatch !== null}
+                    selectedPrompt === null}
                   onclick={() => chooseAnswer(fact.id)}
                 >
                   {#if matched.includes(fact.id)}
@@ -2049,63 +2049,38 @@
           {matchFeedback || "Choose a question, then its answer."}
         </p>
 
-        {#if pendingMatch !== null}
-          <div class="grade-panel">
-            <h3>Rate your recognition</h3>
-
-            {#if pendingFact?.context}
-              <p class="context-copy">{pendingFact.context}</p>
-            {/if}
-
-            {#if pendingFact?.source}
-              <p class="source">
-                Source:
-                {#if sourceUrl(pendingFact.source)}
-                  <a
-                    href={pendingFact.source}
-                    title={pendingFact.source}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {pendingFact.source}
-                  </a>
-                {:else}
-                  {pendingFact.source}
-                {/if}
-              </p>
-            {/if}
-
-            {#if matchMisses[pendingMatch]}
-              <p>
-                {matchMisses[pendingMatch]} incorrect {matchMisses[
-                  pendingMatch
-                ] === 1
-                  ? "choice"
-                  : "choices"}. Choose Again if you guessed.
-              </p>
-            {:else}
-              <p>Choose Again if you guessed.</p>
-            {/if}
-
-            <div class="ratings">
-              {#each ratings as rating}
-                <button class="rating" onclick={() => gradeMatch(rating.id)}>
-                  <strong>{rating.name}</strong>
-                  <span>{rating.detail}</span>
-                </button>
-              {/each}
-            </div>
-          </div>
-        {/if}
-
         {#if matched.length === matchFacts.length}
-          <div class="form-actions">
-            <button class="primary" onclick={startMatching}>Play again</button
-            >
-            <button class="quiet" onclick={() => startPractice()}>
-              Practise
-            </button>
-          </div>
+          {#if roundRated}
+            <div class="form-actions">
+              <button class="primary" onclick={startMatching}
+                >Play again</button
+              >
+              <button class="quiet" onclick={() => startPractice()}>
+                Practise
+              </button>
+            </div>
+          {:else}
+            <div class="grade-panel round-rating" use:bringIntoView>
+              <h3>How easy was this round?</h3>
+              <p>
+                For all {matchFacts.length} pairs.
+                {#if matchMisses}
+                  {matchMisses} incorrect
+                  {matchMisses === 1 ? "choice" : "choices"}.
+                {/if}
+                Choose Again if you guessed.
+              </p>
+
+              <div class="ratings">
+                {#each ratings as rating}
+                  <button class="rating" onclick={() => gradeRound(rating.id)}>
+                    <strong>{rating.name}</strong>
+                    <span>{rating.detail}</span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
         {/if}
       </section>
       <p class="study-notes">
@@ -2773,6 +2748,11 @@
     margin-top: 1.8rem;
     padding-top: 1.5rem;
     border-top: 1px solid #d4e0d8;
+  }
+
+  /* Clear of the tab bar when scrolled into view. */
+  .round-rating {
+    scroll-margin-bottom: calc(56px + 1rem + env(safe-area-inset-bottom));
   }
 
   .grade-panel > p {

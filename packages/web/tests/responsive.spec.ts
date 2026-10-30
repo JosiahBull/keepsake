@@ -151,7 +151,7 @@ test("extra practice loads its next session while the learner finishes the curre
   expect(samples.value).toBe(2);
 });
 
-test("matching loads the next round while the learner rates the last pair", async ({ app, page }) => {
+test("matching loads the next round while the learner rates the round", async ({ app, page }) => {
   const facts = [];
   for (const number of [1, 2, 3]) {
     facts.push(await app.createFact({
@@ -169,8 +169,15 @@ test("matching loads the next round while the learner rates the last pair", asyn
     await game.getByRole("button", { name: fact.prompt, exact: true }).click();
     await game.getByRole("button", { name: fact.answer, exact: true }).click();
     await expect.poll(() => samples.value).toBe(index === facts.length - 1 ? 2 : 1);
-    await game.getByRole("button", { name: /^Good\b/ }).click();
   }
+  // The rating follows the tiles, so it scrolls into view above the tab bar.
+  const easy = game.getByRole("button", { name: /^Easy\b/ });
+  const tabs = await page.getByRole("navigation", { name: "Main navigation" }).boundingBox();
+  await expect.poll(async () => {
+    const box = await easy.boundingBox();
+    return box!.y >= 0 && box!.y + box!.height <= tabs!.y;
+  }).toBe(true);
+  await game.getByRole("button", { name: /^Good\b/ }).click();
   await expect(game.getByRole("status")).toHaveText("Round complete.");
   await game.getByRole("button", { name: "Play again", exact: true }).click();
   await expect(game.getByText("0 of 3 matched", { exact: true })).toBeVisible();

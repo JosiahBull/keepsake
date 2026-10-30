@@ -245,14 +245,12 @@ test("practice samples the whole library however far the library is scrolled or 
   await expect(page.getByRole("combobox")).toHaveCount(0);
 });
 
-test("matching gates ratings, handles mistakes and saves all four outcomes durably", async ({ app, page }) => {
+test("matching asks once a round and saves that rating for every pair with its own time", async ({ app, page }) => {
   const facts: Fact[] = [];
   for (let index = 0; index < 4; index += 1) {
     facts.push(await app.createFact({
       prompt: `Synthetic matching question ${index}?`,
       answer: `Synthetic matching answer ${index}.`,
-      context: `Synthetic matching context ${index}.`,
-      source: `https://example.invalid/matching/${index}`,
       tags: ["synthetic-matching-bank"],
     }));
   }
@@ -261,49 +259,56 @@ test("matching gates ratings, handles mistakes and saves all four outcomes durab
   await page.getByRole("navigation", { name: "Main navigation" })
     .getByRole("button", { name: "Match pairs", exact: true }).click();
   const game = page.getByRole("region", { name: "Matching pairs game" });
+  const rating = game.getByRole("heading", { name: "How easy was this round?", exact: true });
   await expect(game.getByText("0 of 4 matched", { exact: true })).toBeVisible();
-  await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toHaveCount(0);
   for (const fact of facts) {
     await expect(game.getByRole("button", { name: fact.answer, exact: true })).toBeDisabled();
   }
 
-  const outcomes: Outcome[] = ["again", "hard", "good", "easy"];
-  const saved: Review[] = [];
   for (const [index, fact] of facts.entries()) {
     await game.getByRole("button", { name: fact.prompt, exact: true }).click();
     if (index === 0) {
       await game.getByRole("button", { name: facts[1].answer, exact: true }).click();
       await expect(game.getByRole("status")).toHaveText("Not a match. Try another answer.");
-      await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toHaveCount(0);
-      expect((await reviewHistory(app, fact.id)).total).toBe(0);
     }
-    await page.clock.fastForward(1_500);
+    // Each pair takes a different time, so each review carries its own.
+    await page.clock.fastForward((index + 1) * 1_000);
     await game.getByRole("button", { name: fact.answer, exact: true }).click();
-    await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toBeVisible();
-    await expect(game.getByText(fact.context, { exact: true })).toBeVisible();
-    await expect(game.getByRole("link", { name: fact.source, exact: true })).toHaveAttribute("href", fact.source);
-    if (index === 0) {
-      await expect(game.getByText("1 incorrect choice. Choose Again if you guessed.", { exact: true })).toBeVisible();
-    }
-    for (const item of facts) {
-      await expect(game.getByRole("button", { name: item.prompt })).toBeDisabled();
-      await expect(game.getByRole("button", { name: item.answer })).toBeDisabled();
-    }
-    await page.clock.fastForward(7_000);
-    const review = await rate(page, outcomes[index]);
-    expect(review).toMatchObject({ fact_id: fact.id, practice_id: null, method: "matching" });
-    saved.push(review);
     await expect(game.getByText(`${index + 1} of 4 matched`, { exact: true })).toBeVisible();
-    await expect(game.getByRole("heading", { name: "Rate your recognition", exact: true })).toHaveCount(0);
+    if (index < facts.length - 1) {
+      await expect(game.getByRole("status")).toHaveText("Matched.");
+      await expect(rating).toHaveCount(0);
+      // Choosing the next question needs no rating first.
+      await expect(game.getByRole("button", { name: facts[index + 1].prompt, exact: true })).toBeEnabled();
+    }
+  }
+  expect((await reviewHistory(app, facts[0].id)).total).toBe(0);
+
+  await expect(game.getByRole("status")).toHaveText("All pairs matched.");
+  await expect(rating).toBeVisible();
+  await expect(game.getByText("For all 4 pairs. 1 incorrect choice. Choose Again if you guessed.", { exact: true }))
+    .toBeVisible();
+  const saved: Review[] = [];
+  page.on("response", async (response) => {
+    if (new URL(response.url()).pathname === "/api/profiles/1/reviews" && response.request().method() === "POST") {
+      saved.push(await response.json());
+    }
+  });
+  await game.getByRole("button", { name: ratings.hard }).click();
+  await expect(game.getByRole("status")).toHaveText("Round complete.");
+  await expect(rating).toHaveCount(0);
+  await expect.poll(() => saved.length).toBe(4);
+  for (const [index, fact] of facts.entries()) {
+    expect(saved.find((review) => review.fact_id === fact.id)).toMatchObject({
+      practice_id: null, method: "matching", outcome: "hard", response_ms: (index + 1) * 1_000,
+    });
   }
 
-  await expect(game.getByRole("status")).toHaveText("Round complete.");
   await game.getByRole("button", { name: "Play again", exact: true }).click();
   await expect(game.getByText("0 of 4 matched", { exact: true })).toBeVisible();
   await app.restart();
   for (const review of saved) {
     const durable = await reviewHistory(app, review.fact_id);
-    expect(durable.total).toBe(1);
     expect(durable.items).toEqual([review]);
     const target = await app.request.get(`/api/profiles/1/study/facts/${review.fact_id}`);
     expect(target.ok()).toBeTruthy();
