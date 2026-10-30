@@ -15,6 +15,14 @@
     <link rel="icon" type="image/png" href="/keepsake-icon.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Keepsake</title>
+    <script>
+      // The app opens on the profile list, so ask for it while the app's code loads.
+      // The install page at / needs none.
+      if (location.pathname !== "/") {
+        window.keepsakeProfiles = fetch("/api/profiles");
+        window.keepsakeProfiles.catch(() => undefined);
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

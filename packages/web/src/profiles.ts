@@ -1,4 +1,5 @@
 import type { components } from "@keepsake/client";
+import { fetchPreloaded } from "./preload";
 
 // Profile selection belongs to the URL in each tab. Storage is only a root-entry hint.
 export type Screen =
@@ -24,10 +25,12 @@ export class RequestError extends Error {
 }
 
 export async function json<T>(url: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
+  const response = await fetchPreloaded(
+    new Request(url, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init.headers },
+    }),
+  );
   const body: unknown = await response.json();
   if (!response.ok) {
     throw new RequestError(

@@ -16,7 +16,7 @@
   } from "./profiles";
   import { openDialog } from "./dialog";
   import { edgeSwipeBack, iosHomeScreenApp } from "./swipeBack";
-  import { preload } from "./preload";
+  import { preload, preloadedScreens, type PreloadedScreen } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
   import { play, unlockSoundsOnTap } from "./sounds";
 
@@ -67,6 +67,18 @@
     if (activeId === null) return;
     void remindersOn(activeId).catch(() => undefined);
     void refreshBadge(activeId);
+  });
+
+  // Screens open without waiting on the server. While choosing, each profile's library
+  // is requested; once a profile is open, every screen but the one showing.
+  $effect(() => {
+    if (chooser) {
+      for (const profile of profiles)
+        if (profile.setup_complete) preload(profile.id, "library");
+    } else if (activeId !== null) {
+      for (const next of preloadedScreens)
+        if (next !== screen) preload(activeId, next);
+    }
   });
 
   function remember(id: number) {
@@ -147,11 +159,12 @@
 
   // Guess the first screen from the address so its data loads alongside the profiles.
   function preloadLaunch() {
-    const route = /^\/p\/(\d+)\/(library|practice|matching)\/?$/.exec(
-      location.pathname,
-    );
+    const route =
+      /^\/p\/(\d+)\/(library|practice|matching|sharing|sent)\/?$/.exec(
+        location.pathname,
+      );
     if (route) {
-      preload(Number(route[1]), route[2] as "library" | "practice" | "matching");
+      preload(Number(route[1]), route[2] as PreloadedScreen);
       return;
     }
     if (!appEntry() && location.pathname !== "/share") return;
