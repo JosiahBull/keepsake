@@ -70,7 +70,7 @@ test("matching requires three distinct pairs within a topic bank even when dupli
   const pairs = await response.json();
   expect(pairs.items).toEqual([]);
   await expect(empty).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Rate your recognition", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "How easy was this round?", exact: true })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Matching pairs game" })).toHaveCount(0);
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Practise", exact: true })).toHaveCount(2);
