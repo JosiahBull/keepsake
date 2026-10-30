@@ -82,6 +82,40 @@ test.describe("first setup", () => {
     );
     expect(target.ok()).toBe(true);
   });
+
+  test("the household chooser stays put while a slow logo loads", async ({
+    app,
+    page,
+  }) => {
+    const named = await app.request.patch("/api/profiles/1", {
+      data: { name: "Aroha" },
+    });
+    expect(named.ok(), await named.text()).toBe(true);
+    await partner(app);
+    let release!: () => void;
+    const logo = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/keepsake-logo\.svg$/, async (route) => {
+      await logo;
+      await route.continue();
+    });
+
+    try {
+      await page.goto("/app", { waitUntil: "commit" });
+      const heading = page.getByRole("heading", {
+        name: "Who’s practising?",
+        exact: true,
+      });
+      await expect(heading).toBeVisible();
+      const before = await heading.boundingBox();
+      release();
+      await page
+        .getByRole("img", { name: "Keepsake", exact: true })
+        .evaluate((image: HTMLImageElement) => image.decode());
+      expect(await heading.boundingBox()).toEqual(before);
+    } finally {
+      release();
+    }
+  });
 });
 
 test("separate browser contexts accept copies while both libraries and schedules stay independent", async ({

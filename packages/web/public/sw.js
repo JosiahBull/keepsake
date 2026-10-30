@@ -1,6 +1,6 @@
 // Reminders, app badges and an offline app shell. API responses are never cached.
 const SHELL = "keepsake-shell-v1";
-const PRECACHE = ["/keepsake-logo.png"];
+const PRECACHE = ["/keepsake-logo.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

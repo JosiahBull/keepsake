@@ -513,7 +513,13 @@
   <main class="entry"><p role="status">Loading profiles…</p></main>
 {:else if setup || adding || !active || chooser}
   <main class="entry">
-    <img class="entry-logo" src="/keepsake-logo.png" alt="Keepsake" />
+    <img
+      class="entry-logo"
+      src="/keepsake-logo.svg"
+      alt="Keepsake"
+      width="2172"
+      height="724"
+    />
     {#if error}<p class="message error" role="alert">{error}</p>{/if}
     {#if setup || adding}
       <h1>{setup ? "Keep your existing progress" : "Add profile"}</h1>
@@ -569,10 +575,6 @@
           error = "";
         }}>Add profile</button
       >
-      <p class="muted household-note">
-        Household profiles have no passwords. Anyone with access can switch
-        profiles.
-      </p>
     {/if}
   </main>
 {:else if ["library", "practice", "matching"].includes(screen)}
@@ -742,6 +744,7 @@
   }
   .entry-logo {
     width: 165px;
+    height: auto;
     display: block;
   }
   .entry {
@@ -781,9 +784,6 @@
     place-items: center;
     background: #e3ede7;
     border-radius: 50%;
-  }
-  .household-note {
-    margin-top: 2rem;
   }
   .profile-menu {
     position: relative;
