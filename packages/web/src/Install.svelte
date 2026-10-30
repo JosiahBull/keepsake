@@ -124,7 +124,7 @@
 <main class="install" class:desktop>
   <img
     class="logo"
-    src="/keepsake-logo.png"
+    src="/keepsake-logo.svg"
     alt="Keepsake"
     width="2172"
     height="724"
