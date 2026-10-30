@@ -3,6 +3,7 @@
   import AppShell from "./AppShell.svelte";
   import LibraryApp from "./LibraryApp.svelte";
   import LibraryHeading from "./LibraryHeading.svelte";
+  import Loading from "./Loading.svelte";
   import ProfileSettings from "./ProfileSettings.svelte";
   import Sharing from "./Sharing.svelte";
   import {
@@ -523,7 +524,7 @@
 {/snippet}
 
 {#if loading}
-  <main class="entry"><p role="status">Loading profiles…</p></main>
+  <main class="entry"><Loading label="Loading profiles…" /></main>
 {:else if setup || adding || !active || chooser}
   <main class="entry">
     <img

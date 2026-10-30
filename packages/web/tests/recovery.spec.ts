@@ -62,6 +62,30 @@ test("library retries a failed load and shows loading until the real response ar
   }
 });
 
+test("a loading screen shows its mark in the middle of the screen without moving the page", async ({ page }) => {
+  const held = gate();
+  await page.route(/\/api\/profiles\/1\/facts\?/, async (route) => {
+    await held.promise;
+    await route.continue();
+  });
+
+  try {
+    await page.goto("/app");
+    const status = page.getByRole("status").filter({ hasText: "Loading library…" });
+    await expect(status).toHaveText("Loading library…");
+    const tabs = await page.getByRole("button", { name: "My library", exact: true }).boundingBox();
+    const mark = await status.locator("xpath=following-sibling::*[1]").boundingBox();
+    const viewport = page.viewportSize()!;
+    expect(Math.abs(mark!.x + mark!.width / 2 - viewport.width / 2)).toBeLessThan(2);
+    expect(Math.abs(mark!.y + mark!.height / 2 - viewport.height / 2)).toBeLessThan(40);
+    held.release();
+    await expect(status).toHaveCount(0);
+    expect(await page.getByRole("button", { name: "My library", exact: true }).boundingBox()).toEqual(tabs);
+  } finally {
+    held.release();
+  }
+});
+
 test("practice recovers from a dropped request without showing an empty session", async ({ app, page }, testInfo) => {
   const prompt = "Recall the recovery answer";
   await app.createFact({

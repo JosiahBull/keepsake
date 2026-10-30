@@ -268,6 +268,9 @@
   }
 
   :global(html.swiping-back) main {
+    /* The moving page holds fixed descendants, such as the loading mark, so it
+       must stay screen height for them to stay centred. */
+    min-height: 100dvh;
     background: #f5f8f7;
     box-shadow: -8px 0 24px #18362f29;
   }

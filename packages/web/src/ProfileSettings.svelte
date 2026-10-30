@@ -4,6 +4,7 @@
   import { json, errorMessage, type Profile } from "./profiles";
   import AgentAccess from "./AgentAccess.svelte";
   import Reminders from "./Reminders.svelte";
+  import Loading from "./Loading.svelte";
   import { play, setSoundsOn, soundsOn } from "./sounds";
 
   let {
@@ -118,7 +119,7 @@
         disabled={saving || loading}
         onclick={load}>Discard changes and reload</button
       >{/if}{/if}
-  {#if loading}<p role="status">Loading settings…</p>
+  {#if loading}<Loading label="Loading settings…" />
   {:else if settings}
     <form onsubmit={save}>
       <label

@@ -6,6 +6,7 @@
   import AppShell from "./AppShell.svelte";
   import { openDialog } from "./dialog";
   import LibraryHeading from "./LibraryHeading.svelte";
+  import Loading from "./Loading.svelte";
   import QuestionMedia from "./QuestionMedia.svelte";
   import { fetchPreloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
@@ -1555,7 +1556,7 @@
     {/if}
 
     {#if loading}
-      <p role="status">Loading library…</p>
+      <Loading label="Loading library…" />
     {:else if totalFacts === 0 && !search}
       {#if !showAdd && !error}
         <p class="empty-state">No facts yet. Add a fact to start.</p>
@@ -1734,7 +1735,7 @@
         aria-label={selectedMode?.name ?? "Practice session"}
       >
         {#if practiceLoading}
-          <p role="status">Loading practice…</p>
+          <Loading label="Loading practice…" />
         {:else if practiceError}
           <div class="message error" role="alert">{practiceError}</div>
           <button
@@ -1966,7 +1967,7 @@
     </div>
   {:else}
     {#if matchingLoading}
-      <p role="status">Loading matching pairs…</p>
+      <Loading label="Loading matching pairs…" />
     {:else if matchingError}
       <div class="message error" role="alert">{matchingError}</div>
       <button class="quiet" onclick={startMatching}>Try again</button>
