@@ -744,6 +744,13 @@
 {/if}
 
 <style>
+  /* The library keeps loading as it scrolls, so a scrollbar would keep shrinking. */
+  :global(html) {
+    scrollbar-width: none;
+  }
+  :global(html::-webkit-scrollbar) {
+    display: none;
+  }
   :global(select) {
     font: inherit;
     /* iOS zooms into a focused field whose text is smaller than 16px. */

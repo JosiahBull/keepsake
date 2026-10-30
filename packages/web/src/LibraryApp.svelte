@@ -1379,7 +1379,7 @@
   {profileMenu}
 >
   {#if waiting && view !== "practice"}
-    <p role="status">Saving…</p>
+    <p class="saving" role="status">Saving…</p>
   {/if}
   {#if saves.failure}
     <div class="message error" role="alert">
@@ -2217,6 +2217,31 @@
 
   .quiet:hover {
     background: #e8f0eb;
+  }
+
+  /* Floats above the tab bar, so a save never moves what the learner just tapped.
+     A quick one is over before it shows. */
+  .saving {
+    position: fixed;
+    z-index: 6;
+    left: 50%;
+    bottom: calc(56px + env(safe-area-inset-bottom) + 0.75rem);
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 0.3rem 0.9rem;
+    border-radius: 999px;
+    background: #244c44;
+    color: #fff;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    pointer-events: none;
+    animation: saving-in 150ms ease-out 400ms both;
+  }
+
+  @keyframes saving-in {
+    from {
+      opacity: 0;
+    }
   }
 
   /* Library */

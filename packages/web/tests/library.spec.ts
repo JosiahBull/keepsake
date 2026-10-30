@@ -339,3 +339,36 @@ test("a fact can be added and disclosed with the keyboard", async ({ page }) => 
   await expect(page.getByText("To drink", { exact: true })).toBeHidden();
   await expectViewportFit(page);
 });
+
+test("disclosing a fact keeps the list still while its exposure saves", async ({ page, app }) => {
+  const lower = await app.createFact({ prompt: "Synthetic lower disclosed question?" });
+  const upper = await app.createFact({ prompt: "Synthetic upper disclosed question?" });
+  let release!: () => void;
+  const saved = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/\/api\/profiles\/1\/study\/exposures$/, async (route) => {
+    await saved;
+    await route.continue();
+  });
+
+  try {
+    await page.goto("/app");
+    const list = page.getByRole("region", { name: "Saved facts" });
+    const below = list.getByRole("heading", { name: lower.prompt, exact: true });
+    await expect(below).toBeVisible();
+    const before = await below.boundingBox();
+    await list.getByRole("heading", { name: upper.prompt, exact: true }).click();
+    await expect(page.getByText("Saving…", { exact: true })).toBeAttached();
+    expect(await below.boundingBox()).toEqual(before);
+    release();
+    await expect(page.getByText("Saving…", { exact: true })).toHaveCount(0);
+  } finally {
+    release();
+  }
+});
+
+test("the app has no page scrollbar, since the library grows as it scrolls", async ({ page }) => {
+  await page.goto("/app");
+  await expect(page.getByText("No facts yet. Add a fact to start.")).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("scrollbar-width")))
+    .toBe("none");
+});
