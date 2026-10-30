@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import { json, errorMessage, type Profile, type SharePage } from "./profiles";
   import { play } from "./sounds";
+  import Loading from "./Loading.svelte";
   let {
     profile,
     direction,
@@ -125,7 +126,7 @@
     </div>
   {/if}
 {/if}
-{#if loading && !page}<p role="status">Loading shared facts…</p>{/if}
+{#if loading && !page}<Loading label="Loading shared facts…" />{/if}
 {#each page?.items ?? [] as share (share.id)}
   <article class="share-row">
     {#if direction === "inbox" && share.status === "pending" && batchSelection}<input
