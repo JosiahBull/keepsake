@@ -365,7 +365,9 @@ Syncing… while saves reach the server. Saves go in the order they were made wh
 connection returns or Keepsake next opens, from whichever tab is open. Scheduled recall works offline from
 a week of reviews and new facts prepared with the copy; each comes once, and ratings count
 from when you made them. An offline attempt at a fact reviewed meanwhile on another
-device is kept in its history but does not count. See [offline recall](docs/scheduling.md#offline-recall).
+device is kept in its history but does not count. Facts added offline, with their images
+and clips, wait under Waiting to sync and join the library when the connection returns;
+they are not practised until then. See [offline recall](docs/scheduling.md#offline-recall).
 
 **Use Keepsake offline on this device**, in Profile settings, keeps these copies. It applies to every profile on the device. Turning it off removes the copy;
 saves still waiting for the server stay until they are sent.
@@ -513,6 +515,10 @@ copying its data directory: WAL files can contain committed data outside the mai
 - `packages/mcp`: MCP tools for agents, mounted by the server
 - `packages/core/migrations`: append-only SQL migrations embedded in both binaries
 - `skills/keepsake-add-facts`: reusable capture workflow
+
+`POST /api/profiles/{id}/facts` accepts an `Idempotency-Key` UUID header: sending the same
+fact again with it returns the fact first created, and a different fact or one since
+deleted is a conflict.
 
 `pnpm gen:client` generates OpenAPI from Rust and then the TypeScript contract. Commit the
 schema and generated types together. The API exposes facts, practice variants, reviews,

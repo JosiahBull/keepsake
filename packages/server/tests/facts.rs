@@ -148,3 +148,61 @@ async fn write_contention_returns_retryable_service_unavailable() {
     assert!(facts::list(&pool).await.unwrap().items.is_empty());
     pool.close().await;
 }
+
+async fn post_with_key(
+    app: &axum::Router,
+    key: &str,
+    fact: &NewFact,
+) -> (StatusCode, serde_json::Value) {
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/facts")
+                .header("content-type", "application/json")
+                .header("idempotency-key", key)
+                .body(Body::from(serde_json::to_vec(fact).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = response.status();
+    let bytes = response.into_body().collect().await.unwrap().to_bytes();
+    (status, serde_json::from_slice(&bytes).unwrap())
+}
+
+#[tokio::test]
+async fn an_idempotency_key_adds_a_fact_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let pool = db::connect(&format!(
+        "sqlite:{}",
+        directory.path().join("idempotent.db").display()
+    ))
+    .await
+    .unwrap();
+    let app = router(pool.clone(), directory.path());
+    let key = uuid::Uuid::new_v4().to_string();
+
+    let (status, first) = post_with_key(&app, &key, &fact()).await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, again) = post_with_key(&app, &key, &fact()).await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(again["id"], first["id"]);
+    assert_eq!(facts::list(&pool).await.unwrap().total, 1);
+
+    let mut different = fact();
+    different.answer = "Something else".into();
+    let (status, body) = post_with_key(&app, &key, &different).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+
+    let (status, _) = post_with_key(&app, "not-a-uuid", &fact()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // A retry that arrives after the fact was deleted does not bring it back.
+    let id = first["id"].as_i64().unwrap();
+    facts::delete_for(&pool, 1, id).await.unwrap();
+    let (status, body) = post_with_key(&app, &key, &fact()).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(facts::list(&pool).await.unwrap().total, 0);
+}
