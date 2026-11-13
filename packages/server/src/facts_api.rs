@@ -51,6 +51,9 @@ impl ApiError {
         if let Some(error) = error.downcast_ref::<facts::FactError>() {
             return match error {
                 facts::FactError::Conflict(message) => Self(StatusCode::CONFLICT, message.clone()),
+                facts::FactError::Invalid(message) => {
+                    Self(StatusCode::BAD_REQUEST, message.clone())
+                }
             };
         }
         if let Some(error) = error.downcast_ref::<StudyError>() {
@@ -205,6 +208,24 @@ pub async fn get(
             .await
             .map_err(ApiError::internal)?
             .ok_or_else(ApiError::missing)?,
+    ))
+}
+
+#[utoipa::path(patch, path = "/api/facts/{id}", operation_id = "edit_fact", params(("id" = i64, Path)), request_body = facts::FactEdit, responses(
+    (status = 200, body = Fact), (status = 400, body = ErrorBody), (status = 404, body = ErrorBody),
+    (status = 409, description = "A field this edit changes was changed elsewhere", body = ErrorBody),
+    (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn edit(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+    Path(ItemPath { id }): Path<ItemPath>,
+    Json(edit): Json<facts::FactEdit>,
+) -> Result<Json<Fact>, ApiError> {
+    Ok(Json(
+        facts::edit_for(&pool, profile_id, id, edit)
+            .await
+            .map_err(ApiError::internal)?,
     ))
 }
 

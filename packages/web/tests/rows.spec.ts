@@ -43,13 +43,13 @@ async function slid(fact: Locator): Promise<number> {
 async function revealActions(fact: Locator, isMobile: boolean) {
   if (isMobile) {
     await drag(fact.locator("summary"), -120);
-    await expect.poll(() => slid(fact)).toBe(-152);
+    await expect.poll(() => slid(fact)).toBe(-228);
   } else {
     await fact.hover();
   }
 }
 
-test("swiping a row left uncovers Share and Delete, and a tap closes it without opening the fact", async ({
+test("swiping a row left uncovers Edit, Share and Delete, and a tap closes it without opening the fact", async ({
   app,
   page,
   isMobile,
@@ -67,14 +67,14 @@ test("swiping a row left uncovers Share and Delete, and a tap closes it without 
   await expect.poll(() => slid(kai)).toBe(0);
 
   await drag(kai.locator("summary"), -120);
-  await expect.poll(() => slid(kai)).toBe(-152);
+  await expect.poll(() => slid(kai)).toBe(-228);
   await expect(kai.getByRole("button", { name: "Share What does kai mean?", exact: true })).toBeVisible();
   await expect(kai.getByRole("button", { name: "Delete What does kai mean?", exact: true })).toBeVisible();
 
   // Swiping another row closes the first.
   const wai = row(page, "What does wai mean?");
   await drag(wai.locator("summary"), -120);
-  await expect.poll(() => slid(wai)).toBe(-152);
+  await expect.poll(() => slid(wai)).toBe(-228);
   await expect.poll(() => slid(kai)).toBe(0);
 
   await wai.locator("summary").click();
@@ -106,7 +106,7 @@ test("rows leave sideways drags to the page while it is pinch-zoomed", async ({ 
   });
   await expect(kai.locator(".row-content")).toHaveCSS("touch-action", "pan-y");
   await drag(kai.locator("summary"), -120);
-  await expect.poll(() => slid(kai)).toBe(-152);
+  await expect.poll(() => slid(kai)).toBe(-228);
 });
 
 test("a row's Share offers just that fact", async ({ app, page, isMobile }) => {
@@ -199,10 +199,11 @@ test("keyboard focus reaches a row's actions and shows them", async ({ app, page
   const kai = row(page, "What does kai mean?");
   await kai.locator("summary").focus();
   await page.keyboard.press("Tab");
-  const share = kai.getByRole("button", { name: "Share What does kai mean?", exact: true });
-  await expect(share).toBeFocused();
-  if (isMobile) await expect.poll(() => slid(kai)).toBe(-152);
+  await expect(kai.getByRole("button", { name: "Edit What does kai mean?", exact: true })).toBeFocused();
+  if (isMobile) await expect.poll(() => slid(kai)).toBe(-228);
   else await expect(kai.locator(".row-actions")).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Tab");
+  await expect(kai.getByRole("button", { name: "Share What does kai mean?", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(kai.getByRole("button", { name: "Delete What does kai mean?", exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
@@ -234,4 +235,54 @@ test("Select turns rows into a checklist for sharing, and Done turns them back",
   await expect(page.getByRole("checkbox")).toHaveCount(0);
   await expect(toolbar).toHaveCount(0);
   await expect(page.getByRole("article").locator("summary")).toHaveCount(3);
+});
+
+test("editing a fact saves it, and a new answer restarts its schedule", async ({ app, page, isMobile }) => {
+  const [, kai] = await threeFacts(app);
+  await page.goto("/app");
+  const fact = row(page, kai.prompt);
+  await revealActions(fact, isMobile);
+  await fact.getByRole("button", { name: `Edit ${kai.prompt}`, exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit fact" });
+  await dialog.getByRole("textbox", { name: "Context" }).fill("Kai also means a meal.");
+  await expect(dialog.getByText("its schedule starts again")).toHaveCount(0);
+  await dialog.getByRole("textbox", { name: "Answer" }).fill("Food");
+  await expect(dialog.getByText(/its schedule starts again/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "Fact updated." })).toBeVisible();
+
+  const saved = await (await app.request.get(`/api/profiles/1/facts/${kai.id}`)).json();
+  expect(saved).toMatchObject({ answer: "Food", context: "Kai also means a meal." });
+  const target = await (await app.request.get(`/api/profiles/1/study/facts/${kai.id}`)).json();
+  expect(target).toMatchObject({ content_revision: 2, phase: "new" });
+  await row(page, kai.prompt).getByRole("heading", { name: kai.prompt, exact: true }).click();
+  await expect(page.getByText("Food", { exact: true })).toBeVisible();
+});
+
+test("an edit to a field changed elsewhere is refused until the editor keeps their version", async ({ app, page, isMobile }) => {
+  const [, kai] = await threeFacts(app);
+  await page.goto("/app");
+  const fact = row(page, kai.prompt);
+  await revealActions(fact, isMobile);
+  await fact.getByRole("button", { name: `Edit ${kai.prompt}`, exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit fact" });
+
+  // Meanwhile another device changes the source.
+  const base = { prompt: kai.prompt, answer: kai.answer, context: kai.context, source: kai.source, tags: kai.tags };
+  const elsewhere = await app.request.patch(`/api/profiles/1/facts/${kai.id}`, {
+    data: { base, fields: { ...base, source: "Another device" } },
+  });
+  expect(elsewhere.status(), await elsewhere.text()).toBe(200);
+
+  await dialog.getByRole("textbox", { name: "Source" }).fill("My dictionary");
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Could not save your changes. The source changed elsewhere since you opened this fact",
+  );
+  await dialog.getByRole("button", { name: "Keep my version", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect((await (await app.request.get(`/api/profiles/1/facts/${kai.id}`)).json()).source).toBe("My dictionary");
 });
