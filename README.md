@@ -383,7 +383,10 @@ a week of reviews and new facts prepared with the copy; each comes once, and rat
 from when you made them. An offline attempt at a fact reviewed meanwhile on another
 device is kept in its history but does not count. Facts added offline, with their images
 and clips, wait under Waiting to sync and join the library when the connection returns;
-they are not practised until then. See [offline recall](docs/scheduling.md#offline-recall).
+they are not practised until then. Edits and deletions made offline show at once and
+reach the server when the connection returns. An edit that clashes with a change made
+elsewhere reopens the edit form with the reason; one to a fact deleted elsewhere opens the
+fact form with the edited content, to add it again. See [offline recall](docs/scheduling.md#offline-recall).
 
 **Use Keepsake offline on this device**, in Profile settings, keeps these copies. It applies to every profile on the device. Turning it off removes the copy;
 saves still waiting for the server stay until they are sent.
