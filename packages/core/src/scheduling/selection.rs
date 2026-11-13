@@ -63,58 +63,7 @@ pub async fn queue_at_for(
 
     let mut items = Vec::with_capacity(ids.len());
     for id in ids {
-        let schedule = load_schedule(&mut transaction, id).await?;
-        let fact = crate::facts::load_id(&mut transaction, schedule.fact_id)
-            .await?
-            .context("scheduled fact missing")?;
-        validate_content(&mut transaction, &schedule, &fact).await?;
-        let practice_id = sqlx::query_scalar!(
-            "SELECT practice_id FROM target_practices WHERE target_id=? AND qualifying=1
-             ORDER BY random() LIMIT 1",
-            id
-        )
-        .fetch_one(&mut *transaction)
-        .await?;
-        let crate::facts::Fact {
-            id: fact_id,
-            prompt,
-            answer,
-            context,
-            source,
-            tags,
-            created_at,
-            practices,
-            shared_by,
-            media,
-        } = fact;
-        let practice = practices
-            .into_iter()
-            .find(|practice| practice.id == practice_id)
-            .context("scheduled practice missing")?;
-        let transitions = transitions(&schedule, &settings, now)?;
-        items.push(StudyQuestion {
-            fact: crate::paging::FactSummary {
-                id: fact_id,
-                prompt,
-                answer,
-                context,
-                source,
-                tags,
-                created_at,
-                shared_by,
-                media,
-            },
-            practice,
-            target_id: id,
-            content_revision: schedule.content_revision,
-            schedule_version: schedule.version,
-            intervals: RatingIntervals {
-                again: RETRY_SECONDS,
-                hard: transitions.hard.interval_seconds,
-                good: transitions.good.interval_seconds,
-                easy: transitions.easy.interval_seconds,
-            },
-        });
+        items.push(question(&mut transaction, &settings, id, now).await?);
     }
     let mut next_due_at = sqlx::query_scalar!(
         "SELECT min(max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0))) AS \"due: i64\"
@@ -150,6 +99,134 @@ pub async fn queue_at_for(
         budget_seconds: settings.daily_budget_seconds,
         spent_seconds,
         budget_reached: spent_seconds >= settings.daily_budget_seconds,
+    })
+}
+
+/// A target's question, with the rating intervals it would have if answered at `at`.
+async fn question(
+    connection: &mut sqlx::SqliteConnection,
+    settings: &SchedulerSettings,
+    id: i64,
+    at: i64,
+) -> anyhow::Result<StudyQuestion> {
+    let schedule = load_schedule(connection, id).await?;
+    let fact = crate::facts::load_id(connection, schedule.fact_id)
+        .await?
+        .context("scheduled fact missing")?;
+    validate_content(connection, &schedule, &fact).await?;
+    let practice_id = sqlx::query_scalar!(
+        "SELECT practice_id FROM target_practices WHERE target_id=? AND qualifying=1
+         ORDER BY random() LIMIT 1",
+        id
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+    let crate::facts::Fact {
+        id: fact_id,
+        prompt,
+        answer,
+        context,
+        source,
+        tags,
+        created_at,
+        practices,
+        shared_by,
+        media,
+    } = fact;
+    let practice = practices
+        .into_iter()
+        .find(|practice| practice.id == practice_id)
+        .context("scheduled practice missing")?;
+    let transitions = transitions(&schedule, settings, at)?;
+    Ok(StudyQuestion {
+        fact: crate::paging::FactSummary {
+            id: fact_id,
+            prompt,
+            answer,
+            context,
+            source,
+            tags,
+            created_at,
+            shared_by,
+            media,
+        },
+        practice,
+        target_id: id,
+        content_revision: schedule.content_revision,
+        schedule_version: schedule.version,
+        intervals: RatingIntervals {
+            again: RETRY_SECONDS,
+            hard: transitions.hard.interval_seconds,
+            good: transitions.good.interval_seconds,
+            easy: transitions.easy.interval_seconds,
+        },
+    })
+}
+
+/// How far ahead a device prepares scheduled recall for use offline.
+const PREPARED_SECONDS: i64 = 7 * 86_400;
+/// Bounds the download for a very large collection.
+const PREPARED_LIMIT: i64 = 1000;
+
+pub async fn prepared_for(pool: &SqlitePool, profile_id: i64) -> anyhow::Result<PreparedStudy> {
+    prepared_at_for(pool, profile_id, now()).await
+}
+
+/// Scheduled recall for a device to take offline: work falling due within a week, each
+/// with when it becomes available, and the next week of new targets in intake order.
+pub async fn prepared_at_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    now: i64,
+) -> anyhow::Result<PreparedStudy> {
+    invalid(now >= 0, "timestamp must be nonnegative")?;
+    let mut transaction = pool.begin().await?;
+    crate::profiles::require(&mut transaction, profile_id).await?;
+    let settings = load_settings(&mut transaction, profile_id).await?;
+    let (start, end) = day_bounds(now, &settings.timezone)?;
+    let introduced = introduced_today(&mut transaction, profile_id, start, end).await?;
+    let spent_ms = spent_ms(&mut transaction, profile_id, start, end).await?;
+    let horizon = now + PREPARED_SECONDS;
+    let due = sqlx::query!(
+        "SELECT s.target_id AS \"target_id!\", max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) AS \"available_at!: i64\"
+         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
+           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?
+         ORDER BY CASE WHEN s.phase IN ('learning', 'relearning') THEN 0 ELSE 1 END, 2 LIMIT ?",
+        profile_id, horizon, PREPARED_LIMIT
+    )
+    .fetch_all(&mut *transaction)
+    .await?;
+    let new_ids = sqlx::query_scalar!(
+        "SELECT s.target_id FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id
+         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase='new'
+         ORDER BY s.target_id LIMIT ?",
+        profile_id, settings.new_limit.saturating_mul(7).min(PREPARED_LIMIT)
+    )
+    .fetch_all(&mut *transaction)
+    .await?;
+    let mut prepared = Vec::with_capacity(due.len());
+    for row in due {
+        let available_at = row.available_at.max(now);
+        prepared.push(PreparedQuestion {
+            question: question(&mut transaction, &settings, row.target_id, available_at).await?,
+            available_at,
+        });
+    }
+    let mut new = Vec::with_capacity(new_ids.len());
+    for id in new_ids {
+        new.push(question(&mut transaction, &settings, id, now).await?);
+    }
+    transaction.commit().await?;
+    Ok(PreparedStudy {
+        due: prepared,
+        new,
+        new_limit: settings.new_limit,
+        introduced_today: introduced,
+        timezone: settings.timezone,
+        budget_seconds: settings.daily_budget_seconds,
+        spent_seconds: spent_ms / 1000,
+        prepared_at: now,
     })
 }
 

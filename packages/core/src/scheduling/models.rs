@@ -72,6 +72,32 @@ pub struct StudyQueue {
     pub budget_reached: bool,
 }
 
+/// A due or soon-due question prepared for offline use, with when it becomes available.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct PreparedQuestion {
+    pub question: StudyQuestion,
+    /// When the target may be assessed: its due time, or the end of an exposure's delay.
+    pub available_at: i64,
+}
+
+/// Scheduled recall prepared for a device to use offline. The device serves due work
+/// as it becomes available, then new targets within each local day's allowance. The
+/// server applies its own rules again when the attempts arrive.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct PreparedStudy {
+    /// Learning, relearning and review work available within a week, soonest first.
+    pub due: Vec<PreparedQuestion>,
+    /// New targets in the order the queue introduces them, up to a week's allowance.
+    pub new: Vec<StudyQuestion>,
+    pub new_limit: i64,
+    /// New targets already introduced in the current local day.
+    pub introduced_today: i64,
+    pub timezone: String,
+    pub budget_seconds: i64,
+    pub spent_seconds: i64,
+    pub prepared_at: i64,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct StudySummary {
     /// Learning, relearning and review targets ready now.
@@ -156,6 +182,16 @@ pub struct StudySubmission {
     pub expected_version: i64,
     #[serde(default)]
     pub feedback_event_id: Option<i64>,
+    /// The feedback this rating follows, by its submission ID, for a rating made before
+    /// the feedback reached the server. Use it or `feedback_event_id`, not both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feedback_submission_id: Option<String>,
+    /// When the device recorded this event, in UTC Unix seconds, for an event sent later,
+    /// such as one made offline. It may be up to 30 days old; a later time counts as now.
+    /// An event with this time that no longer fits its target is kept as ignored history
+    /// instead of being refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurred_at: Option<i64>,
     pub kind: EventKind,
     pub context: StudyContext,
     pub method: ReviewMethod,
@@ -174,6 +210,9 @@ pub struct StudyResult {
     pub qualifying: bool,
     pub next_due_at: Option<i64>,
     pub review: Option<Review>,
+    /// Why an event recorded later was kept without being applied; absent when applied.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ignored: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -232,6 +271,8 @@ pub struct StudyEvent {
     pub before_json: String,
     pub after_json: String,
     pub result_json: String,
+    /// Why the event was kept without being applied; null when it was applied.
+    pub ignored: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
@@ -256,6 +297,17 @@ impl std::fmt::Display for StudyError {
     }
 }
 impl std::error::Error for StudyError {}
+
+impl StudyError {
+    /// The request no longer fits the target's current state, rather than being malformed
+    /// or naming something missing.
+    pub(crate) const fn is_conflict(&self) -> bool {
+        match self {
+            Self::Conflict(_) => true,
+            Self::Invalid(_) | Self::Missing(_) => false,
+        }
+    }
+}
 
 pub(super) fn invalid(condition: bool, message: &str) -> anyhow::Result<()> {
     if !condition {

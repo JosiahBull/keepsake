@@ -10,15 +10,22 @@
   import QuestionMedia from "./QuestionMedia.svelte";
   import { fetchPreloaded } from "./preload";
   import {
+    markStudied,
     matchingFromCopy,
     pageFromCopy,
     practiceFromCopy,
     readLibrary,
     refreshLibrary,
+    scheduledFromCopy,
   } from "./library";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
-  import { outbox, Rejected, type SaveRequest } from "./outbox.svelte";
+  import {
+    outbox,
+    Rejected,
+    Unreachable,
+    type SaveRequest,
+  } from "./outbox.svelte";
   import { play } from "./sounds";
   import { sync } from "./sync.svelte";
 
@@ -215,7 +222,10 @@
   let checkingNext = $state(false);
   let nextPractice: Promise<PracticeSession | null> | null = null;
   let recalled = $state(false);
-  let feedback: { body: StudySubmission; result: StudyResult } | null = null;
+  // Offline, the result arrives later, if at all, so a rating refers to its submission.
+  let feedback: { body: StudySubmission; result?: StudyResult } | null = null;
+  // Scheduled recall from what this device prepared, sent with the device's times.
+  let offlineSession = $state(false);
   let studyConflict = $state(false);
   let exposureOnly = $state(false);
   const locallyExposed = new Map<number, number>();
@@ -287,6 +297,13 @@
   $effect(() => {
     // A background save can fail after the learner has moved on, out of view.
     if (saves.failure) play("alert");
+  });
+
+  $effect(() => {
+    // Attempts made offline that arrived after their facts changed elsewhere.
+    if (!saves.ignored) return;
+    notice = `${saves.ignored} ${saves.ignored === 1 ? "attempt" : "attempts"} made offline did not count, because ${saves.ignored === 1 ? "its fact" : "their facts"} changed first.`;
+    saves.ignored = 0;
   });
 
   $effect(() => {
@@ -883,7 +900,8 @@
     try {
       return await online();
     } catch (caught) {
-      if (!(caught instanceof TypeError)) throw caught;
+      if (!(caught instanceof TypeError || caught instanceof Unreachable))
+        throw caught;
       const local = await offline();
       if (local === undefined) throw caught;
       return local;
@@ -939,6 +957,7 @@
     practiceError = "";
     saveWarning = "";
     practiceMode = extra ? "extra" : "scheduled";
+    offlineSession = false;
     studyQueue = null;
     checkingNext = false;
     queue = [];
@@ -954,13 +973,23 @@
         nextPractice = null;
         session = (await prefetched) ?? (await practiceSample());
       } else {
-        // A queue read before earlier saves land could offer their targets again.
-        await savesSent();
-        session = unwrap(
-          await api.GET("/api/study/queue", {
-            params: { query: { limit: 20 } },
-          }),
+        let local = false;
+        session = await orFromCopy(
+          async () => {
+            // A queue read before earlier saves land could offer their targets again.
+            await savesSent();
+            return unwrap(
+              await api.GET("/api/study/queue", {
+                params: { query: { limit: 20 } },
+              }),
+            );
+          },
+          async () => {
+            local = true;
+            return scheduledFromCopy(profileId);
+          },
         );
+        if (request === practiceRequest) offlineSession = local;
       }
 
       if (request !== practiceRequest) {
@@ -978,8 +1007,11 @@
     } catch (caught) {
       if (request === practiceRequest) {
         practiceError =
-          !extra && (caught instanceof TypeError || saves.offline)
-            ? "Scheduled recall needs a connection. Extra practice and Match pairs work offline."
+          !extra &&
+          (caught instanceof TypeError ||
+            caught instanceof Unreachable ||
+            saves.offline)
+            ? "Scheduled recall offline needs Keepsake opened once with a connection, to prepare it. Extra practice and Match pairs work offline."
             : `Could not load practice. ${message(caught)}`;
       }
     } finally {
@@ -1016,11 +1048,16 @@
     if (scheduledQuestion) {
       exposureOnly = !recalled && !response.trim();
       const body = feedbackSubmission(scheduledQuestion);
+      const offline = offlineSession;
+      if (offline) body.occurred_at = Math.floor(Date.now() / 1000);
       try {
-        const result = await saveBeforeShowing<StudyResult>(
+        const result = await saveBeforeShowing<StudyResult | undefined>(
           "Could not save this activity.",
           postStudyEvent(body),
+          offline ? "stored" : "sent",
         );
+        if (offline)
+          await markStudied(profileId, body.target_id, body.occurred_at!);
         if (question === shown) {
           feedback = { body, result };
           showAnswer();
@@ -1100,6 +1137,11 @@
 
   async function refreshStudyOverview() {
     const request = practiceRequest;
+    if (offlineSession) {
+      const overview = await scheduledFromCopy(profileId);
+      if (request === practiceRequest && overview) studyQueue = overview;
+      return;
+    }
     checkingNext = true;
     try {
       // The next queue must reflect every rating from this session, however long that takes.
@@ -1160,14 +1202,25 @@
         return;
       }
       // A rating refers to its own feedback and the schedule state that feedback produced.
-      const attempt: StudySubmission = {
-        ...feedback.body,
-        submission_id: crypto.randomUUID(),
-        kind: "attempt",
-        outcome,
-        expected_version: feedback.result.schedule.version,
-        feedback_event_id: feedback.result.event_id,
-      };
+      // Offline, that state is the next version, and the feedback is named by submission.
+      const attempt: StudySubmission = offlineSession
+        ? {
+            ...feedback.body,
+            submission_id: crypto.randomUUID(),
+            kind: "attempt",
+            outcome,
+            expected_version: feedback.body.expected_version + 1,
+            feedback_submission_id: feedback.body.submission_id,
+            occurred_at: Math.floor(Date.now() / 1000),
+          }
+        : {
+            ...feedback.body,
+            submission_id: crypto.randomUUID(),
+            kind: "attempt",
+            outcome,
+            expected_version: feedback.result!.schedule.version,
+            feedback_event_id: feedback.result!.event_id,
+          };
       saved = saveReview(postStudyEvent(attempt));
     } else {
       const review: NewReview = {
@@ -1312,12 +1365,14 @@
   // Shared helpers
   /** Waits for earlier saves to reach the server, and fails while one cannot. */
   async function savesSent() {
-    if (!(await saves.settled()))
-      throw new Error(
-        saves.offline
-          ? "You are offline, and earlier saves must reach Keepsake first."
-          : "Earlier saves must reach Keepsake first. Retry them, then try again.",
+    if (await saves.settled()) return;
+    if (saves.offline)
+      throw new Unreachable(
+        "You are offline, and earlier saves must reach Keepsake first.",
       );
+    throw new Error(
+      "Earlier saves must reach Keepsake first. Retry them, then try again.",
+    );
   }
 
   function unwrap<T>(result: {
@@ -1766,9 +1821,11 @@
     <div class="practice-layout">
       <div class="practice-toolbar">
         <span class="muted"
-          >{practiceMode === "scheduled"
-            ? "Scheduled recall"
-            : "Extra practice · does not advance recall"}</span
+          >{practiceMode === "extra"
+            ? "Extra practice · does not advance recall"
+            : offlineSession
+              ? "Scheduled recall · prepared for offline"
+              : "Scheduled recall"}</span
         >
         <button
           class="text-button"

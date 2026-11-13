@@ -254,7 +254,7 @@ pub async fn export_events_for(
         "SELECT id AS \"id!\", submission_id, target_id, content_revision, occurred_at, kind, context,
          method, outcome, response_ms, qualifying AS \"qualifying: bool\", algorithm, parameter_version,
          elapsed_seconds, model_interval_days AS \"model_interval_days: f32\", policy_override_seconds,
-         request_json, before_json, after_json, result_json
+         request_json, before_json, after_json, result_json, ignored
          FROM study_events WHERE profile_id=? AND id > ? ORDER BY id LIMIT ?", profile_id, after, fetch_limit
     ).fetch_all(pool).await?;
     let next_cursor = if items.len() > limit as usize {

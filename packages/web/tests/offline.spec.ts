@@ -109,9 +109,9 @@ test("the header shows Syncing while a save takes a moment", async ({ app, page 
   }
 });
 
-/** Waits for the device's copy of the library, which downloads once the app opens. */
+/** Waits for the device's copies of the library and study, which download once the app opens. */
 async function copied(page: Page) {
-  await page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/facts/copy"));
+  await page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/study/prepared"));
   await expect(header(page).getByText("Syncing…", { exact: true })).toHaveCount(0);
 }
 
@@ -150,20 +150,18 @@ test("the copy follows a fact added in the app", async ({ page }) => {
   await page.getByRole("banner").getByRole("button", { name: "Add a fact", exact: true }).click();
   await page.getByLabel("Question").fill("A fact added before going offline?");
   await page.getByLabel("Answer").fill("Kept on the device");
-  const copiedAgain = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/facts/copy"));
   await page.getByRole("button", { name: "Save fact", exact: true }).click();
-  await copiedAgain;
-  const copy = await page.evaluate(async () => {
+  await expect.poll(() => page.evaluate(async () => {
     const db: IDBDatabase = await new Promise((resolve) => {
       const request = indexedDB.open("keepsake");
       request.onsuccess = () => resolve(request.result);
     });
-    return new Promise<{ facts: { prompt: string }[] }>((resolve) => {
+    const copy = await new Promise<{ facts: { prompt: string }[] } | undefined>((resolve) => {
       const request = db.transaction("copies").objectStore("copies").get("library:1");
       request.onsuccess = () => resolve(request.result);
     });
-  });
-  expect(copy.facts.map((fact) => fact.prompt)).toEqual(["A fact added before going offline?"]);
+    return copy?.facts.map((fact) => fact.prompt);
+  })).toEqual(["A fact added before going offline?"]);
 });
 
 test("extra practice keeps going from the device's copy for as long as the learner wants", async ({ app, context, page }) => {
@@ -232,15 +230,113 @@ test("offline practice leaves out questions whose images are not on the device",
   await context.setOffline(false);
 });
 
-test("scheduled recall says it needs a connection and points to offline practice", async ({ app, context, page }) => {
-  await app.createFact();
+type StudyEvent = { kind: string; qualifying: boolean; occurred_at: number; ignored: string | null };
+
+async function studyEvents(app: TestApp): Promise<StudyEvent[]> {
+  return (await (await app.request.get("/api/profiles/1/study/events?after=0&limit=100")).json()).items;
+}
+
+/** Opens scheduled recall afresh: the Practise tab may show a queue preloaded online. */
+async function scheduledOffline(page: Page) {
+  await startExtraPractice(page);
+  await page.getByRole("button", { name: "Scheduled recall", exact: true }).click();
+  await expect(page.getByText("Scheduled recall · prepared for offline", { exact: true })).toBeVisible();
+}
+
+async function recallAndRate(page: Page, rating: RegExp) {
+  await page.getByRole("textbox", { name: "Your answer optional" }).fill("My offline attempt");
+  await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Rate your attempt", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: rating }).click();
+}
+
+test("scheduled recall runs offline from what was prepared, and counts from when it happened", async ({ app, context, page }) => {
+  const facts = [await app.createFact({ prompt: "Synthetic first scheduled question?" }),
+    await app.createFact({ prompt: "Synthetic second scheduled question?" })];
+  const loaded = copied(page);
   await page.goto("/app");
+  await loaded;
   await context.setOffline(true);
-  // The Practise tab may show a queue loaded before the connection went, so ask afresh.
+  const studiedAt = Math.floor(Date.now() / 1000);
+  await scheduledOffline(page);
+  await expect(page.getByText(/^Flashcards · 1 of 2$/)).toBeVisible();
+  // The intervals were prepared with the question.
+  await page.getByRole("textbox", { name: "Your answer optional" }).fill("My offline attempt");
+  await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Good\b.*\d+ days?$/ })).toBeVisible();
+  await page.getByRole("button", { name: /^Good\b/ }).click();
+  await recallAndRate(page, /^Again\b/);
+  await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+  await expect(header(page)).toContainText("4 saves to send");
+
+  // Studied targets are not offered again offline.
+  await scheduledOffline(page);
+  await expect(page.getByRole("heading", { name: "Nothing due right now", exact: true })).toBeVisible();
+
+  await context.setOffline(false);
+  await expect.poll(async () => (await studyEvents(app)).length).toBe(4);
+  const recorded = await studyEvents(app);
+  expect(recorded.map((event) => [event.kind, event.qualifying, event.ignored])).toEqual([
+    ["exposure", false, null], ["attempt", true, null], ["exposure", false, null], ["attempt", true, null],
+  ]);
+  for (const event of recorded) {
+    expect(event.occurred_at).toBeGreaterThanOrEqual(studiedAt);
+    expect(event.occurred_at).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
+  }
+  for (const fact of facts) expect((await reviews(app, fact.id)).total).toBe(1);
+});
+
+test("an offline attempt overtaken on another device is kept but does not count", async ({ app, context, page }) => {
+  const fact = await app.createFact({ prompt: "Synthetic contested question?" });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await scheduledOffline(page);
+  await recallAndRate(page, /^Good\b/);
+  await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+
+  // Meanwhile another device reviews it online.
+  const queue = await (await app.request.get("/api/profiles/1/study/queue")).json();
+  const question = queue.items[0];
+  const elsewhere = await app.request.post("/api/profiles/1/study/events", { data: {
+    submission_id: crypto.randomUUID(), target_id: question.target_id, practice_id: question.practice.id,
+    content_revision: question.content_revision, expected_version: question.schedule_version,
+    kind: "attempt", context: "scheduled", method: "flashcard", outcome: "hard", response_ms: 3000,
+    attempted: true, assisted: false, prior_exposure: false,
+  } });
+  expect(elsewhere.status(), await elsewhere.text()).toBe(201);
+
+  await context.setOffline(false);
+  await expect(page.getByRole("status").filter({ hasText: "did not count" }))
+    .toHaveText("1 attempt made offline did not count, because its fact changed first.");
+  const recorded = await studyEvents(app);
+  expect(recorded.map((event) => [event.kind, event.qualifying, Boolean(event.ignored)])).toEqual([
+    ["attempt", true, false], ["exposure", false, true], ["attempt", false, true],
+  ]);
+  expect((await reviews(app, fact.id)).items).toMatchObject([{ outcome: "hard" }]);
+});
+
+test("scheduled recall offline asks for one connected visit when nothing is prepared", async ({ app, context, page }) => {
+  await app.createFact();
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await page.evaluate(async () => {
+    const db: IDBDatabase = await new Promise((resolve) => {
+      const request = indexedDB.open("keepsake");
+      request.onsuccess = () => resolve(request.result);
+    });
+    await new Promise((resolve) => {
+      const request = db.transaction("copies", "readwrite").objectStore("copies").delete("study:1");
+      request.onsuccess = resolve;
+    });
+  });
+  await context.setOffline(true);
   await startExtraPractice(page);
   await page.getByRole("button", { name: "Scheduled recall", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText(
-    "Scheduled recall needs a connection. Extra practice and Match pairs work offline.",
+    "Scheduled recall offline needs Keepsake opened once with a connection, to prepare it. Extra practice and Match pairs work offline.",
   );
   await context.setOffline(false);
 });
