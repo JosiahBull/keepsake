@@ -341,12 +341,13 @@ async fn insert_practice(
 #[derive(Debug)]
 pub enum FactError {
     Conflict(String),
+    Invalid(String),
 }
 
 impl fmt::Display for FactError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Conflict(message) => f.write_str(message),
+            Self::Conflict(message) | Self::Invalid(message) => f.write_str(message),
         }
     }
 }
@@ -532,6 +533,189 @@ pub async fn add_practices_for(
 
 /// Delete a fact with its practices, reviews, schedule and study events, and return what
 /// it held. Its pending offers are withdrawn, and media no other question uses is removed.
+/// The parts of a fact a person can edit.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FactFields {
+    pub prompt: String,
+    pub answer: String,
+    #[serde(default)]
+    pub context: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// An edit, with the fields as the editor last saw them. A field the editor changed that
+/// was also changed meanwhile, to something else, is a conflict; edits to different
+/// fields both apply.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FactEdit {
+    pub base: FactFields,
+    pub fields: FactFields,
+}
+
+/// One field of an edit: the editor's value unless they left it alone, refusing a field
+/// someone else changed meanwhile.
+fn merge<T: PartialEq>(
+    name: &'static str,
+    base: T,
+    edited: T,
+    current: T,
+    conflicts: &mut Vec<&'static str>,
+) -> T {
+    if edited == base || edited == current {
+        current
+    } else if current == base {
+        edited
+    } else {
+        conflicts.push(name);
+        current
+    }
+}
+
+/// Applies an edit. Changing the question or answer makes a new revision of the fact's
+/// recall target with a fresh schedule: performance on the old wording is not evidence
+/// about the new one. Earlier events stay with the retired revision.
+pub async fn edit_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    id: i64,
+    edit: FactEdit,
+) -> anyhow::Result<Fact> {
+    crate::db::write_transaction(pool, move |connection| {
+        let edit = edit.clone();
+        Box::pin(async move {
+            crate::profiles::require_fact(connection, profile_id, id).await?;
+            let current = load_id(connection, id).await?.context("fact missing")?;
+            let FactEdit { base, fields } = edit;
+            let FactFields {
+                prompt: base_prompt,
+                answer: base_answer,
+                context: base_context,
+                source: base_source,
+                tags: base_tags,
+            } = base;
+            let FactFields {
+                prompt,
+                answer,
+                context,
+                source,
+                tags,
+            } = fields;
+            let Fact {
+                id: _,
+                prompt: current_prompt,
+                answer: current_answer,
+                context: current_context,
+                source: current_source,
+                tags: current_tags,
+                created_at: _,
+                practices: _,
+                shared_by: _,
+                media: _,
+            } = current;
+            let mut conflicts = Vec::new();
+            let merged = NewFact {
+                prompt: merge(
+                    "question",
+                    base_prompt,
+                    prompt,
+                    current_prompt.clone(),
+                    &mut conflicts,
+                ),
+                answer: merge(
+                    "answer",
+                    base_answer,
+                    answer,
+                    current_answer.clone(),
+                    &mut conflicts,
+                ),
+                context: merge(
+                    "context",
+                    base_context,
+                    context,
+                    current_context,
+                    &mut conflicts,
+                ),
+                source: merge(
+                    "source",
+                    base_source,
+                    source,
+                    current_source,
+                    &mut conflicts,
+                ),
+                tags: merge("tags", base_tags, tags, current_tags, &mut conflicts),
+                practices: vec![],
+                media: vec![],
+            };
+            if !conflicts.is_empty() {
+                return Err(FactError::Conflict(format!(
+                    "The {} changed elsewhere since you opened this fact",
+                    conflicts.join(" and ")
+                ))
+                .into());
+            }
+            validate_new_fact(&merged).map_err(|error| FactError::Invalid(error.to_string()))?;
+            let NewFact {
+                prompt,
+                answer,
+                context,
+                source,
+                tags,
+                practices: _,
+                media: _,
+            } = merged;
+            sqlx::query!(
+                "UPDATE facts SET prompt=?, answer=?, context=?, source=?, tags=? WHERE id=?",
+                prompt,
+                answer,
+                context,
+                source,
+                serde_json::to_string(&tags)?,
+                id
+            )
+            .execute(&mut *connection)
+            .await?;
+            if prompt != current_prompt || answer != current_answer {
+                // The canonical flashcard follows the fact; generated variants keep their text.
+                let updated = sqlx::query!(
+                    "UPDATE practices SET prompt=?, answer=?
+                     WHERE fact_id=? AND kind='flashcard' AND prompt=? AND answer=?",
+                    prompt,
+                    answer,
+                    id,
+                    current_prompt,
+                    current_answer
+                )
+                .execute(&mut *connection)
+                .await?;
+                if updated.rows_affected() == 0 {
+                    insert_practice(
+                        connection,
+                        id,
+                        &NewPractice {
+                            kind: PracticeKind::Flashcard,
+                            prompt: prompt.clone(),
+                            answer: answer.clone(),
+                            choices: vec![],
+                            explanation: String::new(),
+                        },
+                    )
+                    .await?;
+                }
+                crate::scheduling::revise_target(connection, id).await?;
+            }
+            load_id(connection, id)
+                .await?
+                .context("edited fact missing")
+        })
+    })
+    .await
+}
+
 pub async fn delete_for(pool: &SqlitePool, profile_id: i64, id: i64) -> anyhow::Result<Fact> {
     crate::db::write_transaction(pool, move |connection| {
         Box::pin(async move {

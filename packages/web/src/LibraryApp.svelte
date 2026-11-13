@@ -185,7 +185,7 @@
   let matchingRequest = 0;
 
   // Row actions. On touch screens a row slides left to show Share and Delete.
-  const ACTIONS_WIDTH = 152;
+  const ACTIONS_WIDTH = 228;
   let swiped = $state<number | null>(null);
   let drag = $state<{ id: number; offset: number } | null>(null);
   // Set when a swipe ends, so the click its release may produce is not a tap.
@@ -193,6 +193,15 @@
   // A pinch-zoomed page needs sideways drags to pan, so rows stop taking them.
   let zoomed = $state(false);
   let deleting = $state<Fact | null>(null);
+  // Editing keeps the fields as they were when opened, so changes made elsewhere meanwhile
+  // are kept, and a field changed in both places is caught.
+  type Fields = components["schemas"]["FactFields"];
+  let editing = $state<Fact | null>(null);
+  let editBase = $state<Fields | null>(null);
+  let editFields = $state({ prompt: "", answer: "", context: "", source: "", tags: "" });
+  let editBusy = $state(false);
+  let editError = $state("");
+  let editConflict = $state(false);
   let deleteBusy = $state(false);
   let deleteError = $state("");
 
@@ -301,7 +310,7 @@
   const navigationBlocked = $derived(saving);
 
   $effect(() => {
-    blocked = saving || deleteBusy;
+    blocked = saving || deleteBusy || editBusy;
     dirty = Boolean(
       response.trim() ||
       prompt.trim() ||
@@ -567,6 +576,92 @@
   function shareFact(fact: Fact) {
     swiped = null;
     onShare([fact.id]);
+  }
+
+  function fieldsOf(fact: Fact): Fields {
+    const { prompt, answer, context, source, tags } = fact;
+    return { prompt, answer, context, source, tags: [...tags] };
+  }
+
+  function openEdit(fact: Fact) {
+    swiped = null;
+    editing = fact;
+    editBase = fieldsOf(fact);
+    editFields = {
+      prompt: fact.prompt,
+      answer: fact.answer,
+      context: fact.context,
+      source: fact.source,
+      tags: fact.tags.join(", "),
+    };
+    editError = "";
+    editConflict = false;
+  }
+
+  const editedFields = (): Fields => ({
+    prompt: editFields.prompt.trim(),
+    answer: editFields.answer.trim(),
+    context: editFields.context.trim(),
+    source: editFields.source.trim(),
+    tags: editFields.tags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  });
+
+  // A new question or answer is a new recall target.
+  const restartsSchedule = $derived(
+    editBase !== null &&
+      (editFields.prompt.trim() !== editBase.prompt ||
+        editFields.answer.trim() !== editBase.answer),
+  );
+
+  async function saveEdit(event: SubmitEvent) {
+    event.preventDefault();
+    const fact = editing;
+    if (!fact || !editBase || editBusy) return;
+    editBusy = true;
+    editError = "";
+    editConflict = false;
+    try {
+      const { data, error: failure, response } = await api.PATCH("/api/facts/{id}", {
+        params: { path: { id: fact.id } },
+        body: { base: editBase, fields: editedFields() },
+      });
+      if (failure) {
+        editConflict = response.status === 409;
+        throw new Error(failure.error);
+      }
+      facts = facts.map((item) => (item.id === fact.id ? { ...item, ...data } : item));
+      editing = null;
+      notice = "Fact updated.";
+      play("keep");
+      void refreshLibrary(profileId, true);
+    } catch (caught) {
+      editError = `Could not save your changes. ${message(caught)}`;
+      play("alert");
+    } finally {
+      editBusy = false;
+    }
+  }
+
+  /** After a conflict: take the latest saved fact as the base, keeping what was typed. */
+  async function keepMine() {
+    const fact = editing;
+    if (!fact || editBusy) return;
+    editBusy = true;
+    try {
+      const latest = unwrap(
+        await api.GET("/api/facts/{id}", { params: { path: { id: fact.id } } }),
+      );
+      editBase = fieldsOf(latest);
+      editConflict = false;
+      editError = "";
+    } catch (caught) {
+      editError = `Could not load the latest version. ${message(caught)}`;
+    } finally {
+      editBusy = false;
+    }
   }
 
   function askDelete(fact: Fact) {
@@ -1502,6 +1597,68 @@
   </dialog>
 {/if}
 
+{#if editing}
+  <dialog
+    class="dialog"
+    use:openDialog
+    oncancel={(event) => {
+      event.preventDefault();
+      if (!editBusy) editing = null;
+    }}
+    aria-modal="true"
+    aria-labelledby="edit-title"
+  >
+    <h2 id="edit-title">Edit fact</h2>
+    <form class="edit-form" onsubmit={saveEdit}>
+      <label>
+        Question
+        <textarea bind:value={editFields.prompt} required maxlength="8000" rows="2"
+        ></textarea>
+      </label>
+      <label>
+        Answer
+        <textarea bind:value={editFields.answer} required maxlength="20000" rows="3"
+        ></textarea>
+      </label>
+      <label>
+        Context
+        <textarea bind:value={editFields.context} maxlength="30000" rows="2"></textarea>
+      </label>
+      <label>
+        Source
+        <input bind:value={editFields.source} maxlength="2000" />
+      </label>
+      <label>
+        Tags <span class="optional">comma separated</span>
+        <input bind:value={editFields.tags} maxlength="1000" />
+      </label>
+      {#if restartsSchedule}
+        <p class="muted">
+          A new question or answer is a new fact to learn, so its schedule starts again.
+        </p>
+      {/if}
+      {#if editError}
+        <p class="message error" role="alert">{editError}</p>
+      {/if}
+      <div class="form-actions">
+        <button
+          type="button"
+          class="quiet"
+          disabled={editBusy}
+          onclick={() => (editing = null)}>Cancel</button
+        >{#if editConflict}<button
+            type="button"
+            class="quiet"
+            disabled={editBusy}
+            onclick={keepMine}>Keep my version</button
+          >{/if}<button class="primary" disabled={editBusy}
+          >{editBusy ? "Saving…" : "Save changes"}</button
+        >
+      </div>
+    </form>
+  </dialog>
+{/if}
+
 {#snippet savedReviews()}
   {#if saves.size && saves.offline}
     <p role="status">
@@ -1834,6 +1991,11 @@
                 }}
               >
                 <button
+                  class="row-action edit"
+                  aria-label={`Edit ${fact.prompt}`}
+                  disabled={blocked}
+                  onclick={() => openEdit(fact)}>Edit</button
+                ><button
                   class="row-action share"
                   aria-label={`Share ${fact.prompt}`}
                   disabled={blocked}
@@ -2514,6 +2676,11 @@
     color: #a3402a;
   }
 
+  .edit-form {
+    display: grid;
+    gap: 1rem;
+  }
+
   .row-action.delete:hover {
     background: #f9e9e3;
   }
@@ -3148,6 +3315,11 @@
       border-radius: 0;
       color: #fff;
       font-size: 0.9rem;
+    }
+
+    .row-action.edit,
+    .row-action.edit:hover {
+      background: #6b7d74;
     }
 
     .row-action.share,

@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO learning_targets(fact_id, content_revision, prompt, answer)\n         SELECT id, ?, prompt, answer FROM facts WHERE id = ? RETURNING id AS \"id!\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "1848579cb1593bfda9a3de748718a8ddc0a8a04a221359df87e51311c5623159"
+}

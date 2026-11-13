@@ -119,6 +119,22 @@ SQLite file. The repository and skill launchers select this checkout's database
 from any directory. Point the CLI and server at the same file to access the same household profiles.
 There is no remote HTTP CLI mode.
 
+### Edit a fact
+
+In the website, swipe a fact left on a touch screen, or hover over it with a pointer, and
+choose Edit to change its question, answer, context, source or tags. A new question or
+answer is a new fact to learn: it starts a fresh schedule, and the old wording's reviews
+stay in its history. Context, source and tags change without touching the schedule.
+
+```sh
+curl -X PATCH http://localhost:8080/api/profiles/1/facts/FACT_ID -H 'Content-Type: application/json' \
+  -d '{"base": {...fields as you last saw them...}, "fields": {...new fields...}}'
+```
+
+An edit names the fields as they were when you opened the fact. Edits to different
+fields made elsewhere meanwhile are kept; a field changed both there and in your edit is
+refused, and Keep my version saves yours over it.
+
 ### Delete a fact
 
 Deleting a fact removes it with its practice variants, reviews, schedule and study
