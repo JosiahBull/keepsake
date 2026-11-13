@@ -1,6 +1,7 @@
 import type { components } from "@keepsake/client";
 import { json } from "./profiles";
 import { clearCopies, readCopy, writeCopy } from "./storage";
+import { outbox } from "./outbox.svelte";
 import { MEDIA_CACHE, sync } from "./sync.svelte";
 
 type Fact = components["schemas"]["Fact"];
@@ -11,6 +12,7 @@ type FactSample = components["schemas"]["FactSample"];
 type Media = components["schemas"]["QuestionMedia"];
 type PreparedStudy = components["schemas"]["PreparedStudy"];
 type StudyQueue = components["schemas"]["StudyQueue"];
+type StudyQuestion = components["schemas"]["StudyQuestion"];
 
 /** A profile's whole library as this device last downloaded it, newest fact first. */
 export type LibraryCopy = { facts: Fact[]; savedAt: number };
@@ -23,11 +25,21 @@ const refreshed = new Map<number, number>();
 let latest: number | null = null;
 
 addEventListener("online", () => {
-  if (latest !== null) void refreshLibrary(latest, true);
+  // Download after saves made offline land, so the copy includes them.
+  if (latest !== null)
+    void outbox.settled().then(async () => {
+      if (latest !== null) await refreshLibrary(latest, true);
+    });
 });
 
 export async function readLibrary(profileId: number): Promise<LibraryCopy | undefined> {
   return sync.offlineMode ? readCopy<LibraryCopy>(key(profileId)) : undefined;
+}
+
+/** Changes this device's copy to match a change made offline, until the next download. */
+export async function changeCopy(profileId: number, change: (facts: Fact[]) => Fact[]) {
+  const copy = await readLibrary(profileId);
+  if (copy) await writeCopy<LibraryCopy>(key(profileId), { ...copy, facts: change(copy.facts) });
 }
 
 /**
@@ -265,10 +277,19 @@ export async function scheduledFromCopy(
   const prepared = await readCopy<PreparedStudy>(studyKey(profileId));
   if (!prepared) return undefined;
   const done = new Set((await studied(profileId, prepared)).targets.map((target) => target.id));
+  const library = await readLibrary(profileId);
+  // A fact deleted, or given a new question or answer, offline is not this target any more.
+  const current = (question: StudyQuestion) => {
+    if (!library) return true;
+    const fact = library.facts.find((item) => item.id === question.fact.id);
+    return fact?.prompt === question.fact.prompt && fact.answer === question.fact.answer;
+  };
   const now = Date.now() / 1000;
-  const pending = prepared.due.filter((item) => !done.has(item.question.target_id));
+  const pending = prepared.due.filter(
+    (item) => !done.has(item.question.target_id) && current(item.question),
+  );
   const ready = pending.filter((item) => item.available_at <= now);
-  const facts = (await readLibrary(profileId))?.facts ?? [];
+  const facts = library?.facts ?? [];
   const usable = new Set((await complete(profileId, facts)).map((fact) => fact.id));
   // Without a copy of the library, media cannot be checked; questions without media still can.
   const askable = (fact: { id: number; media: Media[] }) => !fact.media.length || usable.has(fact.id);
@@ -279,7 +300,9 @@ export async function scheduledFromCopy(
       (target) => target.new && target.day === today,
     ).length;
   const allowance = ready.length ? 0 : Math.max(0, prepared.new_limit - introduced);
-  const fresh = prepared.new.filter((question) => !done.has(question.target_id)).slice(0, allowance);
+  const fresh = prepared.new
+    .filter((question) => !done.has(question.target_id) && current(question))
+    .slice(0, allowance);
   const items = [...ready.map((item) => item.question), ...fresh]
     .filter((question) => askable(question.fact))
     .slice(0, limit);

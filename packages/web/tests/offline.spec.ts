@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect, type TestApp } from "./fixtures";
 import { startExtraPractice } from "./actions";
 import { png, wav } from "./media-files";
@@ -396,6 +396,111 @@ test("a fact whose response is lost is added once", async ({ app, page }) => {
   await expect.poll(() => keys.length).toBe(2);
   expect(keys[1]).toBe(keys[0]);
   await expect.poll(async () => (await (await app.request.get("/api/profiles/1/facts")).json()).total).toBe(1);
+});
+
+/** Shows a row's actions: touch screens swipe the row, pointers hover it. */
+async function rowAction(page: Page, prompt: string, action: "Edit" | "Delete", isMobile: boolean) {
+  const row: Locator = page.getByRole("article").filter({ has: page.getByRole("heading", { name: prompt, exact: true }) });
+  if (isMobile) {
+    const target = row.locator("summary");
+    const box = (await target.boundingBox())!;
+    const at = (step: number) => ({
+      pointerId: 7, pointerType: "touch", isPrimary: true,
+      clientX: box.x + box.width - 40 - (150 * step) / 6, clientY: box.y + box.height / 2,
+    });
+    await target.dispatchEvent("pointerdown", at(0));
+    for (let step = 1; step <= 6; step += 1) await target.dispatchEvent("pointermove", at(step));
+    await target.dispatchEvent("pointerup", at(6));
+  } else {
+    await row.hover();
+  }
+  await row.getByRole("button", { name: `${action} ${prompt}`, exact: true }).click();
+}
+
+async function fact(app: TestApp, id: number) {
+  return (await app.request.get(`/api/profiles/1/facts/${id}`));
+}
+
+test("edits and deletions made offline show at once and reach the server on reconnecting", async ({ app, context, page, isMobile }) => {
+  const kept = await app.createFact({ prompt: "Which fact is edited offline?", answer: "This one" });
+  const gone = await app.createFact({ prompt: "Which fact is deleted offline?", answer: "That one" });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+
+  await rowAction(page, kept.prompt, "Edit", isMobile);
+  const dialog = page.getByRole("dialog", { name: "Edit fact" });
+  await dialog.getByRole("textbox", { name: "Context" }).fill("Edited on the plane");
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Edit kept on this device." })).toBeVisible();
+
+  await rowAction(page, gone.prompt, "Delete", isMobile);
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete fact", exact: true }).click();
+  const list = page.getByRole("region", { name: "Saved facts" });
+  await expect(list.getByRole("heading", { level: 2 })).toHaveText([kept.prompt]);
+  // The device's copy has both changes, so searching offline shows them too.
+  await page.getByRole("searchbox").fill("plane");
+  await expect(list.getByRole("heading", { level: 2 })).toHaveText([kept.prompt]);
+  await page.getByRole("searchbox").fill("deleted offline");
+  await expect(list.getByRole("heading", { level: 2 })).toHaveCount(0);
+  await expect(header(page)).toContainText("2 saves to send");
+
+  await context.setOffline(false);
+  await expect.poll(async () => (await fact(app, gone.id)).status()).toBe(404);
+  expect((await (await fact(app, kept.id)).json()).context).toBe("Edited on the plane");
+});
+
+test("an offline edit that conflicts reopens the edit form with the reason", async ({ app, context, page, isMobile }) => {
+  const kai = await app.createFact({ prompt: "What does kai mean?", answer: "Food" });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await rowAction(page, kai.prompt, "Edit", isMobile);
+  const dialog = page.getByRole("dialog", { name: "Edit fact" });
+  await dialog.getByRole("textbox", { name: "Source" }).fill("My dictionary");
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const base = { prompt: kai.prompt, answer: kai.answer, context: kai.context, source: kai.source, tags: kai.tags };
+  const elsewhere = await app.request.patch(`/api/profiles/1/facts/${kai.id}`, {
+    data: { base, fields: { ...base, source: "Another device" } },
+  });
+  expect(elsewhere.status()).toBe(200);
+
+  await context.setOffline(false);
+  await expect(dialog.getByRole("alert")).toHaveText(
+    "Your offline edit was not saved. The source changed elsewhere since you opened this fact",
+  );
+  await expect(dialog.getByRole("textbox", { name: "Source" })).toHaveValue("My dictionary");
+  await dialog.getByRole("button", { name: "Keep my version", exact: true }).click();
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect((await (await fact(app, kai.id)).json()).source).toBe("My dictionary");
+});
+
+test("an offline edit to a fact deleted elsewhere offers to add it again", async ({ app, context, page, isMobile }) => {
+  const wai = await app.createFact({ prompt: "What does wai mean?", answer: "Water" });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await rowAction(page, wai.prompt, "Edit", isMobile);
+  const dialog = page.getByRole("dialog", { name: "Edit fact" });
+  await dialog.getByRole("textbox", { name: "Answer" }).fill("Water, or a stream");
+  await dialog.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect((await app.request.delete(`/api/profiles/1/facts/${wai.id}`)).status()).toBe(204);
+
+  await context.setOffline(false);
+  await expect(page.getByRole("status").filter({ hasText: "was deleted elsewhere" })).toHaveText(
+    "“What does wai mean?” was deleted elsewhere before your offline edit arrived. Save it here to add it again.",
+  );
+  await expect(page.getByRole("textbox", { name: "Answer", exact: true })).toHaveValue("Water, or a stream");
+  await page.getByRole("button", { name: "Save fact", exact: true }).click();
+  await expect.poll(async () => (await (await app.request.get("/api/profiles/1/facts")).json()).items
+    .map((item: { answer: string }) => item.answer)).toEqual(["Water, or a stream"]);
 });
 
 test.describe("with the service worker", () => {
