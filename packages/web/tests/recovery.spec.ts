@@ -99,8 +99,9 @@ test("practice recovers from a dropped request without showing an empty session"
 
   await page.route(/\/api\/profiles\/1\/practice\?/, async (route) => {
     requests += 1;
+    // A server error: an unreachable server would fall back to the device's copy.
     if (requests === 1) {
-      await route.abort("failed");
+      await unavailable(route);
       return;
     }
 

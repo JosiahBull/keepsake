@@ -13,6 +13,8 @@ class Sync {
   /** Whether the browser says it has no network. */
   disconnected = $state(!navigator.onLine);
   offlineMode = $state(readOfflineMode());
+  /** Advances when offline use is turned off, so downloads begun before it keep nothing. */
+  epoch = 0;
 
   constructor() {
     addEventListener("online", () => (this.disconnected = false));
@@ -48,6 +50,7 @@ class Sync {
     }
     // Saves waiting for the server are kept either way; only copies are removed.
     if (on) return;
+    this.epoch += 1;
     await clearCopies();
     if ("caches" in window) await caches.delete(MEDIA_CACHE).catch(() => false);
   }
