@@ -119,3 +119,57 @@ async fn searches_te_reo_with_either_case_of_url_encoded_macrons() {
     }
     pool.close().await;
 }
+
+#[tokio::test]
+async fn copies_whole_facts_with_their_practices_in_pages() {
+    let directory = tempfile::tempdir().unwrap();
+    let pool = db::connect(&format!(
+        "sqlite:{}",
+        directory.path().join("api-copy.db").display()
+    ))
+    .await
+    .unwrap();
+    for index in 0..3 {
+        facts::create(
+            &pool,
+            NewFact {
+                prompt: format!("Question {index}"),
+                answer: format!("Answer {index}"),
+                context: String::new(),
+                source: String::new(),
+                tags: vec!["topic".into()],
+                practices: vec![facts::NewPractice {
+                    kind: facts::PracticeKind::Flashcard,
+                    prompt: format!("Prompt {index}"),
+                    answer: format!("Answer {index}"),
+                    choices: vec![],
+                    explanation: String::new(),
+                }],
+                media: vec![],
+            },
+        )
+        .await
+        .unwrap();
+    }
+    let app = router(pool.clone(), directory.path());
+    let (status, page) = get(app.clone(), "/api/facts/copy?limit=2").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(page["items"].as_array().unwrap().len(), 2);
+    assert_eq!(page["items"][0]["id"], 3);
+    // The canonical flashcard comes first, then the practice supplied with the fact.
+    let prompts: Vec<&str> = page["items"][0]["practices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|practice| practice["prompt"].as_str().unwrap())
+        .collect();
+    assert!(prompts.contains(&"Prompt 2"), "{prompts:?}");
+    assert_eq!(page["next_cursor"], 2);
+    let (_, rest) = get(app.clone(), "/api/facts/copy?limit=2&before_id=2").await;
+    assert_eq!(rest["items"].as_array().unwrap().len(), 1);
+    assert_eq!(rest["next_cursor"], Value::Null);
+    let (status, _) = get(app.clone(), "/api/facts/copy?limit=101").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = get(app, "/api/profiles/9/facts/copy").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
