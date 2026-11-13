@@ -76,8 +76,11 @@
       await readDevice();
     }
   }
-  const megabytes = (bytes: number) =>
-    `${new Intl.NumberFormat(undefined, { maximumFractionDigits: bytes < 10e6 ? 1 : 0 }).format(bytes / 1e6)} MB`;
+  const megabytes = (bytes: number) => {
+    const [value, unit] = bytes >= 1e9 ? [bytes / 1e9, "GB"] : [bytes / 1e6, "MB"];
+    const digits = value < 10 ? 1 : 0;
+    return `${new Intl.NumberFormat(undefined, { maximumFractionDigits: digits }).format(value)} ${unit}`;
+  };
   const when = (time: number) =>
     new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(time);
 
