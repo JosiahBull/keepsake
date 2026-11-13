@@ -114,6 +114,16 @@ Continue with `next_cursor` until it is null. A single event's `request_json` ca
 submitted with `study submit --file`; its original UUID returns its recorded result.
 This is idempotent replay, not a command to reapply historical transitions.
 
+## Editing a fact
+
+Changing a fact's question or answer retires its recall target and starts a new revision
+with a fresh schedule; the canonical flashcard follows the new wording, and other prompts
+stop qualifying until approved again. Context, source and tags change without touching
+the schedule. The [saved research](research/learning-and-retention-2026-10-24.md) treats
+memory-model estimates as predictions about a particular item, so performance on the old
+wording is kept as history rather than carried over. Whether a small correction, such as a
+typo, deserves to keep its schedule is a product question the research does not settle.
+
 ## Offline recall
 
 A device with offline use turned on downloads prepared study with its copy of the library:

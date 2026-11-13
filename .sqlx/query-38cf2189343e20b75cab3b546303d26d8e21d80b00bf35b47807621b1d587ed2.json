@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE learning_targets SET active = 0 WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "38cf2189343e20b75cab3b546303d26d8e21d80b00bf35b47807621b1d587ed2"
+}
