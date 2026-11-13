@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id AS \"id!\", submission_id, target_id, content_revision, occurred_at, kind, context,\n         method, outcome, response_ms, qualifying AS \"qualifying: bool\", algorithm, parameter_version,\n         elapsed_seconds, model_interval_days AS \"model_interval_days: f32\", policy_override_seconds,\n         request_json, before_json, after_json, result_json\n         FROM study_events WHERE profile_id=? AND id > ? ORDER BY id LIMIT ?",
+  "query": "SELECT id AS \"id!\", submission_id, target_id, content_revision, occurred_at, kind, context,\n         method, outcome, response_ms, qualifying AS \"qualifying: bool\", algorithm, parameter_version,\n         elapsed_seconds, model_interval_days AS \"model_interval_days: f32\", policy_override_seconds,\n         request_json, before_json, after_json, result_json, ignored\n         FROM study_events WHERE profile_id=? AND id > ? ORDER BY id LIMIT ?",
   "describe": {
     "columns": [
       {
@@ -222,6 +222,17 @@
             "name": "result_json"
           }
         }
+      },
+      {
+        "name": "ignored",
+        "ordinal": 20,
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "study_events",
+            "name": "ignored"
+          }
+        }
       }
     ],
     "parameters": {
@@ -247,8 +258,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "3e8ef35af3805a48150c7cfe211552b32edc4afbfde62109592da567579f380f"
+  "hash": "42ca61d6db74cbb87ce5396992245af06bb04a6b8b1ce87c578bdfa325bae051"
 }

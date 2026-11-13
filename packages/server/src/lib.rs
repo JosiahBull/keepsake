@@ -79,6 +79,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         media_api::upload,
         media_api::download,
         study_api::queue,
+        study_api::prepared,
         study_api::summary,
         study_api::submit,
         study_api::expose,
@@ -132,6 +133,8 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::scheduling::StudyQueue,
         keepsake_core::scheduling::StudySummary,
         keepsake_core::scheduling::StudyQuestion,
+        keepsake_core::scheduling::PreparedQuestion,
+        keepsake_core::scheduling::PreparedStudy,
         keepsake_core::scheduling::RatingIntervals,
         keepsake_core::scheduling::Schedule,
         keepsake_core::scheduling::StudySubmission,
@@ -312,6 +315,7 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/media/{id}", get(media_api::download))
         .route("/study/queue", get(study_api::queue))
         .route("/study/summary", get(study_api::summary))
+        .route("/study/prepared", get(study_api::prepared))
         .route(
             "/study/events",
             get(study_api::events).post(study_api::submit),

@@ -362,8 +362,10 @@ going, choosing matching rounds by topic tag as the server does. Questions whose
 clips are not on the device are left out. Answers show once their exposure is kept on the
 device, and ratings wait there. The header shows Offline with the number of saves still to send, and
 Syncing… while saves reach the server. Saves go in the order they were made when the
-connection returns or Keepsake next opens, from whichever tab is open. Scheduled recall
-still needs a connection, because the server must save feedback before showing an answer.
+connection returns or Keepsake next opens, from whichever tab is open. Scheduled recall works offline from
+a week of reviews and new facts prepared with the copy; each comes once, and ratings count
+from when you made them. An offline attempt at a fact reviewed meanwhile on another
+device is kept in its history but does not count. See [offline recall](docs/scheduling.md#offline-recall).
 
 **Use Keepsake offline on this device**, in Profile settings, keeps these copies. It applies to every profile on the device. Turning it off removes the copy;
 saves still waiting for the server stay until they are sent.

@@ -30,8 +30,9 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
             "0005_profiles.sql",
             include_str!("../migrations/0005_profiles.sql"),
         ),
-        // Repository code used to build the fixture reads question media and deleted
-        // fact IDs. Adding that schema early still leaves household seeding to run afterwards.
+        // Repository code used to build the fixture reads question media, deleted fact
+        // IDs and ignored study events. Adding that schema early still leaves household
+        // seeding to run afterwards.
         (
             "0009_question_media.sql",
             include_str!("../migrations/0009_question_media.sql"),
@@ -39,6 +40,10 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
         (
             "0011_fact_deletion.sql",
             include_str!("../migrations/0011_fact_deletion.sql"),
+        ),
+        (
+            "0012_offline_study.sql",
+            include_str!("../migrations/0012_offline_study.sql"),
         ),
     ] {
         std::fs::write(migrations.join(name), contents).unwrap();
@@ -125,6 +130,8 @@ async fn accepted_copies_keep_their_owner_provenance_and_learning_state_after_ho
             content_revision: question.content_revision,
             expected_version: question.schedule_version,
             feedback_event_id: None,
+            feedback_submission_id: None,
+            occurred_at: None,
             kind: EventKind::Attempt,
             context: StudyContext::Scheduled,
             method: ReviewMethod::Flashcard,

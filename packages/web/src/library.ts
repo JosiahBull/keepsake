@@ -9,6 +9,8 @@ type FactPage = components["schemas"]["FactPage"];
 type PracticeSession = components["schemas"]["PracticeSession"];
 type FactSample = components["schemas"]["FactSample"];
 type Media = components["schemas"]["QuestionMedia"];
+type PreparedStudy = components["schemas"]["PreparedStudy"];
+type StudyQueue = components["schemas"]["StudyQueue"];
 
 /** A profile's whole library as this device last downloaded it, newest fact first. */
 export type LibraryCopy = { facts: Fact[]; savedAt: number };
@@ -52,9 +54,11 @@ export function refreshLibrary(profileId: number, force = false): Promise<void> 
         facts.push(...page.items);
         before = page.next_cursor;
       } while (before);
+      const prepared = await json<PreparedStudy>(`/api/profiles/${profileId}/study/prepared`);
       // Turned off while downloading: keep nothing.
       if (epoch !== sync.epoch) return;
       await writeCopy<LibraryCopy>(key(profileId), { facts, savedAt: Date.now() });
+      await writeCopy(studyKey(profileId), prepared);
       if (epoch !== sync.epoch) {
         await clearCopies();
         return;
@@ -228,4 +232,80 @@ export async function matchingFromCopy(
   );
   const items = [seed, ...others.slice(0, limit - 1)].map(({ practices: _, ...fact }) => fact);
   return { items };
+}
+
+const studyKey = (profileId: number) => `study:${profileId}`;
+const studiedKey = (profileId: number) => `studied:${profileId}`;
+
+/** Targets studied offline since the prepared study was downloaded, so none comes twice. */
+type Studied = { preparedAt: number; targets: { id: number; day: string; new: boolean }[] };
+
+/** The calendar day, in the profile's study timezone, that sets the new-item allowance. */
+function localDay(seconds: number, timezone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(new Date(seconds * 1000));
+}
+
+async function studied(profileId: number, prepared: PreparedStudy): Promise<Studied> {
+  const kept = await readCopy<Studied>(studiedKey(profileId));
+  return kept?.preparedAt === prepared.prepared_at
+    ? kept
+    : { preparedAt: prepared.prepared_at, targets: [] };
+}
+
+/**
+ * Scheduled recall from what was prepared for offline use: work that has fallen due by
+ * this device's clock, then new targets within each local day's allowance, as the
+ * server's queue orders them. Each target comes at most once until the next download.
+ */
+export async function scheduledFromCopy(
+  profileId: number,
+  limit = 20,
+): Promise<StudyQueue | undefined> {
+  if (!sync.offlineMode) return undefined;
+  const prepared = await readCopy<PreparedStudy>(studyKey(profileId));
+  if (!prepared) return undefined;
+  const done = new Set((await studied(profileId, prepared)).targets.map((target) => target.id));
+  const now = Date.now() / 1000;
+  const pending = prepared.due.filter((item) => !done.has(item.question.target_id));
+  const ready = pending.filter((item) => item.available_at <= now);
+  const facts = (await readLibrary(profileId))?.facts ?? [];
+  const usable = new Set((await complete(profileId, facts)).map((fact) => fact.id));
+  // Without a copy of the library, media cannot be checked; questions without media still can.
+  const askable = (fact: { id: number; media: Media[] }) => !fact.media.length || usable.has(fact.id);
+  const today = localDay(now, prepared.timezone);
+  const introduced =
+    (localDay(prepared.prepared_at, prepared.timezone) === today ? prepared.introduced_today : 0) +
+    (await studied(profileId, prepared)).targets.filter(
+      (target) => target.new && target.day === today,
+    ).length;
+  const allowance = ready.length ? 0 : Math.max(0, prepared.new_limit - introduced);
+  const fresh = prepared.new.filter((question) => !done.has(question.target_id)).slice(0, allowance);
+  const items = [...ready.map((item) => item.question), ...fresh]
+    .filter((question) => askable(question.fact))
+    .slice(0, limit);
+  const later = pending.filter((item) => item.available_at > now).map((item) => item.available_at);
+  return {
+    items,
+    total_due: ready.length,
+    new_remaining: fresh.length,
+    next_due_at: later.length ? Math.min(...later) : null,
+    timezone: prepared.timezone,
+    budget_seconds: prepared.budget_seconds,
+    spent_seconds: prepared.spent_seconds,
+    budget_reached: false,
+  };
+}
+
+/** Records that a prepared target was studied offline, so it is not offered again. */
+export async function markStudied(profileId: number, targetId: number, at: number) {
+  const prepared = await readCopy<PreparedStudy>(studyKey(profileId));
+  if (!prepared) return;
+  const kept = await studied(profileId, prepared);
+  if (kept.targets.some((target) => target.id === targetId)) return;
+  kept.targets.push({
+    id: targetId,
+    day: localDay(at, prepared.timezone),
+    new: prepared.new.some((question) => question.target_id === targetId),
+  });
+  await writeCopy(studiedKey(profileId), kept);
 }

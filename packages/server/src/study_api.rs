@@ -4,8 +4,9 @@ use axum::{
     http::StatusCode,
 };
 use keepsake_core::scheduling::{
-    self, ExposureResult, ExposureSubmission, QueueQuery, Schedule, SchedulerSettings,
-    SettingsUpdate, StudyEventPage, StudyQueue, StudyResult, StudySubmission, StudySummary,
+    self, ExposureResult, ExposureSubmission, PreparedStudy, QueueQuery, Schedule,
+    SchedulerSettings, SettingsUpdate, StudyEventPage, StudyQueue, StudyResult, StudySubmission,
+    StudySummary,
 };
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -26,6 +27,20 @@ pub async fn queue(
 ) -> Result<Json<StudyQueue>, ApiError> {
     query.validate().map_err(ApiError::bad)?;
     scheduling::queue_for(&pool, profile_id, &query)
+        .await
+        .map(Json)
+        .map_err(ApiError::study)
+}
+
+#[utoipa::path(get, path = "/api/study/prepared", operation_id = "prepared_study", responses(
+    (status = 200, description = "Scheduled recall for a device to take offline", body = PreparedStudy),
+    (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn prepared(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+) -> Result<Json<PreparedStudy>, ApiError> {
+    scheduling::prepared_for(&pool, profile_id)
         .await
         .map(Json)
         .map_err(ApiError::study)
