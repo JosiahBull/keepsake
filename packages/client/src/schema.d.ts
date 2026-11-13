@@ -1401,7 +1401,10 @@ export interface operations {
     create: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A UUID. Sending the same fact again with it returns the fact first created. */
+                "Idempotency-Key"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };
@@ -1420,6 +1423,14 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2235,7 +2246,10 @@ export interface operations {
     profile_create: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description A UUID. Sending the same fact again with it returns the fact first created. */
+                "Idempotency-Key"?: string | null;
+            };
             path: {
                 profile_id: number;
             };
@@ -2265,6 +2279,14 @@ export interface operations {
             };
             /** @description Profile or item not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

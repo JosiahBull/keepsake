@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::{StatusCode, header::RETRY_AFTER},
+    http::{HeaderMap, StatusCode, header::RETRY_AFTER},
     response::{IntoResponse, Response},
 };
 use serde::Serialize;
@@ -46,6 +46,11 @@ impl ApiError {
                 }
                 ProfileError::Missing => Self(StatusCode::NOT_FOUND, error.to_string()),
                 ProfileError::Conflict(_) => Self(StatusCode::CONFLICT, error.to_string()),
+            };
+        }
+        if let Some(error) = error.downcast_ref::<facts::FactError>() {
+            return match error {
+                facts::FactError::Conflict(message) => Self(StatusCode::CONFLICT, message.clone()),
             };
         }
         if let Some(error) = error.downcast_ref::<StudyError>() {
@@ -157,18 +162,32 @@ pub async fn sample(
     ))
 }
 
-#[utoipa::path(post, path = "/api/facts", request_body = NewFact, responses(
-    (status = 201, body = Fact), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+#[utoipa::path(post, path = "/api/facts", request_body = NewFact, params(
+    ("Idempotency-Key" = Option<String>, Header, description = "A UUID. Sending the same fact again with it returns the fact first created.")
+), responses(
+    (status = 201, body = Fact), (status = 400, body = ErrorBody), (status = 409, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
 ))]
 pub async fn create(
     State(pool): State<SqlitePool>,
     Actor(profile_id): Actor,
+    headers: HeaderMap,
     Json(fact): Json<NewFact>,
 ) -> Result<(StatusCode, Json<Fact>), ApiError> {
     facts::validate_new_fact(&fact).map_err(ApiError::bad)?;
-    let saved = facts::create_for(&pool, profile_id, fact)
-        .await
-        .map_err(ApiError::internal)?;
+    let saved = match headers.get("idempotency-key") {
+        Some(key) => {
+            let key = key
+                .to_str()
+                .ok()
+                .filter(|key| uuid::Uuid::parse_str(key).is_ok())
+                .ok_or_else(|| {
+                    ApiError::new(StatusCode::BAD_REQUEST, "Idempotency-Key must be a UUID")
+                })?;
+            facts::create_once_for(&pool, profile_id, key, fact).await
+        }
+        None => facts::create_for(&pool, profile_id, fact).await,
+    }
+    .map_err(ApiError::internal)?;
 
     Ok((StatusCode::CREATED, Json(saved)))
 }

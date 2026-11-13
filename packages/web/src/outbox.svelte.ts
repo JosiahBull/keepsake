@@ -23,7 +23,16 @@ type Stored = {
   method: string;
   path: string;
   body: string | null;
+  headers?: Record<string, string>;
+  /** Files for a new fact, uploaded before it; each keeps its media ID once uploaded. */
+  uploads?: Upload[];
 };
+
+/**
+ * An image or clip for a fact added offline, kept until it is uploaded. Its bytes are an
+ * ArrayBuffer because private windows refuse to keep Blobs in IndexedDB.
+ */
+export type Upload = { data: ArrayBuffer; type: string; alt: string; mediaId?: number };
 
 type Save = Stored & {
   /** Settles once the save is kept on this device, or could not be. */
@@ -36,7 +45,13 @@ type Save = Stored & {
   reject?: (error: unknown) => void;
 };
 
-export type SaveRequest = { method: string; path: string; body?: unknown };
+export type SaveRequest = {
+  method: string;
+  path: string;
+  body?: unknown;
+  headers?: Record<string, string>;
+  uploads?: Upload[];
+};
 
 const tab = crypto.randomUUID();
 const tabLock = (owner: string) => `keepsake-tab:${owner}`;
@@ -58,6 +73,8 @@ class Outbox {
   refused = $state<string[]>([]);
   /** Attempts made offline that the server kept without applying, to report once. */
   ignored = $state(0);
+  /** Facts added offline that have not reached the server, by profile path and question. */
+  queuedFacts = $state<{ path: string; prompt: string }[]>([]);
   #saves: Save[] = [];
   #idle: (() => void)[] = [];
   #settled: ((sent: boolean) => void)[] = [];
@@ -92,6 +109,8 @@ class Outbox {
         method: request.method,
         path: request.path,
         body: request.body === undefined ? null : JSON.stringify(request.body),
+        headers: request.headers,
+        uploads: request.uploads,
       };
       const kept = this.#ready
         .then(() => add<Stored>(OUTBOX, stored(save)))
@@ -201,6 +220,10 @@ class Outbox {
 
   #count() {
     this.size = this.#saves.filter((save) => save.counted).length;
+    this.queuedFacts = this.#saves.filter(addsFact).map((save) => ({
+      path: save.path,
+      prompt: (JSON.parse(save.body ?? "{}") as { prompt?: string }).prompt ?? "",
+    }));
   }
 
   #refuse(save: Save, error: unknown) {
@@ -261,28 +284,56 @@ function ignoredAttempt(save: Stored, result: unknown): boolean {
   }
 }
 
-function stored({ owner, label, method, path, body }: Save): Stored {
-  return { owner, label, method, path, body };
+function stored({ owner, label, method, path, body, headers, uploads }: Save): Stored {
+  return { owner, label, method, path, body, headers, uploads };
 }
 
+const addsFact = (save: Stored) => save.method === "POST" && /\/facts$/.test(save.path);
+
 async function send(save: Stored): Promise<unknown> {
+  let body = save.body;
+  if (save.uploads?.length) {
+    const media = save.path.replace(/\/facts$/, "/media");
+    for (const upload of save.uploads) {
+      if (upload.mediaId !== undefined) continue;
+      const uploaded = (await request(media, "POST", new Blob([upload.data]), {
+        "Content-Type": upload.type,
+      })) as { media_id: number };
+      upload.mediaId = uploaded.media_id;
+      // A retry after this point reuses the upload instead of sending the file again.
+      if (save.id !== undefined) await put(OUTBOX, { ...stored(save), id: save.id });
+    }
+    body = JSON.stringify({
+      ...JSON.parse(body ?? "{}"),
+      media: save.uploads.map((upload) => ({ media_id: upload.mediaId, alt: upload.alt })),
+    });
+  }
+  return request(save.path, save.method, body, {
+    ...(body === null ? {} : { "Content-Type": "application/json" }),
+    ...save.headers,
+  });
+}
+
+async function request(
+  path: string,
+  method: string,
+  body: BodyInit | null,
+  headers: Record<string, string>,
+): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetchPreloaded(
-      new Request(save.path, {
-        method: save.method,
-        headers: save.body === null ? {} : { "Content-Type": "application/json" },
-        body: save.body,
-      }),
-    );
+    response = await fetchPreloaded(new Request(path, { method, headers, body }));
   } catch {
     throw new Unreachable("You are offline. Keepsake will send it when you reconnect.");
   }
-  const body: unknown = await response.json().catch(() => undefined);
-  if (response.ok) return body;
+  const answer: unknown = await response.json().catch(() => undefined);
+  if (response.ok) return answer;
   const message =
-    typeof body === "object" && body !== null && "error" in body && typeof body.error === "string"
-      ? body.error
+    typeof answer === "object" &&
+    answer !== null &&
+    "error" in answer &&
+    typeof answer.error === "string"
+      ? answer.error
       : `Request failed (${response.status}).`;
   const { status } = response;
   if (status >= 400 && status < 500 && status !== 408 && status !== 429)
