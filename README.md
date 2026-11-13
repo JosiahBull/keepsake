@@ -357,11 +357,13 @@ device keeps a copy of its whole library, refreshed when it opens and after you 
 delete a fact, so the library lists, searches and opens facts offline. Images and clips
 download in the background, newest fact first, until the browser's storage is within a
 tenth (and at least 50 MB) of its limit; the service worker answers from them, byte ranges
-included. Extra practice already on screen carries on: answers show once their exposure
-is kept on the device, and ratings wait there. The header shows Offline with the number of saves still to send, and
+included. Extra practice and Match pairs draw from that copy for as long as you keep
+going, choosing matching rounds by topic tag as the server does. Questions whose images or
+clips are not on the device are left out. Answers show once their exposure is kept on the
+device, and ratings wait there. The header shows Offline with the number of saves still to send, and
 Syncing… while saves reach the server. Saves go in the order they were made when the
 connection returns or Keepsake next opens, from whichever tab is open. Scheduled recall
-still needs the server to save feedback before showing an answer.
+still needs a connection, because the server must save feedback before showing an answer.
 
 **Use Keepsake offline on this device**, in Profile settings, keeps these copies. It applies to every profile on the device. Turning it off removes the copy;
 saves still waiting for the server stay until they are sent.
