@@ -7,6 +7,12 @@
   import Loading from "./Loading.svelte";
   import { play, setSoundsOn, soundsOn } from "./sounds";
   import { sync } from "./sync.svelte";
+  import {
+    deviceCopy,
+    refreshLibrary,
+    removeCopies,
+    type DeviceCopy,
+  } from "./library";
 
   let {
     profile,
@@ -47,8 +53,37 @@
         timezone !== settings.timezone),
     );
   });
+  let device = $state<DeviceCopy | null>(null);
+  let deviceBusy = $state(false);
+  async function readDevice() {
+    device = sync.offlineMode ? await deviceCopy(id) : null;
+  }
+  async function downloadNow() {
+    deviceBusy = true;
+    try {
+      await refreshLibrary(id, true);
+    } finally {
+      deviceBusy = false;
+      await readDevice();
+    }
+  }
+  async function removeDeviceCopies() {
+    deviceBusy = true;
+    try {
+      await removeCopies();
+    } finally {
+      deviceBusy = false;
+      await readDevice();
+    }
+  }
+  const megabytes = (bytes: number) =>
+    `${new Intl.NumberFormat(undefined, { maximumFractionDigits: bytes < 10e6 ? 1 : 0 }).format(bytes / 1e6)} MB`;
+  const when = (time: number) =>
+    new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(time);
+
   onMount(() => {
     void load();
+    void readDevice();
     return () => controller.abort();
   });
   async function load() {
@@ -206,8 +241,11 @@
         ><input
           type="checkbox"
           checked={sync.offlineMode}
-          onchange={(event) =>
-            void sync.setOfflineMode(event.currentTarget.checked)}
+          onchange={async (event) => {
+            await sync.setOfflineMode(event.currentTarget.checked);
+            if (sync.offlineMode) await downloadNow();
+            else await readDevice();
+          }}
         />Use Keepsake offline on this device</label
       >
       <p class="muted">
@@ -215,6 +253,31 @@
         here, on this device, with as many images and clips as fit. Turning this
         off removes them. Saves that have not reached Keepsake stay until they do.
       </p>
+      {#if device}
+        <dl class="device" aria-label="Kept on this device">
+          <dt>Last downloaded</dt>
+          <dd>{device.savedAt ? when(device.savedAt) : "Not yet"}</dd>
+          {#if device.mediaTotal}
+            <dt>Images and clips</dt>
+            <dd>{device.mediaKept} of {device.mediaTotal}</dd>
+          {/if}
+          {#if device.usage !== null}
+            <dt>Storage used</dt>
+            <dd>
+              {megabytes(device.usage)}{device.quota
+                ? ` of ${megabytes(device.quota)}`
+                : ""}
+            </dd>
+          {/if}
+        </dl>
+        <div class="actions">
+          <button class="quiet" disabled={deviceBusy} onclick={downloadNow}
+            >Download now</button
+          ><button class="quiet" disabled={deviceBusy} onclick={removeDeviceCopies}
+            >Remove copies</button
+          >
+        </div>
+      {/if}
     </section>
     <AgentAccess {profile} />
   {:else}<button class="quiet" onclick={load}>Try again</button>{/if}
@@ -286,6 +349,19 @@
       500 1.5rem/1.3 "Iowan Old Style",
       Palatino,
       serif;
+    margin: 0;
+  }
+  .device {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.35rem 1.25rem;
+    margin: 0;
+    font-size: 0.9rem;
+  }
+  .device dt {
+    color: #64786c;
+  }
+  .device dd {
     margin: 0;
   }
   .toggle {
