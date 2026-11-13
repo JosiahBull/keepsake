@@ -9,7 +9,13 @@
   import Loading from "./Loading.svelte";
   import QuestionMedia from "./QuestionMedia.svelte";
   import { fetchPreloaded } from "./preload";
-  import { pageFromCopy, readLibrary, refreshLibrary } from "./library";
+  import {
+    matchingFromCopy,
+    pageFromCopy,
+    practiceFromCopy,
+    readLibrary,
+    refreshLibrary,
+  } from "./library";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
   import { outbox, Rejected, type SaveRequest } from "./outbox.svelte";
@@ -386,15 +392,14 @@
     before_id?: number;
     search: string;
   }): Promise<FactPage> {
-    try {
-      return unwrap(await api.GET("/api/facts", { params: { query } }));
-    } catch (caught) {
-      // Only a request that never arrived falls back; a server error is reported.
-      if (!(caught instanceof TypeError)) throw caught;
-      const copy = await readLibrary(profileId);
-      if (!copy) throw caught;
-      return pageFromCopy(copy, query);
-    }
+    // Only a request that never arrived falls back; a server error is reported.
+    return orFromCopy(
+      async () => unwrap(await api.GET("/api/facts", { params: { query } })),
+      async () => {
+        const copy = await readLibrary(profileId);
+        return copy && pageFromCopy(copy, query);
+      },
+    );
   }
 
   /** Loads the next page once the end of the list is within a screen of view. */
@@ -855,17 +860,39 @@
   }
 
   // Practice actions
+  // Extra practice and matching ignore schedules, so offline they come from this device's
+  // copy of the library, as many rounds as the learner wants.
   const practiceSample = () =>
-    api.GET("/api/practice", { params: { query: { limit: 20 } } });
+    orFromCopy(
+      async () =>
+        unwrap(await api.GET("/api/practice", { params: { query: { limit: 20 } } })),
+      () => practiceFromCopy(profileId),
+    );
   const matchingSample = () =>
-    api.GET("/api/facts/sample", { params: { query: { limit: 4 } } });
+    orFromCopy(
+      async () =>
+        unwrap(await api.GET("/api/facts/sample", { params: { query: { limit: 4 } } })),
+      () => matchingFromCopy(profileId),
+    );
+
+  /** The server's answer, or the copy's when the request never reaches the server. */
+  async function orFromCopy<T>(
+    online: () => Promise<T>,
+    offline: () => Promise<T | undefined>,
+  ): Promise<T> {
+    try {
+      return await online();
+    } catch (caught) {
+      if (!(caught instanceof TypeError)) throw caught;
+      const local = await offline();
+      if (local === undefined) throw caught;
+      return local;
+    }
+  }
 
   /** Starts a request early. A failure here falls back to a fresh request when needed. */
-  function prefetch<T>(request: Promise<{ data?: T }>): Promise<T | null> {
-    return request.then(
-      (result) => result.data ?? null,
-      () => null,
-    );
+  function prefetch<T>(request: Promise<T>): Promise<T | null> {
+    return request.catch(() => null);
   }
 
   function resetQuestion() {
@@ -925,7 +952,7 @@
       if (extra) {
         const prefetched = nextPractice;
         nextPractice = null;
-        session = (await prefetched) ?? unwrap(await practiceSample());
+        session = (await prefetched) ?? (await practiceSample());
       } else {
         // A queue read before earlier saves land could offer their targets again.
         await savesSent();
@@ -950,7 +977,10 @@
       resetQuestion();
     } catch (caught) {
       if (request === practiceRequest) {
-        practiceError = `Could not load practice. ${message(caught)}`;
+        practiceError =
+          !extra && (caught instanceof TypeError || saves.offline)
+            ? "Scheduled recall needs a connection. Extra practice and Match pairs work offline."
+            : `Could not load practice. ${message(caught)}`;
       }
     } finally {
       if (request === practiceRequest) {
@@ -1186,7 +1216,7 @@
     try {
       const prefetched = nextSample;
       nextSample = null;
-      const sample = (await prefetched) ?? unwrap(await matchingSample());
+      const sample = (await prefetched) ?? (await matchingSample());
 
       if (request !== matchingRequest) {
         return;
