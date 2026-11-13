@@ -503,6 +503,33 @@ test("an offline edit to a fact deleted elsewhere offers to add it again", async
     .map((item: { answer: string }) => item.answer)).toEqual(["Water, or a stream"]);
 });
 
+test("Profile settings shows what this device keeps, and can remove and download it again", async ({ app, page }) => {
+  const upload = await app.request.post("/api/profiles/1/media", { headers: { "content-type": "image/png" }, data: png(20, 20) });
+  const { media_id } = (await upload.json()) as { media_id: number };
+  await app.createFact({ prompt: "Which bird is pictured?", answer: "Kererū", media: [{ media_id, alt: "A pigeon" }] });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await expect.poll(() => page.evaluate(async () => (await (await caches.open("keepsake-media")).keys()).length)).toBe(1);
+
+  await page.getByLabel("Profile: Josiah", { exact: true }).click();
+  await page.getByRole("button", { name: "Profile settings", exact: true }).click();
+  const offline = page.getByRole("region", { name: "Offline" });
+  await expect(offline.getByText("Images and clips", { exact: true })).toBeVisible();
+  await expect(offline.getByText("1 of 1", { exact: true })).toBeVisible();
+  await expect(offline.getByText("Not yet", { exact: true })).toHaveCount(0);
+  await expect(offline.getByText("Storage used", { exact: true })).toBeVisible();
+
+  await offline.getByRole("button", { name: "Remove copies", exact: true }).click();
+  await expect(offline.getByText("Not yet", { exact: true })).toBeVisible();
+  await expect(offline.getByText("Images and clips", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => caches.has("keepsake-media"))).toBe(false);
+
+  await offline.getByRole("button", { name: "Download now", exact: true }).click();
+  await expect(offline.getByText("Not yet", { exact: true })).toHaveCount(0);
+  await expect(offline.getByText("Images and clips", { exact: true })).toBeVisible();
+});
+
 test.describe("with the service worker", () => {
   // WebKit's test browser cannot reload a page offline through a service worker.
   test.skip(({ browserName }) => browserName === "webkit", "offline reload needs Chromium");
