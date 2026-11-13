@@ -422,10 +422,12 @@ test("a failed activity write follows a profile switch until the identical retry
   fail = false;
   await page.getByRole("button", { name: "Retry save", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect.poll(async () => {
+    const recorded = await app.request.get("/api/profiles/1/study/events?after=0&limit=10");
+    return (await recorded.json()).items.length;
+  }).toBe(1);
   expect(submissions).toHaveLength(2);
   expect(submissions[0]).toEqual(submissions[1]);
-  const recorded = await app.request.get("/api/profiles/1/study/events?after=0&limit=10");
-  expect((await recorded.json()).items).toHaveLength(1);
 });
 
 test("a slow library response cannot populate another profile after switching", async ({
