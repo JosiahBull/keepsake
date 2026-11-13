@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use utoipa::{IntoParams, ToSchema};
 
-use crate::facts::{FactRow, Practice, PracticeRow, Review};
+use crate::facts::{Fact, FactRow, Practice, PracticeRow, Review};
 use crate::media::QuestionMedia;
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -84,6 +84,43 @@ impl FactQuery {
         );
         Ok(())
     }
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[serde(default, deny_unknown_fields)]
+#[into_params(parameter_in = Query)]
+pub struct CopyQuery {
+    /// Page size, from 1 to 100 (default 100).
+    pub limit: i64,
+    /// Return facts older than this ID; omit for the newest page.
+    pub before_id: Option<i64>,
+}
+
+impl Default for CopyQuery {
+    fn default() -> Self {
+        Self {
+            limit: 100,
+            before_id: None,
+        }
+    }
+}
+
+impl CopyQuery {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        validate_limit(self.limit, 100)?;
+        ensure!(
+            self.before_id.is_none_or(|id| id > 0),
+            "before_id must be positive"
+        );
+        Ok(())
+    }
+}
+
+/// Whole facts, with their practice prompts, for a device to keep a copy of the library.
+#[derive(Debug, Deserialize, Serialize, ToSchema)]
+pub struct CopyPage {
+    pub items: Vec<Fact>,
+    pub next_cursor: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]
@@ -275,6 +312,37 @@ pub async fn facts_for(
         next_cursor,
         total,
     })
+}
+
+/// A page of whole facts, newest first, for a device's offline copy of the library.
+pub async fn copy_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    query: &CopyQuery,
+) -> anyhow::Result<CopyPage> {
+    query.validate()?;
+    let mut connection = pool.acquire().await?;
+    crate::profiles::require(&mut connection, profile_id).await?;
+    let mut ids: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM facts WHERE profile_id = ? AND (? IS NULL OR id < ?)
+         ORDER BY id DESC LIMIT ?",
+    )
+    .bind(profile_id)
+    .bind(query.before_id)
+    .bind(query.before_id)
+    .bind(query.limit + 1)
+    .fetch_all(&mut *connection)
+    .await?;
+    let has_more = ids.len() > query.limit as usize;
+    ids.truncate(query.limit as usize);
+    let next_cursor = has_more.then(|| *ids.last().expect("nonempty page"));
+    let mut items = Vec::with_capacity(ids.len());
+    for id in ids {
+        if let Some(fact) = crate::facts::load_id(&mut connection, id).await? {
+            items.push(fact);
+        }
+    }
+    Ok(CopyPage { items, next_cursor })
 }
 
 #[derive(sqlx::FromRow)]

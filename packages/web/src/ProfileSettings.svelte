@@ -211,8 +211,9 @@
         />Use Keepsake offline on this device</label
       >
       <p class="muted">
-        Keeps a copy of the household’s profiles on this device. Turning this off
-        removes the copy. Saves that have not reached Keepsake stay until they do.
+        Keeps the household’s profiles, and the library of each profile opened
+        here, on this device, with as many images and clips as fit. Turning this
+        off removes them. Saves that have not reached Keepsake stay until they do.
       </p>
     </section>
     <AgentAccess {profile} />

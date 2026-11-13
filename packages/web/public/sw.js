@@ -1,6 +1,10 @@
-// Reminders, app badges and an offline app shell. API responses are never cached here;
-// the app keeps its own copies for offline use.
+// Reminders, app badges, an offline app shell and question media kept for offline use.
+// Other API responses are never cached here; the app keeps its own copies.
 const SHELL = "keepsake-shell-v2";
+// The app fills this with question images and clips for offline use. Keep the name in
+// step with MEDIA_CACHE in src/sync.svelte.ts.
+const MEDIA = "keepsake-media";
+const MEDIA_PATH = /^\/api\/profiles\/\d+\/media\/\d+$/;
 const PRECACHE = [
   "/keepsake-logo.svg",
   "/keepsake-icon.png",
@@ -29,7 +33,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       for (const key of await caches.keys()) {
-        if (key !== SHELL) await caches.delete(key);
+        if (key !== SHELL && key !== MEDIA) await caches.delete(key);
       }
       await self.clients.claim();
     })(),
@@ -79,6 +83,32 @@ async function asset(request) {
   return response;
 }
 
+// A media file never changes once stored, so a kept copy answers first, byte ranges included.
+async function media(request) {
+  const cached = await (await caches.open(MEDIA)).match(request.url);
+  if (!cached) return fetch(request);
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") ?? "");
+  if (!range) return cached;
+  const body = await cached.blob();
+  const size = body.size;
+  let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+  let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+  start = Math.max(0, start);
+  end = Math.min(end, size - 1);
+  if (start > end) {
+    return new Response(null, { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+  }
+  return new Response(body.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      "Content-Type": cached.headers.get("content-type") ?? "application/octet-stream",
+      "Content-Range": `bytes ${start}-${end}/${size}`,
+      "Content-Length": String(end - start + 1),
+      "Accept-Ranges": "bytes",
+    },
+  });
+}
+
 async function precached(request) {
   try {
     const response = await fetch(request);
@@ -98,6 +128,10 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (MEDIA_PATH.test(url.pathname)) {
+    event.respondWith(media(request));
+    return;
+  }
   if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return;
   if (request.mode === "navigate") event.respondWith(navigate(event));
   else if (url.pathname.startsWith("/assets/")) event.respondWith(asset(request));
