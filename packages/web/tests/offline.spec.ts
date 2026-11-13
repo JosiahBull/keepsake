@@ -341,6 +341,63 @@ test("scheduled recall offline asks for one connected visit when nothing is prep
   await context.setOffline(false);
 });
 
+test("a fact added offline, with its picture and clip, joins the library on reconnecting", async ({ app, browserName, context, page }) => {
+  // WebKit's emulated offline mode also stops pages reading their own Blobs, which a
+  // real device without a connection still can.
+  test.skip(browserName === "webkit", "WebKit cannot read Blobs while emulating offline");
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await page.getByRole("banner").getByRole("button", { name: "Add a fact", exact: true }).click();
+  await page.getByRole("textbox", { name: "Question", exact: true }).fill("Which bird was seen on the flight?");
+  await page.getByRole("textbox", { name: "Answer", exact: true }).fill("Kererū");
+  await page.getByLabel("Images and audio").setInputFiles([
+    { name: "kereru.png", mimeType: "image/png", buffer: png(24, 16) },
+    { name: "call.wav", mimeType: "audio/wav", buffer: wav(300) },
+  ]);
+  await page.getByRole("textbox", { name: /^Describe the image/ }).fill("A green pigeon");
+  await page.getByRole("button", { name: "Save fact", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Fact kept on this device." })).toBeVisible();
+  const waiting = page.getByRole("region", { name: "Waiting to sync" });
+  await expect(waiting.getByRole("listitem")).toHaveText(["Which bird was seen on the flight?"]);
+  await expect(header(page)).toContainText("1 save to send");
+
+  await context.setOffline(false);
+  await expect(waiting).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Saved facts" })
+    .getByRole("heading", { name: "Which bird was seen on the flight?", exact: true })).toBeVisible();
+  const library = await (await app.request.get("/api/profiles/1/facts")).json();
+  expect(library.total).toBe(1);
+  expect(library.items[0].media.map((item: { kind: string; alt: string }) => [item.kind, item.alt]))
+    .toEqual([["image", "A green pigeon"], ["audio", ""]]);
+});
+
+test("a fact whose response is lost is added once", async ({ app, page }) => {
+  const keys: string[] = [];
+  await page.route(/\/api\/profiles\/1\/facts$/, async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    keys.push(route.request().headers()["idempotency-key"]);
+    if (keys.length === 1) {
+      // The server adds the fact, but its answer never arrives.
+      const response = await route.fetch();
+      expect(response.status()).toBe(201);
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.goto("/app");
+  await page.getByRole("banner").getByRole("button", { name: "Add a fact", exact: true }).click();
+  await page.getByRole("textbox", { name: "Question", exact: true }).fill("Added only once?");
+  await page.getByRole("textbox", { name: "Answer", exact: true }).fill("Yes");
+  await page.getByRole("button", { name: "Save fact", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Fact kept on this device." })).toBeVisible();
+  await expect.poll(() => keys.length).toBe(2);
+  expect(keys[1]).toBe(keys[0]);
+  await expect.poll(async () => (await (await app.request.get("/api/profiles/1/facts")).json()).total).toBe(1);
+});
+
 test.describe("with the service worker", () => {
   // WebKit's test browser cannot reload a page offline through a service worker.
   test.skip(({ browserName }) => browserName === "webkit", "offline reload needs Chromium");
