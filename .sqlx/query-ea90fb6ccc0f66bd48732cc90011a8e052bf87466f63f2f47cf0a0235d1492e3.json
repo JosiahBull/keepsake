@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT practice_id FROM target_practices WHERE target_id=? AND qualifying=1\n             ORDER BY random() LIMIT 1",
+  "query": "SELECT practice_id FROM target_practices WHERE target_id=? AND qualifying=1\n         ORDER BY random() LIMIT 1",
   "describe": {
     "columns": [
       {
@@ -22,5 +22,5 @@
       false
     ]
   },
-  "hash": "a15549e20dd6eb8676a28259b8c69cacf6c4f2091b04eace217f286d629549b9"
+  "hash": "ea90fb6ccc0f66bd48732cc90011a8e052bf87466f63f2f47cf0a0235d1492e3"
 }

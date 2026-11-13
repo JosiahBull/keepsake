@@ -56,6 +56,8 @@ class Outbox {
   sending = $state(false);
   /** Saves from an earlier visit that the server refused, to report once. */
   refused = $state<string[]>([]);
+  /** Attempts made offline that the server kept without applying, to report once. */
+  ignored = $state(0);
   #saves: Save[] = [];
   #idle: (() => void)[] = [];
   #settled: ((sent: boolean) => void)[] = [];
@@ -164,6 +166,7 @@ class Outbox {
       try {
         // Sent whether or not anything here waits for the answer, as for an earlier visit's.
         const result = await send(save);
+        if (ignoredAttempt(save, result)) this.ignored += 1;
         save.resolve?.(result);
       } catch (error) {
         if (!(error instanceof Rejected)) {
@@ -245,6 +248,16 @@ class Outbox {
     const start = this.#running ? 1 : 0;
     this.#saves.splice(start, 0, ...orphans.map((save) => ({ ...save, counted: true })));
     this.#count();
+  }
+}
+
+/** A rating made offline that arrived after its target changed, so it did not count. */
+function ignoredAttempt(save: Stored, result: unknown): boolean {
+  if (typeof result !== "object" || result === null || !("ignored" in result)) return false;
+  try {
+    return Boolean(result.ignored) && JSON.parse(save.body ?? "{}").kind === "attempt";
+  } catch {
+    return false;
   }
 }
 

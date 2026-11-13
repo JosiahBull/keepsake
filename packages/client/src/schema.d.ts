@@ -592,6 +592,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/study/prepared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["profile_prepared_study"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/study/queue": {
         parameters: {
             query?: never;
@@ -736,6 +754,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/study/prepared": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["prepared_study"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -979,6 +1013,40 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        /** @description A due or soon-due question prepared for offline use, with when it becomes available. */
+        PreparedQuestion: {
+            /**
+             * Format: int64
+             * @description When the target may be assessed: its due time, or the end of an exposure's delay.
+             */
+            available_at: number;
+            question: components["schemas"]["StudyQuestion"];
+        };
+        /**
+         * @description Scheduled recall prepared for a device to use offline. The device serves due work
+         *     as it becomes available, then new targets within each local day's allowance. The
+         *     server applies its own rules again when the attempts arrive.
+         */
+        PreparedStudy: {
+            /** Format: int64 */
+            budget_seconds: number;
+            /** @description Learning, relearning and review work available within a week, soonest first. */
+            due: components["schemas"]["PreparedQuestion"][];
+            /**
+             * Format: int64
+             * @description New targets already introduced in the current local day.
+             */
+            introduced_today: number;
+            /** @description New targets in the order the queue introduces them, up to a week's allowance. */
+            new: components["schemas"]["StudyQuestion"][];
+            /** Format: int64 */
+            new_limit: number;
+            /** Format: int64 */
+            prepared_at: number;
+            /** Format: int64 */
+            spent_seconds: number;
+            timezone: string;
+        };
         Profile: {
             created_at: string;
             handle: string;
@@ -1155,6 +1223,8 @@ export interface components {
             elapsed_seconds: number;
             /** Format: int64 */
             id: number;
+            /** @description Why the event was kept without being applied; null when it was applied. */
+            ignored?: string | null;
             kind: string;
             method: string;
             /** Format: float */
@@ -1209,6 +1279,8 @@ export interface components {
         StudyResult: {
             /** Format: int64 */
             event_id: number;
+            /** @description Why an event recorded later was kept without being applied; absent when applied. */
+            ignored?: string | null;
             /** Format: int64 */
             next_due_at?: number | null;
             qualifying: boolean;
@@ -1226,8 +1298,21 @@ export interface components {
             expected_version: number;
             /** Format: int64 */
             feedback_event_id?: number | null;
+            /**
+             * @description The feedback this rating follows, by its submission ID, for a rating made before
+             *     the feedback reached the server. Use it or `feedback_event_id`, not both.
+             */
+            feedback_submission_id?: string | null;
             kind: components["schemas"]["EventKind"];
             method: components["schemas"]["ReviewMethod"];
+            /**
+             * Format: int64
+             * @description When the device recorded this event, in UTC Unix seconds, for an event sent later,
+             *     such as one made offline. It may be up to 30 days old; a later time counts as now.
+             *     An event with this time that no longer fits its target is kept as ignored history
+             *     instead of being refused.
+             */
+            occurred_at?: number | null;
             outcome?: null | components["schemas"]["ReviewOutcome"];
             /** Format: int64 */
             practice_id?: number | null;
@@ -3569,6 +3654,62 @@ export interface operations {
             };
         };
     };
+    profile_prepared_study: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Scheduled recall for a device to take offline */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreparedStudy"];
+                };
+            };
+            /** @description Invalid profile or request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Profile or item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     profile_queue: {
         parameters: {
             query?: {
@@ -4145,6 +4286,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    prepared_study: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Scheduled recall for a device to take offline */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreparedStudy"];
                 };
             };
             500: {

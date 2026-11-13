@@ -81,6 +81,8 @@ async fn attempt(pool: &sqlx::SqlitePool, owner: i64, time: i64) -> StudySubmiss
         content_revision: item.content_revision,
         expected_version: item.schedule_version,
         feedback_event_id: None,
+        feedback_submission_id: None,
+        occurred_at: None,
         kind: EventKind::Attempt,
         context: StudyContext::Scheduled,
         method: match item.practice.kind {

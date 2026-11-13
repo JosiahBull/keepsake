@@ -20,18 +20,57 @@ pub async fn submit_for(
     submit_at_for(pool, profile_id, submission, now()).await
 }
 
+/// The longest an event recorded on a device may wait before reaching the server.
+const OFFLINE_SECONDS: i64 = 30 * 86_400;
+
 pub async fn submit_at_for(
     pool: &SqlitePool,
     profile_id: i64,
     submission: StudySubmission,
     now: i64,
 ) -> anyhow::Result<StudyResult> {
-    validate_submission(&submission, now)?;
-    crate::db::write_transaction(pool, move |connection| {
+    let at = event_time(&submission, now)?;
+    validate_submission(&submission, at)?;
+    let applied = {
         let submission = submission.clone();
-        Box::pin(async move { apply(connection, profile_id, submission, now, None).await })
-    })
-    .await
+        crate::db::write_transaction(pool, move |connection| {
+            let submission = submission.clone();
+            Box::pin(async move { apply(connection, profile_id, submission, at, None).await })
+        })
+        .await
+    };
+    match applied {
+        // An event made offline that no longer fits its target is kept, not lost.
+        Err(error)
+            if submission.occurred_at.is_some()
+                && error
+                    .downcast_ref::<StudyError>()
+                    .is_some_and(StudyError::is_conflict) =>
+        {
+            let reason = error.to_string();
+            crate::db::write_transaction(pool, move |connection| {
+                let submission = submission.clone();
+                let reason = reason.clone();
+                Box::pin(
+                    async move { ignore(connection, profile_id, submission, at, reason).await },
+                )
+            })
+            .await
+        }
+        Ok(_) | Err(_) => applied,
+    }
+}
+
+/// When the event happened: the device's time for one sent later, never after now.
+fn event_time(input: &StudySubmission, now: i64) -> anyhow::Result<i64> {
+    let Some(at) = input.occurred_at else {
+        return Ok(now);
+    };
+    invalid(
+        at >= 0 && now - at <= OFFLINE_SECONDS,
+        "occurred_at must be within the last 30 days",
+    )?;
+    Ok(at.min(now))
 }
 
 fn validate_submission(input: &StudySubmission, now: i64) -> anyhow::Result<()> {
@@ -52,6 +91,14 @@ fn validate_submission(input: &StudySubmission, now: i64) -> anyhow::Result<()> 
             .feedback_event_id
             .is_none_or(|id| id > 0 && input.kind.is_attempt()),
         "feedback_event_id must identify feedback for an attempt",
+    )?;
+    invalid(
+        input.feedback_submission_id.as_deref().is_none_or(|id| {
+            uuid::Uuid::parse_str(id).is_ok()
+                && input.kind.is_attempt()
+                && input.feedback_event_id.is_none()
+        }),
+        "feedback_submission_id must be a UUID for an attempt without feedback_event_id",
     )?;
     match input.kind {
         EventKind::Attempt => invalid(
@@ -76,21 +123,10 @@ async fn apply(
 ) -> anyhow::Result<StudyResult> {
     crate::profiles::require_target(connection, profile_id, input.target_id).await?;
     let request_json = serde_json::to_string(&input)?;
-    if let Some(saved) = sqlx::query!(
-        "SELECT request_json, result_json, profile_id FROM study_events WHERE submission_id=?",
-        input.submission_id
-    )
-    .fetch_optional(&mut *connection)
-    .await?
+    if let Some(saved) =
+        recorded(connection, profile_id, &input.submission_id, &request_json).await?
     {
-        if saved.profile_id != Some(profile_id) {
-            return Err(StudyError::Missing("Study event not found".into()).into());
-        }
-        conflict(
-            saved.request_json == request_json,
-            "Submission ID already used for a different event",
-        )?;
-        return Ok(serde_json::from_str(&saved.result_json)?);
+        return Ok(saved);
     }
     let before = load_schedule(connection, input.target_id).await?;
     conflict(
@@ -143,7 +179,8 @@ async fn apply(
         && !input.prior_exposure
         && mapping
         && input.method.assesses_recall();
-    let feedback_at = if input.feedback_event_id.is_some() {
+    let feedback_at = if input.feedback_event_id.is_some() || input.feedback_submission_id.is_some()
+    {
         own_feedback(connection, profile_id, &input, &before, now).await?
     } else {
         None
@@ -174,8 +211,10 @@ async fn apply(
              WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'
                AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?", profile_id, now
         ).fetch_one(&mut *connection).await?;
+        // Offline, the device serves due work first from what it downloaded; reviews that
+        // fell due on the server meanwhile must not cost the learner a new item studied.
         conflict(
-            ready == 0,
+            ready == 0 || input.occurred_at.is_some(),
             "Due reviews are waiting. Refresh practice before introducing another target.",
         )?;
     }
@@ -292,6 +331,86 @@ async fn apply(
         schedule: after,
         qualifying,
         review,
+        ignored: None,
+    };
+    let json = serde_json::to_string(&result)?;
+    sqlx::query!(
+        "UPDATE study_events SET result_json=? WHERE id=?",
+        json,
+        result.event_id
+    )
+    .execute(connection)
+    .await?;
+    Ok(result)
+}
+
+/// The result already recorded for this submission, if any. Reusing its ID for a
+/// different request is a conflict.
+async fn recorded(
+    connection: &mut SqliteConnection,
+    profile_id: i64,
+    submission_id: &str,
+    request_json: &str,
+) -> anyhow::Result<Option<StudyResult>> {
+    let Some(saved) = sqlx::query!(
+        "SELECT request_json, result_json, profile_id FROM study_events WHERE submission_id=?",
+        submission_id
+    )
+    .fetch_optional(&mut *connection)
+    .await?
+    else {
+        return Ok(None);
+    };
+    if saved.profile_id != Some(profile_id) {
+        return Err(StudyError::Missing("Study event not found".into()).into());
+    }
+    conflict(
+        saved.request_json == request_json,
+        "Submission ID already used for a different event",
+    )?;
+    Ok(Some(serde_json::from_str(&saved.result_json)?))
+}
+
+/// Keeps an event made offline that no longer fits its target, such as one reviewed
+/// meanwhile on another device. It joins the history without changing the schedule,
+/// and never counts as recall evidence.
+async fn ignore(
+    connection: &mut SqliteConnection,
+    profile_id: i64,
+    input: StudySubmission,
+    at: i64,
+    reason: String,
+) -> anyhow::Result<StudyResult> {
+    crate::profiles::require_target(connection, profile_id, input.target_id).await?;
+    let request_json = serde_json::to_string(&input)?;
+    if let Some(saved) =
+        recorded(connection, profile_id, &input.submission_id, &request_json).await?
+    {
+        return Ok(saved);
+    }
+    let schedule = load_schedule(connection, input.target_id).await?;
+    let settings = load_settings(connection, profile_id).await?;
+    let state_json = serde_json::to_string(&schedule)?;
+    let kind = input.kind.as_str();
+    let context = input.context.as_str();
+    let method = input.method.as_str();
+    let outcome = input.outcome.map(|outcome| outcome.as_str());
+    let saved = sqlx::query!(
+        "INSERT INTO study_events(profile_id, submission_id, target_id, content_revision, occurred_at, kind, context, method, outcome,
+           response_ms, qualifying, algorithm, parameter_version, elapsed_seconds, request_json, before_json, after_json,
+           result_json, ignored)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0, ?, ?, ?, '{}', ?)",
+        profile_id, input.submission_id, input.target_id, input.content_revision, at, kind, context, method, outcome,
+        input.response_ms, settings.algorithm, settings.parameter_version, request_json, state_json, state_json, reason
+    ).execute(&mut *connection).await?;
+    let result = StudyResult {
+        event_id: saved.last_insert_rowid(),
+        submission_id: input.submission_id,
+        next_due_at: available_at(&schedule),
+        schedule,
+        qualifying: false,
+        review: None,
+        ignored: Some(reason),
     };
     let json = serde_json::to_string(&result)?;
     sqlx::query!(
@@ -350,7 +469,7 @@ pub async fn expose_at_for(
                 // Batch exposures need no assessment prompt; the method describes the source of exposure.
                 let event = StudySubmission { submission_id: uuid::Uuid::new_v4().to_string(),
                     target_id, practice_id: None, content_revision: state.content_revision,
-                    expected_version: state.version, feedback_event_id: None, kind: EventKind::Exposure, context: StudyContext::Supplementary,
+                    expected_version: state.version, feedback_event_id: None, feedback_submission_id: None, occurred_at: None, kind: EventKind::Exposure, context: StudyContext::Supplementary,
                     method: submission.method, outcome: None, response_ms: 0, attempted: false, assisted: false, prior_exposure: true };
                 apply(connection, profile_id, event, now, None).await?;
             }
@@ -372,8 +491,17 @@ async fn own_feedback(
     schedule: &Schedule,
     now: i64,
 ) -> anyhow::Result<Option<i64>> {
-    let Some(feedback_id) = input.feedback_event_id else {
-        return Ok(None);
+    let feedback_id = match (input.feedback_event_id, &input.feedback_submission_id) {
+        (Some(id), _) => id,
+        (None, Some(submission)) => sqlx::query_scalar::<_, i64>(
+            "SELECT id FROM study_events WHERE submission_id=? AND profile_id=?",
+        )
+        .bind(submission)
+        .bind(profile_id)
+        .fetch_optional(&mut *connection)
+        .await?
+        .ok_or_else(|| StudyError::Missing("Feedback not found".into()))?,
+        (None, None) => return Ok(None),
     };
     let owner: Option<i64> = sqlx::query_scalar("SELECT profile_id FROM study_events WHERE id=?")
         .bind(feedback_id)
@@ -435,6 +563,8 @@ pub(crate) async fn record_supplementary(
         content_revision: schedule.content_revision,
         expected_version: schedule.version,
         feedback_event_id: None,
+        feedback_submission_id: None,
+        occurred_at: None,
         kind: EventKind::Attempt,
         context: StudyContext::Supplementary,
         method: review.method,

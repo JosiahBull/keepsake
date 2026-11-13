@@ -1,0 +1,33 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT s.target_id AS \"target_id!\", max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) AS \"available_at!: i64\"\n         FROM schedule_states s JOIN learning_targets t ON t.id=s.target_id\n         WHERE t.fact_id IN (SELECT id FROM facts WHERE profile_id=?) AND t.active=1 AND s.phase <> 'new'\n           AND max(coalesce(s.due_at, 0), coalesce(s.blocked_until, 0)) <= ?\n         ORDER BY CASE WHEN s.phase IN ('learning', 'relearning') THEN 0 ELSE 1 END, 2 LIMIT ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "target_id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "schedule_states",
+            "name": "target_id"
+          }
+        }
+      },
+      {
+        "name": "available_at!: i64",
+        "ordinal": 1,
+        "type_info": "Null",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "bcdc696f1ac9c509c93694d1e50c4539aed13bcddfc1710c96ed834bd2d097c2"
+}
