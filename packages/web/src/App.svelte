@@ -20,6 +20,8 @@
   import { preload, preloadedScreens, type PreloadedScreen } from "./preload";
   import { refreshBadge, remindersOn, serviceWorker } from "./pwa";
   import { play, unlockSoundsOnTap } from "./sounds";
+  import { readCopy, writeCopy } from "./storage";
+  import { sync } from "./sync.svelte";
 
   let profiles = $state<Profile[]>([]);
   let active = $state<Profile | null>(null);
@@ -246,7 +248,7 @@
     void serviceWorker();
     const stopUnlockingSounds = unlockSoundsOnTap();
     preloadLaunch();
-    void json<Profile[]>("/api/profiles")
+    void loadProfiles()
       .then((result) => {
         if (disposed) return;
         profiles = result;
@@ -343,6 +345,21 @@
         );
     };
   });
+
+  /** The household's profiles, or this device's copy of them while offline. */
+  async function loadProfiles(): Promise<Profile[]> {
+    try {
+      const result = await json<Profile[]>("/api/profiles");
+      if (sync.offlineMode) void writeCopy("profiles", result);
+      return result;
+    } catch (caught) {
+      // A server error is reported; only an unreachable server falls back to the copy.
+      if (caught instanceof RequestError || !sync.offlineMode) throw caught;
+      const copy = await readCopy<Profile[]>("profiles");
+      if (!copy) throw caught;
+      return copy;
+    }
+  }
 
   function profileHandle(value: string): string {
     const normalized = value

@@ -26,7 +26,10 @@ failure or delayed response. Reminder settings tests replace only the browser's 
 subscription, which needs a vendor push service; every request still reaches the real
 API. The service worker test runs in Chromium's new headless mode, because the default
 headless shell denies notifications. It delivers a push through the DevTools protocol,
-then reloads offline to check the cached shell. WebKit cannot be muted, so test pages have
+then reloads offline to check the cached shell. Offline tests use Playwright's offline
+switch on the real server: they practise without a connection, reconnect or reopen the
+app, and check what reached the database. Reloading offline through the service worker
+runs in Chromium only, because WebKit's test browser cannot do it. WebKit cannot be muted, so test pages have
 no `AudioContext`; they record which sounds the app asks for instead. Rust tests deliver
 encrypted reminders to a local push service and decrypt them. Unexpected browser exceptions
 and requests outside the test server fail the test. Most cases reset the migrated database

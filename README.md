@@ -284,8 +284,9 @@ without attempting it records exposure, with no successful recall rating. Hard m
 correct recall with difficulty; an incorrect answer means Again. Feedback is saved before
 the answer is shown, so reloading before grading preserves that exposure. Ratings save in
 the background, in the order you made them, so the next question appears straight away.
-A failed save holds back later saves until you retry it, and Keepsake warns before you
-leave with ratings unsaved.
+Every save is kept on the device until the server confirms it, so closing Keepsake or
+losing the connection loses nothing; the next visit sends it. A failed save holds back
+later saves until you retry it, or until the connection returns.
 
 Short sounds mark an answer appearing, a rating, the end of a session and a failed save.
 Every rating sounds the same; only multiple choice and matching sound right or wrong.
@@ -346,9 +347,21 @@ for the phone.
 The app itself lives at `/app`, which is where the installed app opens. **Use it in this
 browser instead** on the front page, or `/app` directly, opens it in any browser.
 
-The installed app opens without browser controls. Starting it offline shows Keepsake's
-connection error rather than a browser error page; nothing is saved offline. On iPhone
-and iPad, swipe in from the left edge to go back to the previous Keepsake screen.
+The installed app opens without browser controls. On iPhone and iPad, swipe in from the
+left edge to go back to the previous Keepsake screen.
+
+### Offline
+
+The installed app opens offline with the household's profiles. Extra practice already on
+screen carries on: answers show once their exposure is kept on the device, and ratings
+wait there. The header shows Offline with the number of saves still to send, and
+Syncing… while saves reach the server. Saves go in the order they were made when the
+connection returns or Keepsake next opens, from whichever tab is open. Scheduled recall
+still needs the server to save feedback before showing an answer.
+
+**Use Keepsake offline on this device**, in Profile settings, keeps that copy of the
+profiles. It applies to every profile on the device. Turning it off removes the copy;
+saves still waiting for the server stay until they are sent.
 
 Turn on reminders in Profile settings. On iPhone and iPad this needs iOS 16.4 or later,
 and Keepsake must be opened from its Home Screen icon. Each profile gets at most one

@@ -20,13 +20,14 @@ async function unavailable(route: Route) {
   });
 }
 
-async function expectNavigationDisabled(page: Page) {
+// A failed save is kept on this device, so it never holds the learner on one screen.
+async function expectNavigationEnabled(page: Page) {
   for (const name of ["Library", "Practise", "Match pairs"]) {
     await expect(page.getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name, exact: true })).toBeDisabled();
+      .getByRole("button", { name, exact: true })).toBeEnabled();
   }
   await expect(page.getByRole("banner")
-    .getByRole("button", { name: "Add a fact", exact: true })).toBeDisabled();
+    .getByRole("button", { name: "Add a fact", exact: true })).toBeEnabled();
 }
 
 test("library retries a failed load and shows loading until the real response arrives", async ({ app, page }) => {
@@ -225,7 +226,7 @@ test("a failed fact save preserves every draft field and retry inserts exactly o
   }
 });
 
-test("a failed review save lets practice finish and blocks leaving until one retry saves it", async ({ app, page }) => {
+test("a failed review save lets practice finish and one retry saves it", async ({ app, page }) => {
   const prompt = "Which review must survive a retry?";
   const fact = await app.createFact({
     prompt,
@@ -255,23 +256,20 @@ test("a failed review save lets practice finish and blocks leaving until one ret
     await expect(page.getByRole("alert")).toContainText("Could not save a review. Temporarily unavailable.");
     await expect(page.getByRole("status")).toHaveText("Saving…");
     await expect(page.getByText("1 review saved.", { exact: true })).toHaveCount(0);
-    await expectNavigationDisabled(page);
+    await expectNavigationEnabled(page);
     // The open menu can cover the alert on a phone, so close it before retrying.
     const profileMenu = page.getByLabel("Profile: Josiah", { exact: true });
     await profileMenu.click();
-    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeEnabled();
     await profileMenu.click();
     expect((await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json()).total).toBe(0);
 
     await page.getByRole("button", { name: "Retry save", exact: true }).click();
     await expect(page.getByRole("alert")).toHaveCount(0);
     await expect(page.getByRole("status")).toHaveText("Saving…");
-    await profileMenu.click();
-    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeDisabled();
     retry.release();
 
     await expect(page.getByText("1 review saved.", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Profile settings", exact: true })).toBeEnabled();
     const reviews = await (await app.request.get(`/api/profiles/1/facts/${fact.id}/reviews`)).json();
     expect(reviews.total).toBe(1);
     expect(reviews.items[0]).toMatchObject({
@@ -286,7 +284,7 @@ test("a failed review save lets practice finish and blocks leaving until one ret
   }
 });
 
-test("a failed matching review blocks leaving and the round's later reviews wait their turn", async ({ app, page }) => {
+test("a failed matching review holds the round's later reviews until it is retried", async ({ app, page }) => {
   const facts = await Promise.all([1, 2, 3].map((number) => app.createFact({
     prompt: `Durable matching question ${number}`,
     answer: `Durable matching answer ${number}`,
@@ -323,7 +321,7 @@ test("a failed matching review blocks leaving and the round's later reviews wait
     await game.getByRole("button", { name: "Hard Correct, with difficulty", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("Could not save a review. Temporarily unavailable.");
     await expect(game.getByRole("status")).toHaveText("Round complete.");
-    await expectNavigationDisabled(page);
+    await expectNavigationEnabled(page);
     // The round's other reviews queue behind the failed one.
     expect(sent).toEqual([shown[0].id]);
 

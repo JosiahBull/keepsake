@@ -11,8 +11,9 @@
   import { fetchPreloaded } from "./preload";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
-  import { Rejected, SaveQueue } from "./saves.svelte";
+  import { outbox, Rejected, type SaveRequest } from "./outbox.svelte";
   import { play } from "./sounds";
+  import { sync } from "./sync.svelte";
 
   let {
     profile,
@@ -192,9 +193,10 @@
   let attachments = $state<Attachment[]>([]);
   let attachmentKey = 0;
 
-  // Saves reach the server in order. The learner waits only for a save that must
-  // precede what is shown next, such as the exposure before an answer.
-  const saves = new SaveQueue();
+  // Saves reach the server in order, and are kept on this device until they do. The
+  // learner waits only for a save that must precede what is shown next, such as the
+  // exposure before an answer.
+  const saves = outbox;
   let waiting = $state(0);
   let saveWarning = $state("");
 
@@ -258,13 +260,11 @@
       ? current
       : null,
   );
-  const navigationBlocked = $derived(
-    waiting > 0 || saves.failure !== null || saving,
-  );
+  // Saves are kept until they reach the server, so only the fact form holds the learner.
+  const navigationBlocked = $derived(saving);
 
   $effect(() => {
-    // Leaving would discard saves that have not reached the server.
-    blocked = saves.size > 0 || saving || deleteBusy;
+    blocked = saving || deleteBusy;
     dirty = Boolean(
       response.trim() ||
       prompt.trim() ||
@@ -279,6 +279,14 @@
   $effect(() => {
     // A background save can fail after the learner has moved on, out of view.
     if (saves.failure) play("alert");
+  });
+
+  $effect(() => {
+    // Saves the learner did not wait for, including any from an earlier visit.
+    if (!saves.refused.length) return;
+    saveWarning = `A save was refused. ${saves.refused.join(" ")}`;
+    saves.refused = [];
+    play("alert");
   });
 
   onMount(() => {
@@ -753,19 +761,24 @@
   /** Saves before showing what it records, such as an answer, so the learner waits for it. */
   async function saveBeforeShowing<T>(
     label: string,
-    send: () => Promise<T>,
+    request: SaveRequest,
+    until: "sent" | "stored" = "sent",
   ): Promise<T> {
     waiting += 1;
     try {
-      return await saves.add(label, send);
+      return await saves.add<T>(label, request, { until });
     } finally {
       waiting -= 1;
     }
   }
 
+  function post(path: string, body: unknown): SaveRequest {
+    return { method: "POST", path: `/api/profiles/${profileId}${path}`, body };
+  }
+
   /** Saves a rating while the learner moves on. A refused rating leaves a warning. */
-  function saveReview(send: () => Promise<unknown>): Promise<boolean> {
-    return saves.add("Could not save a review.", send).then(
+  function saveReview(request: SaveRequest): Promise<boolean> {
+    return saves.add("Could not save a review.", request).then(
       () => true,
       (caught: unknown) => {
         saveWarning = `A review was not saved. ${message(caught)}`;
@@ -775,13 +788,8 @@
     );
   }
 
-  async function postReview(body: NewReview) {
-    return unwrapSave(await api.POST("/api/reviews", { body }));
-  }
-
-  async function postStudyEvent(body: StudySubmission) {
-    return unwrapSave(await api.POST("/api/study/events", { body }));
-  }
+  const postReview = (body: NewReview) => post("/reviews", body);
+  const postStudyEvent = (body: StudySubmission) => post("/study/events", body);
 
   /** Resolves true once the exposure is saved, or false if the server refused it. */
   async function recordExposure(
@@ -795,8 +803,11 @@
     };
     factIds.forEach((id) => locallyExposed.set(id, Date.now()));
     try {
-      await saveBeforeShowing("Could not save this activity.", async () =>
-        unwrapSave(await api.POST("/api/study/exposures", { body })),
+      // Kept on this device is enough: an exposure's result shows nothing.
+      await saveBeforeShowing(
+        "Could not save this activity.",
+        post("/study/exposures", body),
+        "stored",
       );
       return true;
     } catch (caught) {
@@ -901,7 +912,7 @@
         session = (await prefetched) ?? unwrap(await practiceSample());
       } else {
         // A queue read before earlier saves land could offer their targets again.
-        await saves.idle();
+        await savesSent();
         session = unwrap(
           await api.GET("/api/study/queue", {
             params: { query: { limit: 20 } },
@@ -960,9 +971,9 @@
       exposureOnly = !recalled && !response.trim();
       const body = feedbackSubmission(scheduledQuestion);
       try {
-        const result = await saveBeforeShowing(
+        const result = await saveBeforeShowing<StudyResult>(
           "Could not save this activity.",
-          () => postStudyEvent(body),
+          postStudyEvent(body),
         );
         if (question === shown) {
           feedback = { body, result };
@@ -1045,7 +1056,7 @@
     const request = practiceRequest;
     checkingNext = true;
     try {
-      // The next queue must reflect every rating from this session.
+      // The next queue must reflect every rating from this session, however long that takes.
       await saves.idle();
       const overview = unwrap(
         await api.GET("/api/study/queue", { params: { query: { limit: 20 } } }),
@@ -1111,7 +1122,7 @@
         expected_version: feedback.result.schedule.version,
         feedback_event_id: feedback.result.event_id,
       };
-      saved = saveReview(() => postStudyEvent(attempt));
+      saved = saveReview(postStudyEvent(attempt));
     } else {
       const review: NewReview = {
         fact_id: current.fact.id,
@@ -1120,7 +1131,7 @@
         outcome,
         response_ms: responseMs,
       };
-      saved = saveReview(() => postReview(review));
+      saved = saveReview(postReview(review));
     }
 
     const session = practiceRequest;
@@ -1245,7 +1256,7 @@
         outcome,
         response_ms: matchTimes[fact.id] ?? 0,
       };
-      void saveReview(() => postReview(review));
+      void saveReview(postReview(review));
     }
     roundRated = true;
     matchFeedback = "Round complete.";
@@ -1253,6 +1264,16 @@
   }
 
   // Shared helpers
+  /** Waits for earlier saves to reach the server, and fails while one cannot. */
+  async function savesSent() {
+    if (!(await saves.settled()))
+      throw new Error(
+        saves.offline
+          ? "You are offline, and earlier saves must reach Keepsake first."
+          : "Earlier saves must reach Keepsake first. Retry them, then try again.",
+      );
+  }
+
   function unwrap<T>(result: {
     data?: T;
     error?: components["schemas"]["ErrorBody"];
@@ -1265,26 +1286,6 @@
     }
 
     return result.data;
-  }
-
-  /** Like unwrap, but marks a refusal that resending cannot change as Rejected. */
-  function unwrapSave<T>(result: {
-    data?: T;
-    error?: components["schemas"]["ErrorBody"];
-    response: Response;
-  }): T {
-    const { status } = result.response;
-    if (
-      result.error &&
-      status >= 400 &&
-      status < 500 &&
-      status !== 408 &&
-      status !== 429
-    ) {
-      throw new Rejected(result.error.error, status);
-    }
-
-    return unwrap(result);
   }
 
   function message(caught: unknown) {
@@ -1351,7 +1352,12 @@
 {/if}
 
 {#snippet savedReviews()}
-  {#if saves.size}
+  {#if saves.size && saves.offline}
+    <p role="status">
+      {saves.size} {saves.size === 1 ? "save" : "saves"} to send when you are back
+      online.
+    </p>
+  {:else if saves.size}
     <p role="status">Saving…</p>
   {:else}
     <p>{savedCount} {savedCount === 1 ? "review" : "reviews"} saved.</p>
@@ -1383,8 +1389,10 @@
   {#if waiting && view !== "practice"}
     <p class="saving" role="status">Saving…</p>
   {/if}
-  {#if saves.failure}
-    <div class="message error" role="alert">
+  <!-- Offline, the header already says so and saves resume on reconnecting. A request that
+       fails while the device seems connected needs the learner to retry it. -->
+  {#if saves.failure && !(saves.offline && sync.disconnected)}
+    <div class="message" class:error={!saves.offline} role="alert">
       {saves.failure.label}
       {message(saves.failure.error)}
       <button class="text-button" onclick={() => saves.retry()}

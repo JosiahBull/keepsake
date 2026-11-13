@@ -382,7 +382,7 @@ test("switching confirms a typed answer, then clears queues, feedback and expose
   await expect(page.getByText(fact.answer, { exact: true })).toHaveCount(0);
 });
 
-test("failed activity writes prevent profile switching until the identical retry is saved", async ({
+test("a failed activity write follows a profile switch until the identical retry is saved", async ({
   app,
   page,
 }) => {
@@ -412,17 +412,20 @@ test("failed activity writes prevent profile switching until the identical retry
     "Synthetic retry failure",
   );
   await expect(page.getByText(fact.answer, { exact: true })).toHaveCount(0);
+  // The write is kept on this device, so switching loses nothing.
   await page.getByLabel("Profile: Josiah", { exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Partner", exact: true }),
-  ).toBeDisabled();
-  fail = false;
-  await page.getByRole("button", { name: "Retry save", exact: true }).click();
-  await expect(page.getByText(fact.answer, { exact: true })).toBeVisible();
-  expect(submissions).toHaveLength(2);
-  expect(submissions[0]).toEqual(submissions[1]);
   await page.getByRole("button", { name: "Partner", exact: true }).click();
   await expect(page).toHaveURL(/\/p\/2\/library$/);
+  await expect(page.getByRole("alert")).toContainText(
+    "Synthetic retry failure",
+  );
+  fail = false;
+  await page.getByRole("button", { name: "Retry save", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(submissions).toHaveLength(2);
+  expect(submissions[0]).toEqual(submissions[1]);
+  const recorded = await app.request.get("/api/profiles/1/study/events?after=0&limit=10");
+  expect((await recorded.json()).items).toHaveLength(1);
 });
 
 test("a slow library response cannot populate another profile after switching", async ({
