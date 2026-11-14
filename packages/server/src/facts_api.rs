@@ -11,8 +11,8 @@ use utoipa::ToSchema;
 use crate::facts::{self, Fact, NewFact, NewPractice, NewReview, Review};
 use crate::profile_context::{Actor, ItemPath};
 use keepsake_core::paging::{
-    self, FactPage, FactQuery, FactSample, PracticeQuery, PracticeSession, ReviewPage, ReviewQuery,
-    SampleQuery,
+    self, CopyPage, CopyQuery, FactPage, FactQuery, FactSample, PracticeQuery, PracticeSession,
+    ReviewPage, ReviewQuery, SampleQuery,
 };
 
 #[derive(Serialize, ToSchema)]
@@ -104,6 +104,22 @@ pub async fn list(
     query.validate().map_err(ApiError::bad)?;
     Ok(Json(
         paging::facts_for(&pool, profile_id, &query)
+            .await
+            .map_err(ApiError::internal)?,
+    ))
+}
+
+#[utoipa::path(get, path = "/api/facts/copy", operation_id = "copy_facts", params(CopyQuery), responses(
+    (status = 200, body = CopyPage), (status = 400, body = ErrorBody), (status = 500, body = ErrorBody), (status = 503, body = ErrorBody)
+))]
+pub async fn copy(
+    State(pool): State<SqlitePool>,
+    Actor(profile_id): Actor,
+    Query(query): Query<CopyQuery>,
+) -> Result<Json<CopyPage>, ApiError> {
+    query.validate().map_err(ApiError::bad)?;
+    Ok(Json(
+        paging::copy_for(&pool, profile_id, &query)
             .await
             .map_err(ApiError::internal)?,
     ))

@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/facts/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["copy_facts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/facts/sample": {
         parameters: {
             query?: never;
@@ -208,6 +224,24 @@ export interface paths {
         get: operations["profile_list"];
         put?: never;
         post: operations["profile_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/facts/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["profile_copy_facts"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -779,6 +813,12 @@ export interface components {
         AgentAccessUpdate: {
             mode: components["schemas"]["McpMode"];
         };
+        /** @description Whole facts, with their practice prompts, for a device to keep a copy of the library. */
+        CopyPage: {
+            items: components["schemas"]["Fact"][];
+            /** Format: int64 */
+            next_cursor?: number | null;
+        };
         DeviceEndpoint: {
             endpoint: string;
         };
@@ -1292,6 +1332,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Fact"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    copy_facts: {
+        parameters: {
+            query?: {
+                /** @description Page size, from 1 to 100 (default 100). */
+                limit?: number;
+                /** @description Return facts older than this ID; omit for the newest page. */
+                before_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopyPage"];
                 };
             };
             400: {
@@ -2080,6 +2168,65 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Fact"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Profile or item not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    profile_copy_facts: {
+        parameters: {
+            query?: {
+                /** @description Page size, from 1 to 100 (default 100). */
+                limit?: number;
+                /** @description Return facts older than this ID; omit for the newest page. */
+                before_id?: number;
+            };
+            header?: never;
+            path: {
+                profile_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CopyPage"];
                 };
             };
             400: {

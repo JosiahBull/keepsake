@@ -9,6 +9,7 @@
   import Loading from "./Loading.svelte";
   import QuestionMedia from "./QuestionMedia.svelte";
   import { fetchPreloaded } from "./preload";
+  import { pageFromCopy, readLibrary, refreshLibrary } from "./library";
   import type { FactDraft, Profile, Screen } from "./profiles";
   import { refreshBadge } from "./pwa";
   import { outbox, Rejected, type SaveRequest } from "./outbox.svelte";
@@ -59,6 +60,7 @@
   type Method = components["schemas"]["PracticeKind"];
   type Outcome = components["schemas"]["ReviewOutcome"];
   type Fact = components["schemas"]["FactSummary"];
+  type FactPage = components["schemas"]["FactPage"];
   type FactSample = components["schemas"]["FactSample"];
   type NewReview = components["schemas"]["NewReview"];
   type Question = components["schemas"]["PracticeQuestion"];
@@ -294,6 +296,7 @@
     zoom();
     visualViewport?.addEventListener("resize", zoom);
     if (initialDraft) onDraftOpened?.();
+    void refreshLibrary(profileId);
     if (initialView === "practice") void startPractice();
     else if (initialView === "matching") void startMatching();
     else void loadFacts();
@@ -322,11 +325,7 @@
     nextCursor = null;
 
     try {
-      const page = unwrap(
-        await api.GET("/api/facts", {
-          params: { query: { limit: 25, search: listedSearch } },
-        }),
-      );
+      const page = await factsPage({ limit: 25, search: listedSearch });
 
       if (request !== libraryRequest) {
         return;
@@ -356,13 +355,11 @@
     loadingMore = true;
 
     try {
-      const page = unwrap(
-        await api.GET("/api/facts", {
-          params: {
-            query: { limit: 25, before_id: nextCursor, search: listedSearch },
-          },
-        }),
-      );
+      const page = await factsPage({
+        limit: 25,
+        before_id: nextCursor,
+        search: listedSearch,
+      });
 
       if (request !== libraryRequest) {
         return;
@@ -380,6 +377,23 @@
       if (request === libraryRequest) {
         loadingMore = false;
       }
+    }
+  }
+
+  /** A page of the library, from this device's copy when the server cannot be reached. */
+  async function factsPage(query: {
+    limit: number;
+    before_id?: number;
+    search: string;
+  }): Promise<FactPage> {
+    try {
+      return unwrap(await api.GET("/api/facts", { params: { query } }));
+    } catch (caught) {
+      // Only a request that never arrived falls back; a server error is reported.
+      if (!(caught instanceof TypeError)) throw caught;
+      const copy = await readLibrary(profileId);
+      if (!copy) throw caught;
+      return pageFromCopy(copy, query);
     }
   }
 
@@ -544,6 +558,7 @@
       swiped = null;
       deleting = null;
       notice = "Fact deleted.";
+      void refreshLibrary(profileId, true);
     } catch (caught) {
       deleteError = `Could not delete the fact. ${message(caught)}`;
       play("alert");
@@ -745,6 +760,7 @@
       source = "";
       tags = "";
       notice = "Fact saved.";
+      void refreshLibrary(profileId, true);
       play("keep");
       search = "";
       clearTimeout(searchTimer);

@@ -4,6 +4,8 @@ import { clearCopies } from "./storage";
 // Offline mode keeps copies of this household's data on the device. It is on unless
 // turned off in Profile settings, and applies to every profile on this device.
 const offlineKey = "keepsake.offline";
+/** Question images and clips kept for offline use; the service worker answers from it. */
+export const MEDIA_CACHE = "keepsake-media";
 
 class Sync {
   /** Copies being brought up to date from the server. */
@@ -45,7 +47,9 @@ class Sync {
       /* Without storage, the choice lasts until Keepsake reloads. */
     }
     // Saves waiting for the server are kept either way; only copies are removed.
-    if (!on) await clearCopies();
+    if (on) return;
+    await clearCopies();
+    if ("caches" in window) await caches.delete(MEDIA_CACHE).catch(() => false);
   }
 }
 

@@ -67,6 +67,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
     paths(
         health,
         facts_api::list,
+        facts_api::copy,
         facts_api::practice,
         facts_api::sample,
         facts_api::create,
@@ -122,6 +123,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         keepsake_core::media::QuestionMedia,
         keepsake_core::paging::FactSummary,
         keepsake_core::paging::FactPage,
+        keepsake_core::paging::CopyPage,
         keepsake_core::paging::ReviewPage,
         keepsake_core::paging::PracticeQuestion,
         keepsake_core::paging::PracticeSession,
@@ -297,6 +299,7 @@ fn content_routes() -> Router<SqlitePool> {
         .route("/facts", get(facts_api::list).post(facts_api::create))
         .route("/practice", get(facts_api::practice))
         .route("/facts/sample", get(facts_api::sample))
+        .route("/facts/copy", get(facts_api::copy))
         .route("/facts/{id}", get(facts_api::get).delete(facts_api::delete))
         .route("/facts/{id}/practices", post(facts_api::add_practices))
         .route("/facts/{id}/reviews", get(facts_api::reviews))
