@@ -1,5 +1,7 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
+  import { outbox } from "./outbox.svelte";
+  import { sync } from "./sync.svelte";
 
   type View = "library" | "practice" | "matching";
 
@@ -36,6 +38,26 @@
     { id: "practice", label: "Practise" },
     { id: "matching", label: "Match pairs" },
   ];
+
+  // A quick save shows nothing; a longer sync shows long enough to read.
+  let syncing = $state(false);
+  $effect(() => {
+    const active = sync.syncing;
+    const shown = untrack(() => syncing);
+    const timer = setTimeout(
+      () => (syncing = active),
+      active ? 400 : shown ? 600 : 0,
+    );
+    return () => clearTimeout(timer);
+  });
+  const waitingSaves = $derived(
+    outbox.size
+      ? ` · ${outbox.size} ${outbox.size === 1 ? "save" : "saves"} to send`
+      : "",
+  );
+  const status = $derived(
+    syncing ? "Syncing…" : sync.offline ? `Offline${waitingSaves}` : null,
+  );
 </script>
 
 {#snippet icon(view: View)}
@@ -72,7 +94,13 @@
     {/if}
     <div class="title">
       <h1>{title}</h1>
-      {#if detail !== null}<span class="detail">{detail}</span>{/if}
+      {#if status}<span class="detail sync"
+          ><span
+            class={syncing ? "spinner" : "offline-mark"}
+            aria-hidden="true"
+          ></span>{status}</span
+        >
+      {:else if detail !== null}<span class="detail">{detail}</span>{/if}
     </div>
     <div class="actions">
       <button class="add" {disabled} onclick={onAdd}>
@@ -174,6 +202,42 @@
     font-size: 0.75rem;
     line-height: 0.95rem;
     white-space: nowrap;
+  }
+
+  .sync {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .spinner,
+  .offline-mark {
+    flex-shrink: 0;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+  }
+
+  .spinner {
+    border: 1.5px solid #64786c40;
+    border-top-color: #244c44;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .offline-mark {
+    border: 1.5px solid #8a6a2f;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation-duration: 2.4s;
+    }
   }
 
   .actions {

@@ -6,6 +6,7 @@
   import Reminders from "./Reminders.svelte";
   import Loading from "./Loading.svelte";
   import { play, setSoundsOn, soundsOn } from "./sounds";
+  import { sync } from "./sync.svelte";
 
   let {
     profile,
@@ -198,6 +199,21 @@
           }}
         />Play sounds on this device</label
       >
+    </section>
+    <section class="sounds" aria-labelledby="offline-heading">
+      <h2 id="offline-heading">Offline</h2>
+      <label class="toggle"
+        ><input
+          type="checkbox"
+          checked={sync.offlineMode}
+          onchange={(event) =>
+            void sync.setOfflineMode(event.currentTarget.checked)}
+        />Use Keepsake offline on this device</label
+      >
+      <p class="muted">
+        Keeps a copy of the household’s profiles on this device. Turning this off
+        removes the copy. Saves that have not reached Keepsake stay until they do.
+      </p>
     </section>
     <AgentAccess {profile} />
   {:else}<button class="quiet" onclick={load}>Try again</button>{/if}

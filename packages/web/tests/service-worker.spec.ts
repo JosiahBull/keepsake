@@ -51,6 +51,8 @@ test("shows pushed reminders and opens the cached shell offline", async ({ app, 
     data: { navigate: `${app.url}/app` },
   }]);
 
+  // With offline use turned off, the cached shell reports the lost connection itself.
+  await page.evaluate(() => localStorage.setItem("keepsake.offline", "off"));
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole("alert")).toContainText("Could not load profiles.");

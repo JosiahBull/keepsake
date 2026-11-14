@@ -93,7 +93,11 @@ endpoint remains supplementary and cannot update FSRS state.
 The browser sends saves one at a time, in the order the learner made them, so the server
 applies the same sequence as an interface that waited for every response. Exposures still
 save before their answers or options appear; ratings save while the next question is shown.
-A failed save holds back later saves until it is retried with the same UUID. A
+Each save is kept in the browser's IndexedDB until the server confirms or refuses it, and a
+later visit sends any left behind. A supplementary exposure that cannot reach the server
+counts as saved once it is kept, so practice goes on offline; scheduled feedback waits for
+the server, because its rating refers to the recorded event. A failed save holds back later
+saves until it is retried with the same UUID. A
 refusal, such as a conflict, cannot succeed on retry; the browser drops that save and says
 so. A due queue is read only after earlier saves finish. Extra practice and matching
 samples ignore schedules, so the browser loads the next round before the current one ends.

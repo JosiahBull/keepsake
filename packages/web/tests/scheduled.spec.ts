@@ -286,7 +286,8 @@ test("retrying after a committed but lost review response keeps one UUID and one
   await page.getByRole("button", { name: /^Good\b/ }).click();
   await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("Could not save a review.");
-  await expect(page.getByRole("status")).toHaveText("Saving…");
+  // A lost response looks like a lost connection, so the rating waits on this device.
+  await expect(page.getByRole("status")).toHaveText("1 save to send when you are back online.");
   await expect(page.getByText(/^Next review:/)).toHaveCount(0);
   const retried = page.waitForResponse((response) =>
     new URL(response.url()).pathname === "/api/profiles/1/study/events" && response.request().method() === "POST");
@@ -324,7 +325,7 @@ test("a stale browser tab cannot overwrite a newer schedule and can refresh the 
   expect((await events(app)).items).toHaveLength(2);
 });
 
-test("library exposure retries a lost committed response and survives restart without changing memory", async ({ app, page }) => {
+test("library exposure kept through a lost committed response retries and survives restart without changing memory", async ({ app, page }) => {
   const fact = await app.createFact();
   const before = await schedule(app, fact.id);
   const bodies: unknown[] = [];
@@ -341,11 +342,11 @@ test("library exposure retries a lost committed response and survives restart wi
   await page.goto("/app");
   await page.getByRole("heading", { name: fact.prompt, exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Could not save this activity.");
-  await expect(page.getByText(fact.answer, { exact: true })).toHaveCount(0);
+  // The exposure is kept on this device, which is enough to show the answer offline.
+  await expect(page.getByText(fact.answer, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Retry save", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByText("Saving…", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(fact.answer, { exact: true })).toBeVisible();
   expect(bodies).toHaveLength(2);
   expect(bodies[1]).toEqual(bodies[0]);
   const after = await schedule(app, fact.id);

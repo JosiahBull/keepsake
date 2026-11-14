@@ -1,6 +1,14 @@
-// Reminders, app badges and an offline app shell. API responses are never cached.
-const SHELL = "keepsake-shell-v1";
-const PRECACHE = ["/keepsake-logo.svg"];
+// Reminders, app badges and an offline app shell. API responses are never cached here;
+// the app keeps its own copies for offline use.
+const SHELL = "keepsake-shell-v2";
+const PRECACHE = [
+  "/keepsake-logo.svg",
+  "/keepsake-icon.png",
+  "/manifest.webmanifest",
+  "/icons/apple-touch-icon.png",
+  "/icons/icon-192.png",
+  "/icons/badge-96.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -46,10 +54,10 @@ async function navigate(event) {
   const { request } = event;
   try {
     const response = await fetch(request);
-    if (new URL(request.url).pathname === "/") {
-      // Caching must not delay or fail the launch it is preparing for.
+    // Every page is the same shell, so each launch refreshes the offline copy. Caching
+    // must not delay or fail the launch it is preparing for.
+    if (response.headers.get("content-type")?.startsWith("text/html"))
       event.waitUntil(storeShell(response.clone()).catch(() => undefined));
-    }
     return response;
   } catch (error) {
     // Every route renders the same single-page shell, which reports the connection itself.
