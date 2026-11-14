@@ -337,6 +337,89 @@ async fn insert_practice(
     Ok(())
 }
 
+/// A request that conflicts with what the library already holds.
+#[derive(Debug)]
+pub enum FactError {
+    Conflict(String),
+}
+
+impl fmt::Display for FactError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Conflict(message) => f.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for FactError {}
+
+/// Creates a fact once per submission ID, so a retried request returns the fact the first
+/// one created. Reusing the ID for a different fact is a conflict, as is retrying after
+/// the fact was deleted.
+pub async fn create_once_for(
+    pool: &SqlitePool,
+    profile_id: i64,
+    submission_id: &str,
+    fact: NewFact,
+) -> anyhow::Result<Fact> {
+    ensure!(
+        uuid::Uuid::parse_str(submission_id).is_ok(),
+        "Idempotency-Key must be a UUID"
+    );
+    validate_new_fact(&fact)?;
+    let submission_id = submission_id.to_owned();
+    crate::db::write_transaction(pool, move |connection| {
+        let fact = fact.clone();
+        let submission_id = submission_id.clone();
+        Box::pin(async move {
+            crate::profiles::require(connection, profile_id).await?;
+            let request_json = serde_json::to_string(&fact)?;
+            let earlier: Option<(i64, i64, String)> = sqlx::query_as(
+                "SELECT profile_id, fact_id, request_json FROM fact_submissions WHERE submission_id=?",
+            )
+            .bind(&submission_id)
+            .fetch_optional(&mut *connection)
+            .await?;
+            if let Some((owner, fact_id, earlier_json)) = earlier {
+                if owner != profile_id || earlier_json != request_json {
+                    return Err(FactError::Conflict(
+                        "Idempotency-Key already used for a different fact".into(),
+                    )
+                    .into());
+                }
+                let owned: Option<i64> =
+                    sqlx::query_scalar("SELECT id FROM facts WHERE id=? AND profile_id=?")
+                        .bind(fact_id)
+                        .bind(profile_id)
+                        .fetch_optional(&mut *connection)
+                        .await?;
+                if owned.is_none() {
+                    return Err(FactError::Conflict(
+                        "This fact was saved and has since been deleted".into(),
+                    )
+                    .into());
+                }
+                return load_id(connection, fact_id)
+                    .await?
+                    .context("saved fact missing");
+            }
+            let saved = insert_fact(connection, profile_id, fact).await?;
+            sqlx::query(
+                "INSERT INTO fact_submissions(submission_id, profile_id, fact_id, request_json)
+                 VALUES (?, ?, ?, ?)",
+            )
+            .bind(&submission_id)
+            .bind(profile_id)
+            .bind(saved.id)
+            .bind(&request_json)
+            .execute(&mut *connection)
+            .await?;
+            Ok(saved)
+        })
+    })
+    .await
+}
+
 pub async fn create_for(pool: &SqlitePool, profile_id: i64, fact: NewFact) -> anyhow::Result<Fact> {
     create_many_for(pool, profile_id, vec![fact])
         .await?

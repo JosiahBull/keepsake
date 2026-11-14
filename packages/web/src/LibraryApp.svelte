@@ -207,11 +207,30 @@
   let tags = $state("");
   let attachments = $state<Attachment[]>([]);
   let attachmentKey = 0;
+  // Kept until this draft is saved, so a retry cannot add the same fact twice.
+  let factSubmission: string | null = null;
+
 
   // Saves reach the server in order, and are kept on this device until they do. The
   // learner waits only for a save that must precede what is shown next, such as the
   // exposure before an answer.
   const saves = outbox;
+  // Facts added offline for this profile, until they reach the server.
+  const queuedFacts = $derived(
+    saves.queuedFacts.filter(
+      (fact) => fact.path === `/api/profiles/${profileId}/facts`,
+    ),
+  );
+  let queuedBefore = 0;
+  $effect(() => {
+    // A queued fact reached the server: list it with the rest.
+    const queued = queuedFacts.length;
+    if (queued < queuedBefore) {
+      void refreshLibrary(profileId, true);
+      if (view === "library" && !search) void loadFacts();
+    }
+    queuedBefore = queued;
+  });
   let waiting = $state(0);
   let saveWarning = $state("");
 
@@ -714,6 +733,8 @@
       attachment.upload = upload;
       return upload;
     } catch (caught) {
+      // Offline, the file waits on this device with the fact instead.
+      if (caught instanceof TypeError) throw caught;
       throw new Error(`${attachment.name}: ${message(caught)}`);
     }
   }
@@ -749,29 +770,56 @@
         }
       }
 
-      const media = [];
-      for (const attachment of attachments) {
-        const upload = await uploadAttachment(attachment);
-        media.push({ media_id: upload.media_id, alt: attachment.alt.trim() });
+      factSubmission ??= crypto.randomUUID();
+      const fact = {
+        prompt: prompt.trim(),
+        answer: answer.trim(),
+        context: context.trim(),
+        source: source.trim(),
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+        practices: [],
+      };
+      let queued = false;
+      try {
+        const media = [];
+        for (const attachment of attachments) {
+          const upload = await uploadAttachment(attachment);
+          media.push({ media_id: upload.media_id, alt: attachment.alt.trim() });
+        }
+        unwrap(
+          await api.POST("/api/facts", {
+            headers: { "Idempotency-Key": factSubmission },
+            body: { ...fact, media },
+          }),
+        );
+      } catch (caught) {
+        // Unreachable: keep the fact, and any files not yet uploaded, on this device.
+        if (!(caught instanceof TypeError) || !sync.offlineMode) throw caught;
+        await saves.add(
+          `Could not add “${fact.prompt}”.`,
+          {
+            method: "POST",
+            path: `/api/profiles/${profileId}/facts`,
+            body: fact,
+            headers: { "Idempotency-Key": factSubmission },
+            uploads: await Promise.all(
+              attachments.map(async (attachment) => ({
+                data: await attachment.file.arrayBuffer(),
+                type: attachment.type,
+                alt: attachment.alt.trim(),
+                mediaId: attachment.upload?.media_id,
+              })),
+            ),
+          },
+          { until: "stored" },
+        );
+        queued = true;
       }
 
-      unwrap(
-        await api.POST("/api/facts", {
-          body: {
-            media,
-            prompt: prompt.trim(),
-            answer: answer.trim(),
-            context: context.trim(),
-            source: source.trim(),
-            tags: tags
-              .split(",")
-              .map((tag) => tag.trim())
-              .filter(Boolean),
-            practices: [],
-          },
-        }),
-      );
-
+      factSubmission = null;
       showAdd = false;
       for (const attachment of attachments)
         URL.revokeObjectURL(attachment.preview);
@@ -781,8 +829,10 @@
       context = "";
       source = "";
       tags = "";
-      notice = "Fact saved.";
-      void refreshLibrary(profileId, true);
+      notice = queued
+        ? "Fact kept on this device. It joins your library when you reconnect."
+        : "Fact saved.";
+      if (!queued) void refreshLibrary(profileId, true);
       play("keep");
       search = "";
       clearTimeout(searchTimer);
@@ -1665,6 +1715,15 @@
       </section>
     {/if}
 
+    {#if queuedFacts.length}
+      <section class="queued" aria-labelledby="queued-heading">
+        <h2 id="queued-heading">Waiting to sync</h2>
+        <ul>
+          {#each queuedFacts as fact}<li>{fact.prompt}</li>{/each}
+        </ul>
+      </section>
+    {/if}
+
     {#if loading}
       <Loading label="Loading library…" />
     {:else if totalFacts === 0 && !search}
@@ -2202,6 +2261,25 @@
 </AppShell>
 
 <style>
+  .queued {
+    margin: 0 0 1.25rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px dashed #b4c8c0;
+    border-radius: 8px;
+  }
+
+  .queued h2 {
+    margin: 0 0 0.4rem;
+    color: #64786c;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .queued ul {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+
   /* Global defaults and accessible focus */
   :global(*) {
     box-sizing: border-box;
