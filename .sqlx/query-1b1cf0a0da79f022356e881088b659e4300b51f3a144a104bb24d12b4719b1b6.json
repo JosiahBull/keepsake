@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE facts SET prompt=?, answer=?, context=?, source=?, tags=? WHERE id=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "1b1cf0a0da79f022356e881088b659e4300b51f3a144a104bb24d12b4719b1b6"
+}

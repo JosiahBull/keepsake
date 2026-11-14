@@ -65,7 +65,7 @@ export interface paths {
         delete: operations["delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["edit_fact"];
         trace?: never;
     };
     "/api/facts/{id}/practices": {
@@ -281,7 +281,7 @@ export interface paths {
         delete: operations["profile_delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        patch: operations["profile_edit_fact"];
         trace?: never;
     };
     "/api/profiles/{profile_id}/facts/{id}/practices": {
@@ -887,6 +887,27 @@ export interface components {
             shared_by?: string | null;
             source: string;
             tags: string[];
+        };
+        /**
+         * @description An edit, with the fields as the editor last saw them. A field the editor changed that
+         *     was also changed meanwhile, to something else, is a conflict; edits to different
+         *     fields both apply.
+         */
+        FactEdit: {
+            base: components["schemas"]["FactFields"];
+            fields: components["schemas"]["FactFields"];
+        };
+        /**
+         * @description Delete a fact with its practices, reviews, schedule and study events, and return what
+         *     it held. Its pending offers are withdrawn, and media no other question uses is removed.
+         *     The parts of a fact a person can edit.
+         */
+        FactFields: {
+            answer: string;
+            context?: string;
+            prompt: string;
+            source?: string;
+            tags?: string[];
         };
         FactPage: {
             items: components["schemas"]["FactSummary"][];
@@ -1614,6 +1635,72 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    edit_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A field this edit changes was changed elsewhere */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2512,6 +2599,73 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    profile_edit_fact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: number;
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactEdit"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fact"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A field this edit changes was changed elsewhere */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

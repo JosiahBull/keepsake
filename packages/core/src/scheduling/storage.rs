@@ -156,6 +156,58 @@ pub(crate) async fn register_fact(
     map_practices(connection, fact_id).await
 }
 
+/// Retires a fact's recall target after its question or answer changed, and starts a new
+/// revision with a fresh schedule. The retired target keeps its events as history.
+pub(crate) async fn revise_target(
+    connection: &mut SqliteConnection,
+    fact_id: i64,
+) -> anyhow::Result<()> {
+    let retired = sqlx::query!(
+        "SELECT id AS \"id!\", content_revision FROM learning_targets WHERE fact_id = ? AND active = 1",
+        fact_id
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+    // A practice maps to one target; the new revision decides which still qualify.
+    sqlx::query!(
+        "DELETE FROM target_practices WHERE target_id = ?",
+        retired.id
+    )
+    .execute(&mut *connection)
+    .await?;
+    sqlx::query!(
+        "UPDATE learning_targets SET active = 0 WHERE id = ?",
+        retired.id
+    )
+    .execute(&mut *connection)
+    .await?;
+    let revision = retired.content_revision + 1;
+    let id = sqlx::query_scalar!(
+        "INSERT INTO learning_targets(fact_id, content_revision, prompt, answer)
+         SELECT id, ?, prompt, answer FROM facts WHERE id = ? RETURNING id AS \"id!\"",
+        revision,
+        fact_id
+    )
+    .fetch_one(&mut *connection)
+    .await?;
+    let schedule = Schedule {
+        target_id: id,
+        fact_id,
+        content_revision: revision,
+        phase: "new".into(),
+        due_at: None,
+        last_review_at: None,
+        stability: None,
+        difficulty: None,
+        lapses: 0,
+        version: 1,
+        introduced_at: None,
+        blocked_until: None,
+    };
+    save_schedule(connection, &schedule).await?;
+    map_practices(connection, fact_id).await
+}
+
 pub(crate) async fn map_practices(
     connection: &mut SqliteConnection,
     fact_id: i64,

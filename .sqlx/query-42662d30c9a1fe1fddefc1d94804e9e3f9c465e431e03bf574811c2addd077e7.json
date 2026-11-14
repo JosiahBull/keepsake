@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id AS \"id!\", content_revision FROM learning_targets WHERE fact_id = ? AND active = 1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "name": "content_revision",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "learning_targets",
+            "name": "content_revision"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "42662d30c9a1fe1fddefc1d94804e9e3f9c465e431e03bf574811c2addd077e7"
+}

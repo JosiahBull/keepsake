@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE practices SET prompt=?, answer=?\n                     WHERE fact_id=? AND kind='flashcard' AND prompt=? AND answer=?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "d85818d25fa7468379e63a4132f7908551108da29cec841bc84d7fe032dd7074"
+}
