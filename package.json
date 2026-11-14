@@ -23,6 +23,6 @@
     "sqlx:check": "node scripts/sqlx-prepare.mjs --check"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.7"
   }
 }
