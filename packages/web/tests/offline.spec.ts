@@ -166,6 +166,85 @@ test("the copy follows a fact added in the app", async ({ page }) => {
   expect(copy.facts.map((fact) => fact.prompt)).toEqual(["A fact added before going offline?"]);
 });
 
+test("extra practice keeps going from the device's copy for as long as the learner wants", async ({ app, context, page }) => {
+  const facts = [
+    await practiceFact(app, "Which bird is called Kererū?"),
+    await practiceFact(app, "Which bird is called Tūī?"),
+  ];
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await startExtraPractice(page);
+  // Each fact has one flashcard, so a round has two questions.
+  for (let round = 0; round < 2; round += 1) {
+    for (let question = 0; question < 2; question += 1) {
+      await page.getByRole("button", { name: "Reveal answer", exact: true }).click();
+      await page.getByRole("button", { name: "Good Correct", exact: true }).click();
+    }
+    await expect(page.getByRole("heading", { name: "Session complete", exact: true })).toBeVisible();
+    if (round === 0) await page.getByRole("button", { name: "Practise again", exact: true }).click();
+  }
+  await expect(header(page)).toContainText("8 saves to send");
+  await context.setOffline(false);
+  await expect.poll(async () => (await reviews(app, facts[0].id)).total + (await reviews(app, facts[1].id)).total)
+    .toBe(4);
+});
+
+test("matching plays rounds from the device's copy offline", async ({ app, context, page }) => {
+  const facts = [];
+  for (const [prompt, answer] of [["kererū", "Wood pigeon"], ["tūī", "Parson bird"], ["pīwakawaka", "Fantail"], ["kōtare", "Kingfisher"]])
+    facts.push(await app.createFact({ prompt: `What does ${prompt} mean?`, answer, tags: ["birds"] }));
+  // Not matchable: no topic in common with the rest.
+  await app.createFact({ prompt: "What is the capital?", answer: "Wellington", tags: ["places"] });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await context.setOffline(true);
+  await tab(page, "Match pairs").click();
+  const game = page.getByRole("region", { name: "Matching pairs game" });
+  await expect(game.getByText("0 of 4 matched", { exact: true })).toBeVisible();
+  for (const fact of facts) {
+    await game.getByRole("button", { name: fact.prompt, exact: true }).click();
+    await game.getByRole("button", { name: fact.answer, exact: true }).click();
+  }
+  await game.getByRole("button", { name: "Good Correct", exact: true }).click();
+  await expect(game.getByRole("status")).toHaveText("Round complete.");
+  await context.setOffline(false);
+  for (const fact of facts)
+    await expect.poll(async () => (await reviews(app, fact.id)).items).toMatchObject([{ outcome: "good" }]);
+});
+
+test("offline practice leaves out questions whose images are not on the device", async ({ app, context, page }) => {
+  const upload = await app.request.post("/api/profiles/1/media", { headers: { "content-type": "image/png" }, data: png(20, 20) });
+  const { media_id } = (await upload.json()) as { media_id: number };
+  await app.createFact({ prompt: "Which bird is pictured?", answer: "Kererū", media: [{ media_id, alt: "A pigeon" }] });
+  const plain = await app.createFact({ prompt: "Which bird has a white tuft?", answer: "Tūī" });
+  const loaded = copied(page);
+  await page.goto("/app");
+  await loaded;
+  await expect.poll(() => page.evaluate(async () => (await (await caches.open("keepsake-media")).keys()).length)).toBe(1);
+  await page.evaluate(() => caches.delete("keepsake-media"));
+  await context.setOffline(true);
+  await startExtraPractice(page);
+  await expect(page.getByText("Flashcards · 1 of 1", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: plain.prompt, exact: true })).toBeVisible();
+  await context.setOffline(false);
+});
+
+test("scheduled recall says it needs a connection and points to offline practice", async ({ app, context, page }) => {
+  await app.createFact();
+  await page.goto("/app");
+  await context.setOffline(true);
+  // The Practise tab may show a queue loaded before the connection went, so ask afresh.
+  await startExtraPractice(page);
+  await page.getByRole("button", { name: "Scheduled recall", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "Scheduled recall needs a connection. Extra practice and Match pairs work offline.",
+  );
+  await context.setOffline(false);
+});
+
 test.describe("with the service worker", () => {
   // WebKit's test browser cannot reload a page offline through a service worker.
   test.skip(({ browserName }) => browserName === "webkit", "offline reload needs Chromium");
