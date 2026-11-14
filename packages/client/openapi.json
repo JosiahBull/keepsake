@@ -3318,6 +3318,77 @@
         }
       }
     },
+    "/api/profiles/{profile_id}/study/prepared": {
+      "parameters": [
+        {
+          "name": "profile_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "profile_prepared_study",
+        "responses": {
+          "200": {
+            "description": "Scheduled recall for a device to take offline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedStudy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid profile or request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Profile or item not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/profiles/{profile_id}/study/queue": {
       "parameters": [
         {
@@ -4060,6 +4131,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/study/prepared": {
+      "get": {
+        "tags": [
+          "study_api"
+        ],
+        "operationId": "prepared_study",
+        "responses": {
+          "200": {
+            "description": "Scheduled recall for a device to take offline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedStudy"
                 }
               }
             }
@@ -4906,6 +5017,78 @@
           }
         }
       },
+      "PreparedQuestion": {
+        "type": "object",
+        "description": "A due or soon-due question prepared for offline use, with when it becomes available.",
+        "required": [
+          "question",
+          "available_at"
+        ],
+        "properties": {
+          "available_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When the target may be assessed: its due time, or the end of an exposure's delay."
+          },
+          "question": {
+            "$ref": "#/components/schemas/StudyQuestion"
+          }
+        }
+      },
+      "PreparedStudy": {
+        "type": "object",
+        "description": "Scheduled recall prepared for a device to use offline. The device serves due work\nas it becomes available, then new targets within each local day's allowance. The\nserver applies its own rules again when the attempts arrive.",
+        "required": [
+          "due",
+          "new",
+          "new_limit",
+          "introduced_today",
+          "timezone",
+          "budget_seconds",
+          "spent_seconds",
+          "prepared_at"
+        ],
+        "properties": {
+          "budget_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "due": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreparedQuestion"
+            },
+            "description": "Learning, relearning and review work available within a week, soonest first."
+          },
+          "introduced_today": {
+            "type": "integer",
+            "format": "int64",
+            "description": "New targets already introduced in the current local day."
+          },
+          "new": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StudyQuestion"
+            },
+            "description": "New targets in the order the queue introduces them, up to a week's allowance."
+          },
+          "new_limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prepared_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "spent_seconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        }
+      },
       "Profile": {
         "type": "object",
         "required": [
@@ -5482,6 +5665,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "ignored": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the event was kept without being applied; null when it was applied."
+          },
           "kind": {
             "type": "string"
           },
@@ -5655,6 +5845,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "ignored": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why an event recorded later was kept without being applied; absent when applied."
+          },
           "next_due_at": {
             "type": [
               "integer",
@@ -5723,11 +5920,26 @@
             ],
             "format": "int64"
           },
+          "feedback_submission_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The feedback this rating follows, by its submission ID, for a rating made before\nthe feedback reached the server. Use it or `feedback_event_id`, not both."
+          },
           "kind": {
             "$ref": "#/components/schemas/EventKind"
           },
           "method": {
             "$ref": "#/components/schemas/ReviewMethod"
+          },
+          "occurred_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When the device recorded this event, in UTC Unix seconds, for an event sent later,\nsuch as one made offline. It may be up to 30 days old; a later time counts as now.\nAn event with this time that no longer fits its target is kept as ignored history\ninstead of being refused."
           },
           "outcome": {
             "oneOf": [

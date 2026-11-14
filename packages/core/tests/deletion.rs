@@ -110,6 +110,8 @@ async fn deleting_a_fact_removes_its_history_and_media_no_other_question_uses() 
             content_revision: question.content_revision,
             expected_version: question.schedule_version,
             feedback_event_id: None,
+            feedback_submission_id: None,
+            occurred_at: None,
             kind: EventKind::Attempt,
             context: StudyContext::Scheduled,
             method: ReviewMethod::Flashcard,

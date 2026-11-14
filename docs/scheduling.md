@@ -114,6 +114,36 @@ Continue with `next_cursor` until it is null. A single event's `request_json` ca
 submitted with `study submit --file`; its original UUID returns its recorded result.
 This is idempotent replay, not a command to reapply historical transitions.
 
+## Offline recall
+
+A device with offline use turned on downloads prepared study with its copy of the library:
+work available within the next seven days, each with when it becomes available and its
+rating intervals at that time, and the next week of new targets in intake order (at most
+1,000 of each). Offline, it serves due work once available by its own clock, then new
+targets within the local day's allowance, counted in the profile's study timezone. Each
+target comes at most once until the next download; Again does not bring it back offline.
+
+Offline events carry `occurred_at`, the device's time, and a rating names its feedback by
+`feedback_submission_id`. The server applies its usual rules at that time: elapsed time
+for the model, the 15-minute rating window, due times and the day's new-item allowance
+all use when the attempt happened, not when it arrived. Times may be up to 30 days old; a
+time later than the server's counts as now. The rule that keeps new targets behind
+waiting reviews is not applied to offline events, because reviews may fall due on the
+server while the device has none left to serve.
+
+An offline event that no longer fits its target, because another device reviewed it or
+its content changed, is kept with the reason in `ignored`. It leaves the schedule as it
+was, adds no review, and is never recall evidence. The app says how many offline attempts
+did not count. Events for a deleted fact cannot be kept and are refused.
+
+The [saved research](research/learning-and-retention-2026-10-24.md) supports spacing and
+measures it in elapsed time between occasions; using the time of the attempt keeps that
+measurement honest after a long offline stretch. Offline feedback still follows a
+recorded attempt, as retrieval before feedback requires. Offering each target once and
+holding new items within the daily allowance keep offline sessions within the same
+spacing and budget as online ones. The seven-day window and the 30-day limit are product
+choices; the research does not study offline practice.
+
 ## Reminders
 
 A profile can receive one Web Push reminder per local day on each browser where it

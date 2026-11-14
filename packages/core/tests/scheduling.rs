@@ -53,6 +53,8 @@ fn submission(question: &StudyQuestion, outcome: ReviewOutcome) -> StudySubmissi
         target_id: question.target_id,
         practice_id: Some(question.practice.id),
         feedback_event_id: None,
+        feedback_submission_id: None,
+        occurred_at: None,
         content_revision: question.content_revision,
         expected_version: question.schedule_version,
         kind: EventKind::Attempt,
