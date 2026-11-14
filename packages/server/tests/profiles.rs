@@ -675,6 +675,14 @@ async fn openapi_scoped_paths_declare_every_path_parameter_and_unique_operations
             if let Some(id) = operation["operationId"].as_str() {
                 assert!(operations.insert(id), "duplicate operationId {id}");
             }
+            for (status, response) in operation["responses"].as_object().unwrap() {
+                assert!(
+                    response["description"]
+                        .as_str()
+                        .is_some_and(|d| !d.is_empty()),
+                    "{verb} {path} {status} has no description"
+                );
+            }
             for parameter in path.split('/').filter_map(|part| {
                 part.strip_prefix('{')
                     .and_then(|part| part.strip_suffix('}'))

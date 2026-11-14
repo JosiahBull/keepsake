@@ -15,7 +15,7 @@ fdk-aac-rs = { version = "=0.1.0", default-features = false, features = ["encode
 image = { version = "0.25", default-features = false, features = ["avif", "jpeg", "png", "rayon", "webp"] }
 serde.workspace = true
 serde_json.workspace = true
-sha2 = "0.10"
+sha2 = "0.11"
 strum.workspace = true
 sqlx.workspace = true
 symphonia = { version = "0.6", default-features = false, features = ["aac", "alac", "flac", "isomp4", "mkv", "mp3", "ogg", "pcm", "vorbis", "wav"] }

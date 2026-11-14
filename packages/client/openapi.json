@@ -48,7 +48,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -58,7 +58,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -68,7 +68,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -78,7 +78,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -120,7 +120,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -130,7 +130,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -140,7 +140,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -150,7 +150,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -160,7 +160,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -202,7 +202,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -212,7 +212,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -222,7 +222,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -232,7 +232,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -264,7 +264,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -274,7 +274,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -284,7 +284,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -294,7 +294,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -325,7 +325,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -335,7 +335,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -345,7 +345,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -355,7 +355,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -387,7 +387,7 @@
             "description": "The fact, its practices and its study history are deleted"
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -397,7 +397,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -407,7 +407,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -446,7 +446,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -456,7 +456,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -466,7 +466,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -486,7 +486,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -496,7 +496,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -540,7 +540,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -550,7 +550,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -560,7 +560,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -570,7 +570,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -580,7 +580,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -631,7 +631,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -641,7 +641,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -651,7 +651,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -661,7 +661,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -671,7 +671,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -725,7 +725,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -735,7 +735,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -745,7 +745,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -755,7 +755,7 @@
             }
           },
           "413": {
-            "description": "",
+            "description": "Payload Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -765,7 +765,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -775,7 +775,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -806,7 +806,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -818,7 +818,7 @@
             }
           },
           "206": {
-            "description": "",
+            "description": "Partial Content",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -830,7 +830,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -840,7 +840,7 @@
             }
           },
           "416": {
-            "description": "",
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -850,7 +850,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -860,7 +860,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -892,7 +892,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -902,7 +902,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -912,7 +912,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -922,7 +922,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -942,7 +942,7 @@
         "operationId": "list_profiles",
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -955,7 +955,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -983,7 +983,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -993,7 +993,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1003,7 +1003,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -1013,7 +1013,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1044,7 +1044,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1054,7 +1054,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1093,7 +1093,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1103,7 +1103,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1113,7 +1113,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1144,7 +1144,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1154,7 +1154,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1164,7 +1164,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1203,7 +1203,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1213,7 +1213,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1223,7 +1223,7 @@
             }
           },
           "422": {
-            "description": "",
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -1233,7 +1233,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1295,7 +1295,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1305,7 +1305,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1325,7 +1325,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1335,7 +1335,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1377,7 +1377,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -1387,7 +1387,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1407,7 +1407,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -1417,7 +1417,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1427,7 +1427,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1480,7 +1480,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1490,7 +1490,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1510,7 +1510,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1520,7 +1520,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1563,7 +1563,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1573,7 +1573,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1593,7 +1593,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1603,7 +1603,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1645,7 +1645,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1665,7 +1665,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1675,7 +1675,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1685,7 +1685,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1727,7 +1727,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1737,7 +1737,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1747,7 +1747,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1786,7 +1786,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1796,7 +1796,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1806,7 +1806,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1826,7 +1826,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1836,7 +1836,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1891,7 +1891,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -1901,7 +1901,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -1911,7 +1911,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1921,7 +1921,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -1931,7 +1931,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -1993,7 +1993,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2003,7 +2003,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2013,7 +2013,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2023,7 +2023,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -2033,7 +2033,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2077,7 +2077,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -2087,7 +2087,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2107,7 +2107,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -2117,7 +2117,7 @@
             }
           },
           "413": {
-            "description": "",
+            "description": "Payload Too Large",
             "content": {
               "application/json": {
                 "schema": {
@@ -2127,7 +2127,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -2137,7 +2137,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2179,7 +2179,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -2191,7 +2191,7 @@
             }
           },
           "206": {
-            "description": "",
+            "description": "Partial Content",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -2213,7 +2213,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2223,7 +2223,7 @@
             }
           },
           "416": {
-            "description": "",
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2233,7 +2233,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -2243,7 +2243,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2286,7 +2286,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2296,7 +2296,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2316,7 +2316,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -2326,7 +2326,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2357,7 +2357,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2367,7 +2367,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2377,7 +2377,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2416,7 +2416,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2426,7 +2426,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2436,7 +2436,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2487,7 +2487,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2497,7 +2497,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2546,7 +2546,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2556,7 +2556,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2600,7 +2600,7 @@
             "description": "The push service accepted a confirmation for this browser"
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2610,7 +2610,7 @@
             }
           },
           "410": {
-            "description": "",
+            "description": "Gone",
             "content": {
               "application/json": {
                 "schema": {
@@ -2620,7 +2620,7 @@
             }
           },
           "502": {
-            "description": "",
+            "description": "Bad Gateway",
             "content": {
               "application/json": {
                 "schema": {
@@ -2661,7 +2661,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -2671,7 +2671,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2681,7 +2681,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2691,7 +2691,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -2701,7 +2701,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -2766,7 +2766,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2776,7 +2776,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2786,7 +2786,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2825,7 +2825,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -2838,7 +2838,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2848,7 +2848,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2858,7 +2858,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -2899,7 +2899,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2912,7 +2912,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -2922,7 +2922,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2932,7 +2932,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -2972,7 +2972,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -2982,7 +2982,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2992,7 +2992,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3032,7 +3032,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3042,7 +3042,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3052,7 +3052,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3092,7 +3092,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3102,7 +3102,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3112,7 +3112,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3165,7 +3165,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3175,7 +3175,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3195,7 +3195,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3205,7 +3205,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3233,7 +3233,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -3243,7 +3243,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3253,7 +3253,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3263,7 +3263,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3273,7 +3273,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3283,7 +3283,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3324,7 +3324,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3334,7 +3334,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3344,7 +3344,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3354,7 +3354,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3364,7 +3364,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3374,7 +3374,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3416,7 +3416,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3436,7 +3436,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3446,7 +3446,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3456,7 +3456,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3502,7 +3502,7 @@
             "description": "Practice approved without resetting its recall schedule"
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3512,7 +3512,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -3522,7 +3522,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3532,7 +3532,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3593,7 +3593,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3603,7 +3603,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3646,7 +3646,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3656,7 +3656,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3676,7 +3676,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3686,7 +3686,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3717,7 +3717,7 @@
         "operationId": "profile_settings",
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3747,7 +3747,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3757,7 +3757,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3785,7 +3785,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3795,7 +3795,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3815,7 +3815,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -3825,7 +3825,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3835,7 +3835,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3896,7 +3896,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3906,7 +3906,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3926,7 +3926,7 @@
         "operationId": "push_key",
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -3936,7 +3936,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -3946,7 +3946,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -3976,7 +3976,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -3986,7 +3986,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -3996,7 +3996,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4006,7 +4006,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4016,7 +4016,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4058,7 +4058,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4068,7 +4068,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4078,7 +4078,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4088,7 +4088,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4116,7 +4116,7 @@
         },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Created",
             "content": {
               "application/json": {
                 "schema": {
@@ -4126,7 +4126,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4136,7 +4136,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4146,7 +4146,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -4156,7 +4156,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4166,7 +4166,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4196,7 +4196,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4206,7 +4206,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4216,7 +4216,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4226,7 +4226,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -4236,7 +4236,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4246,7 +4246,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4277,7 +4277,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4287,7 +4287,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4297,7 +4297,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4307,7 +4307,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4342,7 +4342,7 @@
             "description": "Practice approved without resetting its recall schedule"
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4352,7 +4352,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -4362,7 +4362,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4372,7 +4372,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4402,7 +4402,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4412,7 +4412,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4444,7 +4444,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4454,7 +4454,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4464,7 +4464,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4474,7 +4474,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4494,7 +4494,7 @@
         "operationId": "settings",
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4504,7 +4504,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4514,7 +4514,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4542,7 +4542,7 @@
         },
         "responses": {
           "200": {
-            "description": "",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -4552,7 +4552,7 @@
             }
           },
           "400": {
-            "description": "",
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
@@ -4562,7 +4562,7 @@
             }
           },
           "409": {
-            "description": "",
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -4572,7 +4572,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4582,7 +4582,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -4612,7 +4612,7 @@
             }
           },
           "500": {
-            "description": "",
+            "description": "Internal Server Error",
             "content": {
               "application/json": {
                 "schema": {
@@ -4622,7 +4622,7 @@
             }
           },
           "503": {
-            "description": "",
+            "description": "Service Unavailable",
             "content": {
               "application/json": {
                 "schema": {
@@ -6137,10 +6137,10 @@
           "review": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/Review"
               },
               {
-                "$ref": "#/components/schemas/Review"
+                "type": "null"
               }
             ]
           },
@@ -6216,10 +6216,10 @@
           "outcome": {
             "oneOf": [
               {
-                "type": "null"
+                "$ref": "#/components/schemas/ReviewOutcome"
               },
               {
-                "$ref": "#/components/schemas/ReviewOutcome"
+                "type": "null"
               }
             ]
           },

@@ -1305,7 +1305,7 @@ export interface components {
             /** Format: int64 */
             next_due_at?: number | null;
             qualifying: boolean;
-            review?: null | components["schemas"]["Review"];
+            review?: components["schemas"]["Review"] | null;
             schedule: components["schemas"]["Schedule"];
             submission_id: string;
         };
@@ -1334,7 +1334,7 @@ export interface components {
              *     instead of being refused.
              */
             occurred_at?: number | null;
-            outcome?: null | components["schemas"]["ReviewOutcome"];
+            outcome?: components["schemas"]["ReviewOutcome"] | null;
             /** Format: int64 */
             practice_id?: number | null;
             prior_exposure: boolean;
@@ -1385,6 +1385,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1393,6 +1394,7 @@ export interface operations {
                     "application/json": components["schemas"]["FactPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1401,6 +1403,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1409,6 +1412,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1435,6 +1439,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1443,6 +1448,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1451,6 +1457,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1459,6 +1466,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1467,6 +1475,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1491,6 +1500,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1499,6 +1509,7 @@ export interface operations {
                     "application/json": components["schemas"]["CopyPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1507,6 +1518,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1515,6 +1527,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1537,6 +1550,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1545,6 +1559,7 @@ export interface operations {
                     "application/json": components["schemas"]["FactSample"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1553,6 +1568,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1561,6 +1577,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1582,6 +1599,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1590,6 +1608,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1598,6 +1617,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1606,6 +1626,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1634,6 +1655,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1642,6 +1664,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1650,6 +1673,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1675,6 +1699,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1683,6 +1708,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1691,6 +1717,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1708,6 +1735,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1716,6 +1744,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1741,6 +1770,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1749,6 +1779,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1757,6 +1788,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1765,6 +1797,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1773,6 +1806,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1799,6 +1833,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1807,6 +1842,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1815,6 +1851,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1823,6 +1860,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1831,6 +1869,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1882,6 +1921,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -1890,6 +1930,7 @@ export interface operations {
                     "application/json": components["schemas"]["MediaUpload"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -1898,6 +1939,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -1906,6 +1948,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Payload Too Large */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -1914,6 +1957,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1922,6 +1966,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -1943,6 +1988,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1951,6 +1997,7 @@ export interface operations {
                     "application/octet-stream": string;
                 };
             };
+            /** @description Partial Content */
             206: {
                 headers: {
                     [name: string]: unknown;
@@ -1959,6 +2006,7 @@ export interface operations {
                     "application/octet-stream": string;
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -1967,6 +2015,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Range Not Satisfiable */
             416: {
                 headers: {
                     [name: string]: unknown;
@@ -1975,6 +2024,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1983,6 +2033,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2005,6 +2056,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2013,6 +2065,7 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2021,6 +2074,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2029,6 +2083,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2048,6 +2103,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2056,6 +2112,7 @@ export interface operations {
                     "application/json": components["schemas"]["Profile"][];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2079,6 +2136,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2087,6 +2145,7 @@ export interface operations {
                     "application/json": components["schemas"]["Profile"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2095,6 +2154,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2103,6 +2163,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2124,6 +2185,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2132,6 +2194,7 @@ export interface operations {
                     "application/json": components["schemas"]["Profile"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2157,6 +2220,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2165,6 +2229,7 @@ export interface operations {
                     "application/json": components["schemas"]["Profile"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2173,6 +2238,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2194,6 +2260,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2202,6 +2269,7 @@ export interface operations {
                     "application/json": components["schemas"]["AgentAccess"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2210,6 +2278,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2235,6 +2304,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2243,6 +2313,7 @@ export interface operations {
                     "application/json": components["schemas"]["AgentAccess"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2251,6 +2322,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -2259,6 +2331,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2287,6 +2360,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2295,6 +2369,7 @@ export interface operations {
                     "application/json": components["schemas"]["FactPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2312,6 +2387,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2320,6 +2396,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2348,6 +2425,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2356,6 +2434,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2373,6 +2452,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2381,6 +2461,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2389,6 +2470,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2415,6 +2497,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2423,6 +2506,7 @@ export interface operations {
                     "application/json": components["schemas"]["CopyPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2440,6 +2524,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2448,6 +2533,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2472,6 +2558,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2480,6 +2567,7 @@ export interface operations {
                     "application/json": components["schemas"]["FactSample"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2497,6 +2585,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2505,6 +2594,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2527,6 +2617,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2544,6 +2635,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2552,6 +2644,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2560,6 +2653,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2598,6 +2692,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2606,6 +2701,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2614,6 +2710,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2640,6 +2737,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2648,6 +2746,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2656,6 +2755,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2673,6 +2773,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2681,6 +2782,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2707,6 +2809,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2715,6 +2818,7 @@ export interface operations {
                     "application/json": components["schemas"]["Fact"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2723,6 +2827,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2731,6 +2836,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2739,6 +2845,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2766,6 +2873,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2774,6 +2882,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReviewPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2782,6 +2891,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2790,6 +2900,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2798,6 +2909,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2824,6 +2936,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2832,6 +2945,7 @@ export interface operations {
                     "application/json": components["schemas"]["MediaUpload"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2849,6 +2963,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -2857,6 +2972,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Payload Too Large */
             413: {
                 headers: {
                     [name: string]: unknown;
@@ -2865,6 +2981,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2873,6 +2990,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2895,6 +3013,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2903,6 +3022,7 @@ export interface operations {
                     "application/octet-stream": string;
                 };
             };
+            /** @description Partial Content */
             206: {
                 headers: {
                     [name: string]: unknown;
@@ -2920,6 +3040,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -2928,6 +3049,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Range Not Satisfiable */
             416: {
                 headers: {
                     [name: string]: unknown;
@@ -2936,6 +3058,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2944,6 +3067,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -2968,6 +3092,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2976,6 +3101,7 @@ export interface operations {
                     "application/json": components["schemas"]["PracticeSession"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -2993,6 +3119,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3001,6 +3128,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3022,6 +3150,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3030,6 +3159,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReminderSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3038,6 +3168,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3063,6 +3194,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3071,6 +3203,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReminderSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3079,6 +3212,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3113,6 +3247,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReminderSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3121,6 +3256,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3155,6 +3291,7 @@ export interface operations {
                     "application/json": components["schemas"]["ReminderSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3163,6 +3300,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3195,6 +3333,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3203,6 +3342,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Gone */
             410: {
                 headers: {
                     [name: string]: unknown;
@@ -3211,6 +3351,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Bad Gateway */
             502: {
                 headers: {
                     [name: string]: unknown;
@@ -3236,6 +3377,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3244,6 +3386,7 @@ export interface operations {
                     "application/json": components["schemas"]["Review"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3252,6 +3395,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3260,6 +3404,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3268,6 +3413,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3294,6 +3440,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3302,6 +3449,7 @@ export interface operations {
                     "application/json": components["schemas"]["SharePage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3310,6 +3458,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3335,6 +3484,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3343,6 +3493,7 @@ export interface operations {
                     "application/json": components["schemas"]["Share"][];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3351,6 +3502,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3359,6 +3511,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3384,6 +3537,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3392,6 +3546,7 @@ export interface operations {
                     "application/json": components["schemas"]["Share"][];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3400,6 +3555,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3408,6 +3564,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3430,6 +3587,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3438,6 +3596,7 @@ export interface operations {
                     "application/json": components["schemas"]["Share"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3446,6 +3605,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3468,6 +3628,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3476,6 +3637,7 @@ export interface operations {
                     "application/json": components["schemas"]["Share"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3484,6 +3646,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3506,6 +3669,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3514,6 +3678,7 @@ export interface operations {
                     "application/json": components["schemas"]["Share"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3522,6 +3687,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3548,6 +3714,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3556,6 +3723,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyEventPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3573,6 +3741,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3581,6 +3750,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3606,6 +3776,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3614,6 +3785,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyResult"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3622,6 +3794,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3630,6 +3803,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3638,6 +3812,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3646,6 +3821,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3671,6 +3847,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3679,6 +3856,7 @@ export interface operations {
                     "application/json": components["schemas"]["ExposureResult"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3687,6 +3865,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3695,6 +3874,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -3703,6 +3883,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3711,6 +3892,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3733,6 +3915,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3750,6 +3933,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3758,6 +3942,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3766,6 +3951,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3796,6 +3982,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3804,6 +3991,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3812,6 +4000,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3820,6 +4009,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3868,6 +4058,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3876,6 +4067,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3900,6 +4092,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3908,6 +4101,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyQueue"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -3925,6 +4119,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3933,6 +4128,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -3954,6 +4150,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3980,6 +4177,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -3988,6 +4186,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4013,6 +4212,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4021,6 +4221,7 @@ export interface operations {
                     "application/json": components["schemas"]["SchedulerSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4038,6 +4239,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4046,6 +4248,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4054,6 +4257,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4102,6 +4306,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4110,6 +4315,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4129,6 +4335,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4137,6 +4344,7 @@ export interface operations {
                     "application/json": components["schemas"]["PushKey"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4145,6 +4353,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4168,6 +4377,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4176,6 +4386,7 @@ export interface operations {
                     "application/json": components["schemas"]["Review"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4184,6 +4395,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4192,6 +4404,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4200,6 +4413,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4224,6 +4438,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4232,6 +4447,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyEventPage"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4240,6 +4456,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4248,6 +4465,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4271,6 +4489,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -4279,6 +4498,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyResult"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4287,6 +4507,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4295,6 +4516,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4303,6 +4525,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4311,6 +4534,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4334,6 +4558,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4342,6 +4567,7 @@ export interface operations {
                     "application/json": components["schemas"]["ExposureResult"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4350,6 +4576,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4358,6 +4585,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4366,6 +4594,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4374,6 +4603,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4395,6 +4625,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4403,6 +4634,7 @@ export interface operations {
                     "application/json": components["schemas"]["Schedule"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4411,6 +4643,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4419,6 +4652,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4448,6 +4682,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4456,6 +4691,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Not Found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4464,6 +4700,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4472,6 +4709,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4500,6 +4738,7 @@ export interface operations {
                     "application/json": components["schemas"]["PreparedStudy"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4508,6 +4747,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4530,6 +4770,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4538,6 +4779,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudyQueue"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4546,6 +4788,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4554,6 +4797,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4573,6 +4817,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4581,6 +4826,7 @@ export interface operations {
                     "application/json": components["schemas"]["SchedulerSettings"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4589,6 +4835,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4612,6 +4859,7 @@ export interface operations {
             };
         };
         responses: {
+            /** @description OK */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -4620,6 +4868,7 @@ export interface operations {
                     "application/json": components["schemas"]["SchedulerSettings"];
                 };
             };
+            /** @description Bad Request */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -4628,6 +4877,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Conflict */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4636,6 +4886,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4644,6 +4895,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -4672,6 +4924,7 @@ export interface operations {
                     "application/json": components["schemas"]["StudySummary"];
                 };
             };
+            /** @description Internal Server Error */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -4680,6 +4933,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
             };
+            /** @description Service Unavailable */
             503: {
                 headers: {
                     [name: string]: unknown;
