@@ -332,3 +332,44 @@ export async function markStudied(profileId: number, targetId: number, at: numbe
   });
   await writeCopy(studiedKey(profileId), kept);
 }
+
+/** What this device keeps of a profile for offline use. */
+export type DeviceCopy = {
+  savedAt: number | null;
+  mediaKept: number;
+  mediaTotal: number;
+  /** Bytes the browser counts against Keepsake, and its limit, where the browser says. */
+  usage: number | null;
+  quota: number | null;
+};
+
+export async function deviceCopy(profileId: number): Promise<DeviceCopy> {
+  const copy = await readLibrary(profileId);
+  const wanted = new Set(
+    (copy?.facts ?? []).flatMap((fact) =>
+      fact.media.map((item) => mediaPath(profileId, item.media_id)),
+    ),
+  );
+  let mediaKept = 0;
+  if (wanted.size && "caches" in window && (await caches.has(MEDIA_CACHE))) {
+    const cache = await caches.open(MEDIA_CACHE);
+    for (const request of await cache.keys())
+      if (wanted.has(new URL(request.url).pathname)) mediaKept += 1;
+  }
+  const estimate = await navigator.storage?.estimate?.().catch(() => undefined);
+  return {
+    savedAt: copy?.savedAt ?? null,
+    mediaKept,
+    mediaTotal: wanted.size,
+    usage: estimate?.usage ?? null,
+    quota: estimate?.quota ?? null,
+  };
+}
+
+/** Removes every copy kept for offline use; the next visit with a connection downloads again. */
+export async function removeCopies() {
+  sync.epoch += 1;
+  refreshed.clear();
+  await clearCopies();
+  if ("caches" in window) await caches.delete(MEDIA_CACHE).catch(() => false);
+}

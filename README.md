@@ -388,7 +388,10 @@ reach the server when the connection returns. An edit that clashes with a change
 elsewhere reopens the edit form with the reason; one to a fact deleted elsewhere opens the
 fact form with the edited content, to add it again. See [offline recall](docs/scheduling.md#offline-recall).
 
-**Use Keepsake offline on this device**, in Profile settings, keeps these copies. It applies to every profile on the device. Turning it off removes the copy;
+**Use Keepsake offline on this device**, in Profile settings, keeps these copies. Below it,
+Keepsake shows when the profile's copy was last downloaded, how many of its images and clips
+are on the device, and the storage the browser counts against it. **Download now** fetches
+everything again; **Remove copies** frees the space until the next connected visit. It applies to every profile on the device. Turning it off removes the copy;
 saves still waiting for the server stay until they are sent.
 
 Turn on reminders in Profile settings. On iPhone and iPad this needs iOS 16.4 or later,
