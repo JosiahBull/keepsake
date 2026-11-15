@@ -10,6 +10,7 @@
   import QuestionMedia from "./QuestionMedia.svelte";
   import { fetchPreloaded } from "./preload";
   import {
+    changeCopy,
     markStudied,
     matchingFromCopy,
     pageFromCopy,
@@ -616,6 +617,49 @@
         editFields.answer.trim() !== editBase.answer),
   );
 
+  $effect(() => {
+    // An edit made offline that the server refused: offer it again, with the reason.
+    const refused = saves.refusedEdits.find((edit) =>
+      edit.path.startsWith(`/api/profiles/${profileId}/facts/`),
+    );
+    if (!refused || editing || showAdd) return;
+    saves.refusedEdits = saves.refusedEdits.filter((edit) => edit !== refused);
+    const sent = JSON.parse(refused.body) as { base: Fields; fields: Fields };
+    const complete = (value: Fields) => ({
+      prompt: value.prompt,
+      answer: value.answer,
+      context: value.context ?? "",
+      source: value.source ?? "",
+      tags: value.tags ?? [],
+    });
+    const base = complete(sent.base);
+    const fields = complete(sent.fields);
+    if (refused.status === 404) {
+      // Deleted elsewhere: the edited content can still be added as a new fact.
+      prompt = fields.prompt;
+      answer = fields.answer;
+      context = fields.context;
+      source = fields.source;
+      tags = fields.tags.join(", ");
+      view = "library";
+      showAdd = true;
+      notice = `“${base.prompt}” was deleted elsewhere before your offline edit arrived. Save it here to add it again.`;
+      return;
+    }
+    const id = Number(refused.path.split("/").pop());
+    editing = facts.find((item) => item.id === id) ?? {
+      id,
+      ...base,
+      created_at: "",
+      media: [],
+    };
+    editBase = base;
+    editFields = { ...fields, tags: fields.tags.join(", ") };
+    editConflict = refused.status === 409;
+    editError = `Your offline edit was not saved. ${refused.reason}`;
+    play("alert");
+  });
+
   async function saveEdit(event: SubmitEvent) {
     event.preventDefault();
     const fact = editing;
@@ -623,20 +667,39 @@
     editBusy = true;
     editError = "";
     editConflict = false;
+    const body = { base: editBase, fields: editedFields() };
     try {
-      const { data, error: failure, response } = await api.PATCH("/api/facts/{id}", {
-        params: { path: { id: fact.id } },
-        body: { base: editBase, fields: editedFields() },
-      });
-      if (failure) {
-        editConflict = response.status === 409;
-        throw new Error(failure.error);
+      let saved: Fields;
+      let queued = false;
+      try {
+        const { data, error: failure, response } = await api.PATCH("/api/facts/{id}", {
+          params: { path: { id: fact.id } },
+          body,
+        });
+        if (failure) {
+          editConflict = response.status === 409;
+          throw new Error(failure.error);
+        }
+        saved = fieldsOf(data);
+      } catch (caught) {
+        // Unreachable: show the edit now, and merge it on the server when the connection returns.
+        if (!(caught instanceof TypeError) || !sync.offlineMode) throw caught;
+        await saves.add(
+          `Could not save your edit to “${body.base.prompt}”.`,
+          { method: "PATCH", path: `/api/profiles/${profileId}/facts/${fact.id}`, body },
+          { until: "stored" },
+        );
+        saved = body.fields;
+        queued = true;
+        await changeCopy(profileId, (kept) =>
+          kept.map((item) => (item.id === fact.id ? { ...item, ...saved } : item)),
+        );
       }
-      facts = facts.map((item) => (item.id === fact.id ? { ...item, ...data } : item));
+      facts = facts.map((item) => (item.id === fact.id ? { ...item, ...saved } : item));
       editing = null;
-      notice = "Fact updated.";
+      notice = queued ? "Edit kept on this device. It is saved when you reconnect." : "Fact updated.";
       play("keep");
-      void refreshLibrary(profileId, true);
+      if (!queued) void refreshLibrary(profileId, true);
     } catch (caught) {
       editError = `Could not save your changes. ${message(caught)}`;
       play("alert");
@@ -678,13 +741,26 @@
     deleteBusy = true;
     deleteError = "";
     try {
-      const { error: failure, response } = await api.DELETE(
-        "/api/facts/{id}",
-        { params: { path: { id: fact.id } } },
-      );
-      // A fact already deleted elsewhere, such as from the CLI, is gone either way.
-      if (failure && response.status !== 404) {
-        throw new Error(failure.error);
+      let queued = false;
+      try {
+        const { error: failure, response } = await api.DELETE(
+          "/api/facts/{id}",
+          { params: { path: { id: fact.id } } },
+        );
+        // A fact already deleted elsewhere, such as from the CLI, is gone either way.
+        if (failure && response.status !== 404) {
+          throw new Error(failure.error);
+        }
+      } catch (caught) {
+        // Unreachable: delete it here now, and on the server when the connection returns.
+        if (!(caught instanceof TypeError) || !sync.offlineMode) throw caught;
+        await saves.add(
+          `Could not delete “${fact.prompt}”.`,
+          { method: "DELETE", path: `/api/profiles/${profileId}/facts/${fact.id}` },
+          { until: "stored" },
+        );
+        await changeCopy(profileId, (kept) => kept.filter((item) => item.id !== fact.id));
+        queued = true;
       }
 
       facts = facts.filter((item) => item.id !== fact.id);
@@ -694,7 +770,7 @@
       swiped = null;
       deleting = null;
       notice = "Fact deleted.";
-      void refreshLibrary(profileId, true);
+      if (!queued) void refreshLibrary(profileId, true);
     } catch (caught) {
       deleteError = `Could not delete the fact. ${message(caught)}`;
       play("alert");

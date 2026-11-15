@@ -73,6 +73,8 @@ class Outbox {
   refused = $state<string[]>([]);
   /** Attempts made offline that the server kept without applying, to report once. */
   ignored = $state(0);
+  /** Edits made offline that the server refused, to offer again in the edit form. */
+  refusedEdits = $state<{ path: string; body: string; status: number; reason: string }[]>([]);
   /** Facts added offline that have not reached the server, by profile path and question. */
   queuedFacts = $state<{ path: string; prompt: string }[]>([]);
   #saves: Save[] = [];
@@ -228,6 +230,13 @@ class Outbox {
 
   #refuse(save: Save, error: unknown) {
     const reason = error instanceof Error ? error.message : "";
+    if (save.method === "PATCH" && error instanceof Rejected && save.body !== null) {
+      this.refusedEdits = [
+        ...this.refusedEdits,
+        { path: save.path, body: save.body, status: error.status, reason },
+      ];
+      return;
+    }
     this.refused = [...this.refused, `${save.label} ${reason}`.trim()];
   }
 
@@ -308,6 +317,12 @@ async function send(save: Stored): Promise<unknown> {
       media: save.uploads.map((upload) => ({ media_id: upload.mediaId, alt: upload.alt })),
     });
   }
+  // A fact deleted already, perhaps on another device, is deleted either way.
+  if (save.method === "DELETE")
+    return request(save.path, save.method, body, save.headers ?? {}).catch((error) => {
+      if (error instanceof Rejected && error.status === 404) return undefined;
+      throw error;
+    });
   return request(save.path, save.method, body, {
     ...(body === null ? {} : { "Content-Type": "application/json" }),
     ...save.headers,
