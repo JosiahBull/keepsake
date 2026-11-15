@@ -26,7 +26,7 @@ use axum::{
 };
 use keepsake_mcp::{McpConfig, McpMode};
 use notifications::Notifier;
-use profile_schema::ProfilePaths;
+use profile_schema::{ProfilePaths, ResponseDescriptions};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::{path::Path, sync::Arc};
@@ -167,7 +167,7 @@ async fn health(State(pool): State<SqlitePool>) -> Result<Json<Health>, StatusCo
         agent_access_api::AgentAccess,
         agent_access_api::AgentAccessUpdate
     )),
-    modifiers(&ProfilePaths)
+    modifiers(&ResponseDescriptions, &ProfilePaths)
 )]
 pub struct ApiDoc;
 

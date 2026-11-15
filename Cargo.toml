@@ -15,9 +15,9 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 chrono-tz = "0.10"
 fsrs = "=6.6.2"
 hyper-util = { version = "0.1", features = ["server-auto", "server-graceful", "service", "tokio"] }
-rmcp = { version = "3.5", features = ["server", "macros", "schemars", "transport-streamable-http-server"] }
+rmcp = { version = "3.10", features = ["server", "macros", "schemars", "transport-streamable-http-server"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
-scraper = "0.24"
+scraper = "0.29"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 strum = { version = "0.28", features = ["derive"] }
@@ -27,7 +27,7 @@ tokio-util = { version = "0.7", features = ["rt"] }
 tower-http = { version = "0.7", features = ["fs", "compression-gzip", "catch-panic", "limit"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-utoipa = "5"
+utoipa = "6"
 uuid = { version = "1", features = ["v4"] }
 
 [profile.release]
